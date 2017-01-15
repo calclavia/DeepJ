@@ -1,15 +1,15 @@
 import numpy as np
 from keras.layers import Dense, Input, merge, Activation, Flatten
-from keras.layers.recurrent import LSTM
+from keras.layers.recurrent import GRU
 from music import NUM_CLASSES
 
 
 def rnn_model(timesteps):
     note_input = Input(shape=(timesteps, NUM_CLASSES), name='note_input')
     x = note_input
-    for i in range(2):
-        x = LSTM(64, return_sequences=True, name='lstm' + str(i))(x)
-    x = LSTM(64, name='lstm_last')(x)
+    for i in range(1):
+        x = GRU(64, return_sequences=True, name='lstm' + str(i))(x)
+    x = GRU(64, name='lstm_last')(x)
     return [note_input], x
 
 
