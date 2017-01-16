@@ -6,7 +6,9 @@ TICKS_PER_BEAT = 2
 NUM_NOTES = 128
 
 
-def midi_encode(composition, resolution=TICKS_PER_BEAT):
+def midi_encode(composition,
+                step=DEFAULT_RES // TICKS_PER_BEAT,
+                resolution=TICKS_PER_BEAT):
     """
     Takes a composition array and encodes it into MIDI pattern
     """
@@ -27,7 +29,7 @@ def midi_encode(composition, resolution=TICKS_PER_BEAT):
     # Amount of NOOP ticks
     noop_ticks = 0
 
-    # TODO: Tempo
+    # track.append(midi.SetTempoEvent())
     for tick, data in enumerate(composition):
         data = np.array(data)
 
@@ -41,17 +43,17 @@ def midi_encode(composition, resolution=TICKS_PER_BEAT):
                 if bit > 0:
                     # Was off, but now turned on
                     evt = midi.NoteOnEvent(
-                        tick=tick - last_event_tick,
+                        tick=(tick - last_event_tick) * step,
                         velocity=velocity,
-                        pitch=index
+                        pitch=index[0]
                     )
                     track.append(evt)
                     last_event_tick = tick
                 elif bit < 0:
                     # Was on, but now turned off
                     evt = midi.NoteOffEvent(
-                        tick=tick - last_event_tick,
-                        pitch=index
+                        tick=(tick - last_event_tick) * step,
+                        pitch=index[0]
                     )
                     track.append(evt)
                     last_event_tick = tick
@@ -61,7 +63,7 @@ def midi_encode(composition, resolution=TICKS_PER_BEAT):
         current = data
 
     # Add the end of track event, append it to the track
-    eot = midi.EndOfTrackEvent(tick=noop_ticks - 1)
+    eot = midi.EndOfTrackEvent(tick=noop_ticks)
     track.append(eot)
     return pattern
 
@@ -109,7 +111,7 @@ class TestMIDI(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        pattern = midi_encode(composition)
+        pattern = midi_encode(composition, step=1)
         self.assertEqual(pattern.resolution, 2)
         self.assertEqual(len(pattern), 1)
         track = pattern[0]
@@ -121,9 +123,13 @@ class TestMIDI(unittest.TestCase):
         self.assertIsInstance(off2, midi.NoteOffEvent)
 
         self.assertEqual(on1.tick, 0)
+        self.assertEqual(on1.pitch, 1)
         self.assertEqual(on2.tick, 2)
+        self.assertEqual(on2.pitch, 3)
         self.assertEqual(off1.tick, 2)
+        self.assertEqual(off1.pitch, 1)
         self.assertEqual(off2.tick, 1)
+        self.assertEqual(off2.pitch, 3)
 
     def test_decode(self):
         # Instantiate a MIDI Pattern (contains a list of tracks)
@@ -158,8 +164,15 @@ class TestMIDI(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        new_comp = midi_decode(midi_encode(composition), 4, step=1)
+        new_comp = midi_decode(midi_encode(composition, step=1), 4, step=1)
         np.testing.assert_array_equal(composition, new_comp)
 
 if __name__ == '__main__':
+    """
+    # Test
+    p = midi.read_midifile("out/Melody 001.mid")
+    comp = midi_decode(p, track_index=1, step=1)
+    p = midi_encode(comp, step=1, resolution=96)
+    midi.write_midifile("out/Melody 002.mid", p)
+    """
     unittest.main()
