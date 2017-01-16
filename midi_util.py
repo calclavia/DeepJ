@@ -5,7 +5,6 @@ DEFAULT_RES = 96
 TICKS_PER_BEAT = 2
 NUM_NOTES = 128
 
-
 def midi_encode(composition,
                 step=DEFAULT_RES // TICKS_PER_BEAT,
                 resolution=TICKS_PER_BEAT):
@@ -38,7 +37,7 @@ def midi_encode(composition,
 
             # A bit difference vector.
             diff = data - current
-
+            # TODO: Handle articulate
             for index, bit in np.ndenumerate(diff):
                 if bit > 0:
                     # Was off, but now turned on
