@@ -1,5 +1,7 @@
 import midi
 import numpy as np
+from os import listdir
+from os.path import isfile, join
 
 DEFAULT_RES = 96
 TICKS_PER_BEAT = 2
@@ -94,6 +96,16 @@ def midi_decode(pattern,
             pitch, velocity = event.data
             composition[-1][pitch] = 0
     return composition
+
+
+def load_midi(path='data'):
+    files = [f for f in listdir(path) if isfile(join(path, f))]
+
+    out = []
+    for f in files:
+        p = midi.read_midifile(path + '/' + f)
+        out.append(midi_decode(p))
+    return out
 
 import unittest
 
