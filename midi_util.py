@@ -1,7 +1,12 @@
 import midi
 import numpy as np
 
-def midi_encode(composition, resolution=2):
+DEFAULT_RES = 96
+TICKS_PER_BEAT = 2
+NUM_NOTES = 128
+
+
+def midi_encode(composition, resolution=TICKS_PER_BEAT):
     """
     Takes a composition array and encodes it into MIDI pattern
     """
@@ -18,13 +23,16 @@ def midi_encode(composition, resolution=2):
     # The current pattern being played
     current = np.zeros_like(composition[0])
     # Absolute tick of last event
-    last_event_tick = -1
+    last_event_tick = 0
+    # Amount of NOOP ticks
+    noop_ticks = 0
 
+    # TODO: Tempo
     for tick, data in enumerate(composition):
         data = np.array(data)
+
         if not np.array_equal(current, data):
-            if last_event_tick == -1:
-                last_event_tick = 0
+            noop_ticks = 0
 
             # A bit difference vector.
             diff = data - current
@@ -47,42 +55,44 @@ def midi_encode(composition, resolution=2):
                     )
                     track.append(evt)
                     last_event_tick = tick
+        else:
+            noop_ticks += 1
+
         current = data
 
     # Add the end of track event, append it to the track
-    eot = midi.EndOfTrackEvent(tick=1)
+    eot = midi.EndOfTrackEvent(tick=noop_ticks - 1)
     track.append(eot)
     return pattern
 
 
-def midi_decode(pattern):
+def midi_decode(pattern,
+                classes=NUM_NOTES,
+                track_index=0,
+                step=DEFAULT_RES // TICKS_PER_BEAT):
     """
     Takes a MIDI pattern and decodes it into a composition array.
     """
-    # Extract first pattern
-    # pattern.make_ticks_abs()
-    step = pattern.resolution // TICKS_PER_BEAT
-    track = pattern[1]
-    # A list of notes currently on
-    notes = []
-    composition = []
+    track = pattern[track_index]
+    composition = [np.zeros((classes,))]
 
-    for event in track[1:-1]:
-        # TODO: We only care about one note for now
-        if isinstance(event, midi.NoteOnEvent) and len(notes) == 0:
+    for event in track:
+        # Duplicate the last note pattern to wait for next event
+        for _ in range(event.tick // step):
+            composition.append(np.copy(composition[-1]))
+
+        if isinstance(event, midi.EndOfTrackEvent):
+            break
+
+        # Modify the last note pattern
+        if isinstance(event, midi.NoteOnEvent):
             pitch, velocity = event.data
-            notes.append(pitch)
+            composition[-1][pitch] = 1
 
         if isinstance(event, midi.NoteOffEvent):
             pitch, velocity = event.data
-            if pitch in notes:
-                notes.remove(pitch)
-                # Write to composition
-                composition.append(pitch)  # - MIN_NOTE)
-                composition += [NO_EVENT] * (event.tick // step)
-
-        print(event)
-    print(composition)
+            composition[-1][pitch] = 0
+    return composition
 
 import unittest
 
@@ -116,14 +126,40 @@ class TestMIDI(unittest.TestCase):
         self.assertEqual(off2.tick, 1)
 
     def test_decode(self):
-        raise 'Not impl'
+        # Instantiate a MIDI Pattern (contains a list of tracks)
+        pattern = midi.Pattern(resolution=96)
+        # Instantiate a MIDI Track (contains a list of MIDI events)
+        track = midi.Track()
+        # Append the track to the pattern
+        pattern.append(track)
+
+        track.append(midi.NoteOnEvent(tick=0, velocity=127, pitch=0))
+        track.append(midi.NoteOnEvent(tick=96, velocity=127, pitch=1))
+        track.append(midi.NoteOffEvent(tick=0, velocity=127, pitch=0))
+        track.append(midi.NoteOffEvent(tick=48, velocity=127, pitch=1))
+        track.append(midi.EndOfTrackEvent(tick=1))
+
+        composition = midi_decode(pattern, 4)
+
+        np.testing.assert_array_equal(composition, [
+            [1, 0, 0, 0],
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, 0]
+        ])
+
+    def test_encode_decode(self):
+        composition = [
+            [0, 1, 0, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 0, 1],
+            [0, 0, 0, 1],
+            [0, 0, 0, 0]
+        ]
+
+        new_comp = midi_decode(midi_encode(composition), 4, step=1)
+        np.testing.assert_array_equal(composition, new_comp)
 
 if __name__ == '__main__':
     unittest.main()
-
-"""
-Reference:
-pattern2 = midi.read_midifile("data/Melody 001.mid")
-midi_to_composition(pattern2)
-
-"""
