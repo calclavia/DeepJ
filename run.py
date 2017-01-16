@@ -12,6 +12,7 @@ from util import *
 
 with tf.device('/cpu:0'), tf.Session() as sess:
     env = track(gym.make('music-theory-v0'))
+    env.num_notes = 128
     agent = make_agent()
     agent.load(sess)
     agent.run(sess, env)

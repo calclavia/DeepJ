@@ -9,7 +9,8 @@ def make_agent():
         NUM_CLASSES,
         lambda: rnn_model(time_steps),
         time_steps=time_steps,
-        preprocess=note_preprocess
+        preprocess=note_preprocess,
+        entropy_factor=1e-1
     )
 
 def env_to_midi(env):
