@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 DEFAULT_RES = 96
-TICKS_PER_BEAT = 2
+TICKS_PER_BEAT = 4
 NUM_NOTES = 128
 
 
