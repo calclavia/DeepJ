@@ -12,7 +12,7 @@ prev = deque([np.zeros((NUM_NOTES,))
               for _ in range(time_steps)], maxlen=time_steps)
 composition = []
 
-for i in range(128):
+for i in range(64):
     results = model.predict(np.array([prev]))
     result = results[0]
     # Pick notes probabilistically

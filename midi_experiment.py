@@ -10,7 +10,7 @@ import os
 time_steps = 8
 model_save_file = 'out/model.h5'
 
-compositions = load_midi('data/classical')
+compositions = load_midi('data/mozart_c')
 
 # convert an array of values into a dataset matrix
 
@@ -39,7 +39,7 @@ x = note_input
 
 x = Dropout(0.2)(x)
 # Conv layer
-for i in range(1):
+for i in range(0):
     x = Convolution1D(64, 8, border_mode='same')(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
@@ -66,6 +66,6 @@ model = Model([note_input], x)
 model.compile(optimizer='adam', loss='binary_crossentropy',
               metrics=['accuracy'])
 
-model.fit(data_set, label_set, nb_epoch=1)
+model.fit(data_set, label_set, nb_epoch=40)
 
 model.save(model_save_file)
