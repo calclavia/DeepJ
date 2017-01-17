@@ -3,15 +3,15 @@ from keras.layers import Dense, Input, Activation, Flatten, Dropout, merge
 from keras.layers.recurrent import GRU
 from keras.layers.convolutional import Convolution1D
 from keras.models import Model
-from midi_util import *
 from util import *
+from midi_util import *
 import midi
 import os
 
 time_steps = 8
 model_save_file = 'out/model.h5'
 
-compositions = load_midi('data/edm_c_chords')
+compositions = load_midi('data/edm')
 
 data_set, beat_set, label_set = [], [], []
 
@@ -40,7 +40,7 @@ for i in range(1):
 
 x = merge([x, beat_input], mode='concat')
 
-for i in range(1):
+for i in range(3):
     x = GRU(256, return_sequences=True, name='lstm' + str(i))(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
@@ -49,7 +49,7 @@ x = GRU(256, name='lstm_last')(x)
 x = Activation('relu')(x)
 x = Dropout(0.5)(x)
 
-for i in range(1):
+for i in range(2):
     x = Dense(128, name='dense' + str(i))(x)
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
@@ -62,6 +62,6 @@ model = Model([note_input, beat_input], x)
 model.compile(optimizer='adam', loss='binary_crossentropy',
               metrics=['accuracy'])
 
-model.fit([data_set, beat_set], label_set, nb_epoch=500)
+model.fit([data_set, beat_set], label_set, nb_epoch=400)
 
 model.save(model_save_file)

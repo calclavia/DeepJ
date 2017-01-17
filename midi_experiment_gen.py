@@ -5,7 +5,7 @@ from util import *
 from midi_util import *
 
 time_steps = 8
-BARS = 16
+BARS = 64
 
 model = load_model('out/model.h5')
 
@@ -16,7 +16,7 @@ prev_beats = deque(maxlen=time_steps)
 i = BEATS_PER_BAR - 1
 for _ in range(time_steps):
     prev_notes.append(np.zeros((NUM_NOTES,)))
-    prev_beats.append(one_hot(i, BEATS_PER_BAR))
+    prev_beats.appendleft(one_hot(i, BEATS_PER_BAR))
 
     i -= 1
     if i < 0:
