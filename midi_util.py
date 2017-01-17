@@ -1,14 +1,14 @@
 import midi
 import numpy as np
-from os import listdir
-from os.path import isfile, join
+import os
 
 DEFAULT_RES = 96
 TICKS_PER_BEAT = 2
 NUM_NOTES = 128
 
+
 def midi_encode(composition,
-                step=DEFAULT_RES // TICKS_PER_BEAT,
+                step=1,
                 resolution=TICKS_PER_BEAT):
     """
     Takes a composition array and encodes it into MIDI pattern
@@ -99,12 +99,14 @@ def midi_decode(pattern,
 
 
 def load_midi(path='data'):
-    files = [f for f in listdir(path) if isfile(join(path, f))]
-
     out = []
-    for f in files:
-        p = midi.read_midifile(path + '/' + f)
-        out.append(midi_decode(p))
+
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            fname = os.path.join(root, f)
+            if os.path.isfile(fname):
+                p = midi.read_midifile(fname)
+                out.append(midi_decode(p, track_index=1))
     return out
 
 import unittest
