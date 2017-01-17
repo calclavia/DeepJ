@@ -4,6 +4,7 @@ from keras.layers.recurrent import GRU
 from keras.layers.convolutional import Convolution1D
 from keras.models import Model
 from midi_util import *
+from util import *
 import midi
 import os
 
@@ -11,32 +12,6 @@ time_steps = 8
 model_save_file = 'out/model.h5'
 
 compositions = load_midi('data/edm_c_chords')
-
-BEATS_PER_BAR = TICKS_PER_BEAT * BEATS_PER_BAR
-
-def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
-    """
-    Augment the composition with the beat count in a bar it is in.
-    """
-    beat_patterns = []
-    i = 0
-    for note in composition:
-        beat_pattern = np.zeros((beats_per_bar,))
-        beat_pattern[i] = 1
-        beat_patterns.append(beat_pattern)
-        i = (i + 1) % beats_per_bar
-    return beat_patterns
-
-# convert an array of values into a dataset matrix
-
-
-def create_dataset(data, look_back=1):
-    dataX, dataY = [], []
-    for i in range(len(data) - look_back - 1):
-        a = data[i:(i + look_back)]
-        dataX.append(a)
-        dataY.append(data[i + look_back])
-    return dataX, dataY
 
 data_set, beat_set, label_set = [], [], []
 

@@ -1,8 +1,3 @@
-import sys
-
-# Import modules
-sys.path.append('../gym-music')
-
 import tensorflow as tf
 
 from rl import A3CAgent
