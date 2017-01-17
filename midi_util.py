@@ -4,8 +4,8 @@ import os
 
 DEFAULT_RES = 96
 TICKS_PER_BEAT = 4
+BEATS_PER_BAR = 4
 NUM_NOTES = 128
-
 
 def midi_encode(composition,
                 step=1,
