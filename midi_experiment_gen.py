@@ -5,6 +5,7 @@ from util import *
 from midi_util import *
 
 time_steps = 8
+BARS = 16
 
 model = load_model('out/model.h5')
 
@@ -23,10 +24,10 @@ for _ in range(time_steps):
 
 composition = []
 
-for i in range(256):
+for i in range(BEATS_PER_BAR * BARS):
     results = model.predict([np.array([prev_notes]), np.array([prev_beats])])
     result = results[0]
-    
+
     # Pick notes from probability distribution
     for index, p in enumerate(result):
         if np.random.random() <= p:
