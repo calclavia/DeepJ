@@ -6,12 +6,14 @@ sys.path.append('../gym-music')
 from music import *
 import midi
 from rl import A3CAgent
-from models import *
+from midi_util import *
 
 def make_agent():
-    time_steps = 5
+    from models import note_model, note_preprocess
+    
+    time_steps = 4
     return A3CAgent(
-        lambda: rnn_model(NUM_CLASSES, time_steps),
+        lambda: note_model(NUM_NOTES, time_steps),
         time_steps=time_steps,
         preprocess=note_preprocess,
         entropy_factor=1e-1

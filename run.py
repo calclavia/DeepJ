@@ -1,14 +1,9 @@
-import sys
-
-# Import modules
-sys.path.append('../gym-music')
-
 import tensorflow as tf
 import gym
 
 from rl import A3CAgent, track
-from music import *
 from util import *
+from music import *
 
 with tf.device('/cpu:0'), tf.Session() as sess:
     env = track(gym.make('music-theory-v0'))
