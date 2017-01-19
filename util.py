@@ -10,13 +10,13 @@ from midi_util import *
 
 def make_agent():
     from models import note_model, note_preprocess
-    
+
     time_steps = 4
     return A3CAgent(
         lambda: note_model(NUM_NOTES, time_steps),
         time_steps=time_steps,
         preprocess=note_preprocess,
-        entropy_factor=1e-1
+        entropy_factor=0
     )
 
 def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):

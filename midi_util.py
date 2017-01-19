@@ -40,6 +40,7 @@ def midi_encode(composition,
 
             # A bit difference vector.
             diff = data - current
+
             # TODO: Handle articulate
             for index, bit in np.ndenumerate(diff):
                 if bit > 0:

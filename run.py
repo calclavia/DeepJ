@@ -3,19 +3,15 @@ import gym
 
 from rl import A3CAgent, track
 from util import *
-from music import *
+from midi_util import *
+from music import label_compositions
+import midi
 
 with tf.device('/cpu:0'), tf.Session() as sess:
-    env = track(gym.make('music-theory-v0'))
-    env.num_notes = 128
+    env = track(gym.make('music-v0'))
     agent = make_agent()
     agent.load(sess)
     agent.run(sess, env)
 
-    mf = env_to_midi(env)
-
-    with open('out/output.mid', 'wb') as outf:
-        mf.writeFile(outf)
-
-    print('Composition', env.composition)
     print('Reward', env.total_reward)
+    midi.write_midifile('out/output.mid', midi_encode(env.composition))

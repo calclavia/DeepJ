@@ -11,7 +11,7 @@ def note_model(num_notes, timesteps):
 
     x = note_input
 
-    for i in range(1):
+    for i in range(0):
         x = GRU(256, return_sequences=True, name='lstm' + str(i))(x)
         x = Activation('relu')(x)
 
@@ -23,8 +23,9 @@ def note_model(num_notes, timesteps):
         x = Activation('relu')(x)
 
     # Output layers for policy and value estimations
+    # TODO: Is binary a good idea?
     policies = [
-        Dense(1, activation='sigmoid', name='note' + str(i))(x)
+        Dense(2, activation='softmax', name='note' + str(i))(x)
         for i in range(num_notes)
     ]
     value = Dense(1, activation='linear', name='value_output')(x)
