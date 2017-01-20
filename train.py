@@ -9,4 +9,4 @@ label_compositions += load_midi('data/edm/edm_c')
 
 with tf.device('/cpu:0'):
   agent = make_agent()
-  agent.train('music-clone-v0')
+  agent.train('music-theory-v0')

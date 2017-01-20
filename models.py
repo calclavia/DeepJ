@@ -11,15 +11,15 @@ def note_model(num_notes, timesteps):
 
     x = note_input
 
-    for i in range(0):
-        x = GRU(256, return_sequences=True, name='lstm' + str(i))(x)
+    for i in range(1):
+        x = GRU(128, return_sequences=True, name='lstm' + str(i))(x)
         x = Activation('relu')(x)
 
-    x = GRU(256, name='lstm_last')(x)
+    x = GRU(128, name='lstm_last')(x)
     x = Activation('relu')(x)
 
     for i in range(1):
-        x = Dense(128, name='dense' + str(i))(x)
+        x = Dense(256, name='dense' + str(i))(x)
         x = Activation('relu')(x)
 
     # Output layers for policy and value estimations
@@ -33,4 +33,4 @@ def note_model(num_notes, timesteps):
 
 
 def note_preprocess(env, x):
-    return one_hot(x, NUM_NOTES)
+    return x

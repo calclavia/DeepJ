@@ -15,8 +15,7 @@ def make_agent():
     return A3CAgent(
         lambda: note_model(NUM_NOTES, time_steps),
         time_steps=time_steps,
-        preprocess=note_preprocess,
-        entropy_factor=0
+        preprocess=note_preprocess
     )
 
 def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
