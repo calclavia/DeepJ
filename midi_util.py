@@ -19,7 +19,7 @@ def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
     # Append the track to the pattern
     pattern.append(track)
 
-    track.append(midi.SetTempoEvent(bpm=50))
+    track.append(midi.SetTempoEvent(bpm=40))
 
     velocity = 127
     last_note = None
@@ -45,7 +45,7 @@ def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
 
         if action != NOTE_OFF:
             # A note is played. Turn it on!
-            pitch = MIN_CLASS + MIN_NOTE + action
+            pitch = MIN_NOTE + action - MIN_CLASS
 
             # Turn a note on
             track.append(
