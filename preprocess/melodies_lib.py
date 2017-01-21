@@ -27,7 +27,6 @@ import numpy as np
 
 from . import constants
 from . import events_lib
-from . import midi_io
 from . import sequences_lib
 from . import statistics
 from . import music_pb2
@@ -676,12 +675,12 @@ def extract_melodies(quantized_sequence,
   return melodies, stats.values()
 
 
-def midi_file_to_melody(midi_file, steps_per_quarter=4, qpm=None,
+def midi_file_to_melody(sequence, steps_per_quarter=4, qpm=None,
                         ignore_polyphonic_notes=True):
   """Loads a melody from a MIDI file.
 
   Args:
-    midi_file: Absolute path to MIDI file.
+    sequence: NoteSequence protobuf
     steps_per_quarter: Quantization of Melody. For example, 4 = 16th notes.
     qpm: Tempo in quarters per a minute. If not set, tries to use the first
         tempo of the midi track and defaults to
@@ -691,7 +690,6 @@ def midi_file_to_melody(midi_file, steps_per_quarter=4, qpm=None,
   Returns:
     A Melody object extracted from the MIDI file.
   """
-  sequence = midi_io.midi_file_to_sequence_proto(midi_file)
   if qpm is None:
     if sequence.tempos:
       qpm = sequence.tempos[0].qpm
