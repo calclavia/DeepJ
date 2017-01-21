@@ -17,7 +17,7 @@ def make_agent():
         lambda: note_model(time_steps),
         time_steps=time_steps,
         preprocess=note_preprocess,
-        entropy_factor=0.3
+        entropy_factor=0.1
     )
 
 def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
