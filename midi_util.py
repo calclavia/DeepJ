@@ -1,12 +1,10 @@
 import midi
 import numpy as np
 import os
-from music import NUM_CLASSES, MIN_CLASS
+from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BAR
 
+# MIDI Resolution
 DEFAULT_RES = 96
-TICKS_PER_BEAT = 4
-BEATS_PER_BAR = 4
-BEATS_PER_BAR = TICKS_PER_BEAT * BEATS_PER_BAR
 
 def melody_to_roll():
     """
@@ -16,7 +14,7 @@ def melody_to_roll():
 
 def midi_encode(composition,
                 step=1,
-                resolution=TICKS_PER_BEAT):
+                resolution=NOTES_PER_BAR):
     """
     Takes a composition array and encodes it into MIDI pattern
     """
@@ -80,7 +78,7 @@ def midi_encode(composition,
 def midi_decode(pattern,
                 classes=NUM_CLASSES,
                 track_index=0,
-                step=DEFAULT_RES // TICKS_PER_BEAT):
+                step=DEFAULT_RES // NOTES_PER_BAR):
     """
     Takes a MIDI pattern and decodes it into a composition array.
     """
