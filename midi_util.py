@@ -1,11 +1,11 @@
 import midi
 import numpy as np
 import os
-from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BAR, NOTE_OFF, NO_EVENT
+from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BAR, NOTE_OFF, NO_EVENT, MIN_NOTE
 
 # MIDI Resolution
 DEFAULT_RES = 96
-
+MIDI_MAX_NOTES = 128
 
 def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
     """
@@ -45,7 +45,7 @@ def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
 
         if action != NOTE_OFF:
             # A note is played. Turn it on!
-            pitch = MIN_CLASS + action
+            pitch = MIN_CLASS + MIN_NOTE + action
 
             # Turn a note on
             track.append(
@@ -128,7 +128,7 @@ def midi_encode(composition,
 
 
 def midi_decode(pattern,
-                classes=NUM_CLASSES,
+                classes=MIDI_MAX_NOTES,
                 track_index=0,
                 step=DEFAULT_RES // NOTES_PER_BAR):
     """
