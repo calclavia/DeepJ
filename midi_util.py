@@ -1,16 +1,68 @@
 import midi
 import numpy as np
 import os
-from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BAR
+from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BAR, NOTE_OFF, NO_EVENT
 
 # MIDI Resolution
 DEFAULT_RES = 96
 
-def melody_to_roll():
+
+def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
     """
     Converts a sequence of melodies to a piano roll
     """
-    pass
+    # Instantiate a MIDI Pattern (contains a list of tracks)
+    pattern = midi.Pattern()
+    pattern.resolution = resolution
+    # Instantiate a MIDI Track (contains a list of MIDI events)
+    track = midi.Track()
+    # Append the track to the pattern
+    pattern.append(track)
+
+    track.append(midi.SetTempoEvent(bpm=50))
+
+    velocity = 127
+    last_note = None
+    last_event = 0
+    noop_ticks = 0
+
+    for i, action in enumerate(melody):
+        if action == NO_EVENT:
+            noop_ticks += 1
+            continue
+
+        noop_ticks = 0
+
+        # If a note is currently being played, turn it off
+        if last_note != None:
+            track.append(
+                midi.NoteOffEvent(
+                    tick=(i - last_event) * step,
+                    pitch=last_note
+                )
+            )
+            last_event = i
+
+        if action != NOTE_OFF:
+            # A note is played. Turn it on!
+            pitch = MIN_CLASS + action
+
+            # Turn a note on
+            track.append(
+                midi.NoteOnEvent(
+                    tick=(i - last_event) * step,
+                    velocity=velocity,
+                    pitch=pitch
+                )
+            )
+            last_note = pitch
+            last_event = i
+
+    # Add the end of track event, append it to the track
+    eot = midi.EndOfTrackEvent(tick=0)
+    track.append(eot)
+
+    return pattern
 
 def midi_encode(composition,
                 step=1,
