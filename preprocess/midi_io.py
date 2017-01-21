@@ -29,8 +29,8 @@ import tempfile
 import pretty_midi
 import tensorflow as tf
 
-import constants
-import music_pb2
+from . import constants
+from . import music_pb2
 # pylint: enable=g-import-not-at-top
 
 
@@ -71,7 +71,7 @@ def midi_to_sequence_proto(midi_data):
     midi = midi_data
   else:
     try:
-      midi = pretty_midi.PrettyMIDI(StringIO(midi_data))
+      midi = pretty_midi.PrettyMIDI(midi_data)
     except:
       raise MIDIConversionError('Midi decoding error %s: %s' %
                                 (sys.exc_info()[0], sys.exc_info()[1]))
@@ -140,7 +140,7 @@ def midi_to_sequence_proto(midi_data):
   for program, instrument, is_drum, midi_note in midi_notes:
     note = sequence.notes.add()
     note.instrument = instrument
-    note.program = program
+    note.program = int(program)
     note.start_time = midi_note.start
     note.end_time = midi_note.end
     note.pitch = midi_note.pitch
@@ -150,7 +150,7 @@ def midi_to_sequence_proto(midi_data):
   for program, instrument, is_drum, midi_pitch_bend in midi_pitch_bends:
     pitch_bend = sequence.pitch_bends.add()
     pitch_bend.instrument = instrument
-    pitch_bend.program = program
+    pitch_bend.program = int(program)
     pitch_bend.time = midi_pitch_bend.time
     pitch_bend.bend = midi_pitch_bend.pitch
     pitch_bend.is_drum = is_drum
@@ -158,7 +158,7 @@ def midi_to_sequence_proto(midi_data):
   for program, instrument, is_drum, midi_control_change in midi_control_changes:
     control_change = sequence.control_changes.add()
     control_change.instrument = instrument
-    control_change.program = program
+    control_change.program = int(program)
     control_change.time = midi_control_change.time
     control_change.control_number = midi_control_change.number
     control_change.control_value = midi_control_change.value
@@ -257,24 +257,6 @@ def sequence_proto_to_pretty_midi(sequence):
         (instr_id, prog_id, is_drum)]['controls']
 
   return pm
-
-
-def midi_file_to_sequence_proto(midi_file):
-  """Converts MIDI file to a tensorflow.magenta.NoteSequence proto.
-
-  Args:
-    midi_file: A string path to a MIDI file.
-
-  Returns:
-    A tensorflow.magenta.Sequence proto.
-
-  Raises:
-    MIDIConversionError: Invalid midi_file.
-  """
-  with tf.gfile.Open(midi_file, 'r') as f:
-    midi_as_string = f.read()
-    return midi_to_sequence_proto(midi_as_string)
-
 
 def sequence_proto_to_midi_file(sequence, output_file):
   """Convert tensorflow.magenta.NoteSequence proto to a MIDI file on disk.
