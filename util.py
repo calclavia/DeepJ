@@ -1,52 +1,48 @@
+import sys
+
+# Import modules
+sys.path.append('../gym-music')
+
 from music import *
-from midiutil.MidiFile import MIDIFile
+import midi
 from rl import A3CAgent
-from models import *
+from midi_util import *
 
 def make_agent():
-    time_steps = 5
+    from models import note_model, note_preprocess
+
+    time_steps = 8
+
     return A3CAgent(
-        NUM_CLASSES,
-        lambda: rnn_model(time_steps),
+        lambda: note_model(time_steps),
         time_steps=time_steps,
-        preprocess=note_preprocess
+        preprocess=note_preprocess,
+        entropy_factor=0.1
     )
 
-def env_to_midi(env):
+def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
     """
-    Takes a composition environment and converts it to MIDI note array
+    Augment the composition with the beat count in a bar it is in.
     """
-    track = 0
-    channel = 0
-    # In beats
-    time = 0
-    # In BPM
-    tempo = 120 * BEATS_PER_BAR / 4
-    # 0-127, as per the MIDI standard
-    volume = 127
-
-    # One track, defaults to format 1 (tempo track automatically created)
-    mf = MIDIFile(1)
-    mf.addTempo(track, time, tempo)
-
+    beat_patterns = []
     i = 0
-    while i < len(env.composition):
-        action = env.composition[i]
-        if action != NO_EVENT and action != NOTE_OFF:
-            pitch = MIN_NOTE + action
+    for note in composition:
+        beat_pattern = np.zeros((beats_per_bar,))
+        beat_pattern[i] = 1
+        beat_patterns.append(beat_pattern)
+        i = (i + 1) % beats_per_bar
+    return beat_patterns
 
-            # Compute the duration in beats by checking forward
-            duration = 1
+# convert an array of values into a dataset matrix
+def create_dataset(data, look_back=1):
+    dataX, dataY = [], []
+    for i in range(len(data) - look_back - 1):
+        a = data[i:(i + look_back)]
+        dataX.append(a)
+        dataY.append(data[i + look_back])
+    return dataX, dataY
 
-            j = i + 1
-            while j < len(env.composition) and env.composition[j] == NO_EVENT:
-                duration += 1
-                j += 1
-
-            print(time, pitch, duration)
-            mf.addNote(track, channel, pitch, time, duration, volume)
-
-        time = time + 1
-        i += 1
-
-    return mf
+def one_hot(i, nb_classes):
+    arr = np.zeros((nb_classes,))
+    arr[i] = 1
+    return arr
