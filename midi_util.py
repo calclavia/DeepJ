@@ -1,25 +1,29 @@
 import midi
 import numpy as np
 import os
-from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BAR, NOTE_OFF, NO_EVENT, MIN_NOTE
+from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BEAT, NOTE_OFF, NO_EVENT, MIN_NOTE
 
 # MIDI Resolution
 DEFAULT_RES = 96
 MIDI_MAX_NOTES = 128
 
-def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
+
+def midi_encode_melody(melody,
+                       resolution=DEFAULT_RES,
+                       step=DEFAULT_RES // NOTES_PER_BEAT):
     """
     Converts a sequence of melodies to a piano roll
     """
     # Instantiate a MIDI Pattern (contains a list of tracks)
     pattern = midi.Pattern()
+    # Resolution is in pulses per quarter note
     pattern.resolution = resolution
     # Instantiate a MIDI Track (contains a list of MIDI events)
     track = midi.Track()
     # Append the track to the pattern
     pattern.append(track)
 
-    track.append(midi.SetTempoEvent(bpm=40))
+    # track.append(midi.SetTempoEvent(bpm=40))
 
     velocity = 127
     last_note = None
@@ -64,9 +68,10 @@ def midi_encode_melody(melody, resolution=NOTES_PER_BAR, step=1):
 
     return pattern
 
+
 def midi_encode(composition,
-                step=1,
-                resolution=NOTES_PER_BAR):
+                resolution=DEFAULT_RES,
+                step=DEFAULT_RES // NOTES_PER_BEAT):
     """
     Takes a composition array and encodes it into MIDI pattern
     """
@@ -130,7 +135,7 @@ def midi_encode(composition,
 def midi_decode(pattern,
                 classes=MIDI_MAX_NOTES,
                 track_index=0,
-                step=DEFAULT_RES // NOTES_PER_BAR):
+                step=DEFAULT_RES // NOTES_PER_BEAT):
     """
     Takes a MIDI pattern and decodes it into a composition array.
     """
