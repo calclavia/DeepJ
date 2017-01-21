@@ -1,12 +1,18 @@
 import midi
 import numpy as np
 import os
+from music import NUM_CLASSES, MIN_CLASS
 
 DEFAULT_RES = 96
 TICKS_PER_BEAT = 4
 BEATS_PER_BAR = 4
-NUM_NOTES = 128
 BEATS_PER_BAR = TICKS_PER_BEAT * BEATS_PER_BAR
+
+def melody_to_roll():
+    """
+    Converts a sequence of melodies to a piano roll
+    """
+    pass
 
 def midi_encode(composition,
                 step=1,
@@ -72,7 +78,7 @@ def midi_encode(composition,
 
 
 def midi_decode(pattern,
-                classes=NUM_NOTES,
+                classes=NUM_CLASSES,
                 track_index=0,
                 step=DEFAULT_RES // TICKS_PER_BEAT):
     """
