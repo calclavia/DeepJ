@@ -7,6 +7,7 @@ from music import *
 import midi
 from rl import A3CAgent
 from midi_util import *
+from preprocess import midi_io, melodies_lib
 
 def make_agent():
     from models import note_model, note_preprocess
@@ -46,3 +47,15 @@ def one_hot(i, nb_classes):
     arr = np.zeros((nb_classes,))
     arr[i] = 1
     return arr
+
+def load_melodies(path='data'):
+    out = []
+
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            fname = os.path.join(root, f)
+            if os.path.isfile(fname):
+                seq_pb = midi_io.midi_to_sequence_proto(fname)
+                melody = melodies_lib.midi_file_to_melody(seq_pb)
+                out.append([x + MIN_CLASS for x in melody])
+    return out
