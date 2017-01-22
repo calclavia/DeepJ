@@ -6,9 +6,12 @@ from music import target_compositions, NOTES_PER_BAR
 
 # Agent imports
 import gym
+import random
 from rl import discount, make_summary
 
 target_compositions += load_melodies('data/edm/edm_c')
+
+batch_cache = {}
 
 # Build custom cloning agent
 
@@ -20,36 +23,36 @@ class CloneAgentRunner(ACAgentRunner):
             print("Pre-processing CloneAgentRunner...")
             episode_count = 0
 
-            # TODO: Randomize
-            targets = target_compositions[0]
+            def build_cache(targets):
+                # Prebuild state input batches because we're cloning
+                # A list of minibatches of input data.
+                minibatches = [[[] for _ in self.model.model.inputs]]
 
-            # Prebuild state input batches because we're cloning
-            # A list of minibatches of input data.
-            minibatches = [[[] for _ in self.model.model.inputs]]
-
-            # Initialize first state
-            state = self.preprocess(None, (targets[0], 0))
-            self.memory.reset(state)
-
-            # Bookkeeping
-            for i, state in enumerate(self.memory.to_states()):
-                minibatches[-1][i].append(state)
-
-            for t_index, target in enumerate(targets):
-                # Exclude first and last targets
-                if t_index == 0 and t_index < len(targets) - 2:
-                    continue
-                # Simulate state transition
-                # TODO: Refactor so we don't need to pass env.
-                state = self.preprocess(None, (target, i % NOTES_PER_BAR))
-                self.memory.remember(state)
+                # Initialize first state
+                state = self.preprocess(None, (targets[0], 0))
+                self.memory.reset(state)
 
                 # Bookkeeping
                 for i, state in enumerate(self.memory.to_states()):
                     minibatches[-1][i].append(state)
 
-                if t_index % self.batch_size == 0:
-                    minibatches.append([[] for _ in self.model.model.inputs])
+                for t_index, target in enumerate(targets):
+                    # Exclude first and last targets
+                    if t_index == 0 and t_index < len(targets) - 2:
+                        continue
+                    # Simulate state transition
+                    # TODO: Refactor so we don't need to pass env.
+                    state = self.preprocess(None, (target, i % NOTES_PER_BAR))
+                    self.memory.remember(state)
+
+                    # Bookkeeping
+                    for i, state in enumerate(self.memory.to_states()):
+                        minibatches[-1][i].append(state)
+
+                    if t_index % self.batch_size == 0:
+                        minibatches.append([[]
+                                            for _ in self.model.model.inputs])
+                return minibatches
 
             # Reset per-episode vars
             terminal = False
@@ -57,6 +60,12 @@ class CloneAgentRunner(ACAgentRunner):
             step_count = 0
             # Index of current minibatch
             b_index = 0
+            # Reset composition
+            comp_id = random.randint(0, len(target_compositions) - 1)
+            targets = target_compositions[comp_id]
+            if comp_id not in batch_cache:
+                batch_cache[comp_id] = build_cache(targets)
+            minibatches = batch_cache[comp_id]
 
             print("Training CloneAgentRunner...")
 
@@ -154,6 +163,12 @@ class CloneAgentRunner(ACAgentRunner):
                     step_count = 0
                     # Index of current minibatch
                     b_index = 0
+                    # Reset composition
+                    comp_id = random.randint(0, len(target_compositions) - 1)
+                    targets = target_compositions[comp_id]
+                    if comp_id not in batch_cache:
+                        batch_cache[comp_id] = build_cache(targets)
+                    minibatches = batch_cache[comp_id]
 
         except Exception as e:
             # Report exceptions to the coordinator.
@@ -161,6 +176,7 @@ class CloneAgentRunner(ACAgentRunner):
 
 with tf.Session() as sess, tf.device('/cpu:0'):
     agent = make_agent()
+    agent.agents = [] # TODO
     agent.add_agent(CloneAgentRunner)
 
     try:
