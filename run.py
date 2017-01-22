@@ -12,6 +12,6 @@ with tf.device('/cpu:0'), tf.Session() as sess:
     agent = make_agent()
     agent.load(sess)
     agent.run(sess, env)
-    
+    print('Composition', env.composition)
     mf = midi_encode_melody(env.composition)
     midi.write_midifile('out/output.mid', mf)

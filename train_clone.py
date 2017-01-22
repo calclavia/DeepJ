@@ -66,6 +66,7 @@ class CloneAgentRunner(ACAgentRunner):
             if comp_id not in batch_cache:
                 batch_cache[comp_id] = build_cache(targets)
             minibatches = batch_cache[comp_id]
+            reward_amount = 1#1. / (len(targets) - 1)
 
             print("Training CloneAgentRunner...")
 
@@ -87,7 +88,7 @@ class CloneAgentRunner(ACAgentRunner):
                 # Compute rewards
                 target_index = b_index * self.batch_size
                 # TODO: Scale the reward
-                rewards = [1 if a[0] == targets[target_index + i + 1]
+                rewards = [reward_amount if a[0] == targets[target_index + i + 1]
                            else 0 for i, a in enumerate(actions)]
 
                 b_index += 1
@@ -169,6 +170,7 @@ class CloneAgentRunner(ACAgentRunner):
                     if comp_id not in batch_cache:
                         batch_cache[comp_id] = build_cache(targets)
                     minibatches = batch_cache[comp_id]
+                    reward_amount = 1#1. / (len(targets) - 1)
 
         except Exception as e:
             # Report exceptions to the coordinator.
@@ -176,7 +178,6 @@ class CloneAgentRunner(ACAgentRunner):
 
 with tf.Session() as sess, tf.device('/cpu:0'):
     agent = make_agent()
-    agent.agents = [] # TODO
     agent.add_agent(CloneAgentRunner)
 
     try:
@@ -186,4 +187,4 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         print('Starting new session')
 
     agent.compile(sess)
-    agent.train(sess, 'music-clone-v0').join()
+    agent.train(sess, 'music-theory-v0').join()
