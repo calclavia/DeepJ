@@ -18,7 +18,7 @@ def make_agent():
         lambda: note_model(time_steps),
         time_steps=time_steps,
         preprocess=note_preprocess,
-        entropy_factor=0.1
+        entropy_factor=1e-2
     )
 
 def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
@@ -48,6 +48,15 @@ def one_hot(i, nb_classes):
     arr[i] = 1
     return arr
 
+def process_melody(melody):
+    res = []
+    for x in melody:
+        if x >= 0:
+            res.append(x - MIN_NOTE)
+        else:
+            res.append(abs(x) - 1)
+    return res
+
 def load_melodies(path='data'):
     out = []
 
@@ -57,5 +66,6 @@ def load_melodies(path='data'):
             if os.path.isfile(fname):
                 seq_pb = midi_io.midi_to_sequence_proto(fname)
                 melody = melodies_lib.midi_file_to_melody(seq_pb)
-                out.append([x + MIN_CLASS for x in melody])
+                # Pre-process melody
+                out.append(process_melody(melody))
     return out

@@ -12,7 +12,7 @@ def note_model(timesteps):
 
     x = merge([note_input, beat_input], mode='concat')
 
-    for i in range(2):
+    for i in range(1):
         x = GRU(128, return_sequences=True, name='lstm' + str(i))(x)
         x = Activation('relu')(x)
 

@@ -2,10 +2,10 @@ import tensorflow as tf
 
 from rl import A3CAgent
 from util import *
-from music import label_compositions
+from music import target_compositions
 
-label_compositions += load_melodies('data/edm/edm_c')
+target_compositions += load_melodies('data/edm/edm_c')
 
 with tf.device('/cpu:0'):
   agent = make_agent()
-  agent.train('music-clone-v0')
+  agent.train('music-clone-v0', num_workers=5)
