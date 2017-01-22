@@ -2,28 +2,26 @@ import tensorflow as tf
 
 from rl import A3CAgent, ACAgentRunner
 from util import *
-from music import target_compositions, NOTES_PER_BAR
+from music import NOTES_PER_BAR
 
 # Agent imports
 import gym
 import random
 from rl import discount, make_summary
 
-target_compositions += load_melodies('data/edm/edm_c')
+target_compositions = load_melodies('data/edm/edm_c')
 
-batch_cache = {}
 
 # Build custom cloning agent
-
-
 class CloneAgentRunner(ACAgentRunner):
 
     def train(self, sess, coord, env_name, writer, gamma):
         try:
             print("Pre-processing CloneAgentRunner...")
             episode_count = 0
+            self.batch_cache = {}
 
-            def build_cache(targets):
+            def build_minibatch(targets):
                 # Prebuild state input batches because we're cloning
                 # A list of minibatches of input data.
                 minibatches = [[[] for _ in self.model.model.inputs]]
@@ -50,8 +48,7 @@ class CloneAgentRunner(ACAgentRunner):
                         minibatches[-1][i].append(state)
 
                     if t_index % self.batch_size == 0:
-                        minibatches.append([[]
-                                            for _ in self.model.model.inputs])
+                        minibatches.append([[] for _ in self.model.model.inputs])
                 return minibatches
 
             # Reset per-episode vars
@@ -63,9 +60,10 @@ class CloneAgentRunner(ACAgentRunner):
             # Reset composition
             comp_id = random.randint(0, len(target_compositions) - 1)
             targets = target_compositions[comp_id]
-            if comp_id not in batch_cache:
-                batch_cache[comp_id] = build_cache(targets)
-            minibatches = batch_cache[comp_id]
+            if comp_id not in self.batch_cache:
+                self.batch_cache[comp_id] = build_minibatch(targets)
+            minibatches = self.batch_cache[comp_id]
+            #minibatches = build_minibatch(targets)
             reward_amount = 1#1. / (len(targets) - 1)
 
             print("Training CloneAgentRunner...")
@@ -88,9 +86,12 @@ class CloneAgentRunner(ACAgentRunner):
                 # Compute rewards
                 target_index = b_index * self.batch_size
                 # TODO: Scale the reward
+                # if len(actions) > len(targets[target_index + 1:]):
+                #    print('FAIL', len(actions), len(targets), target_index + 1, targets[target_index + 1:])
                 rewards = [reward_amount if a[0] == targets[target_index + i + 1]
                            else 0 for i, a in enumerate(actions)]
-
+                print(actions, targets, rewards)
+                raise 'e'
                 b_index += 1
                 terminal = b_index >= len(minibatches)
                 total_reward += sum(rewards)
@@ -167,17 +168,20 @@ class CloneAgentRunner(ACAgentRunner):
                     # Reset composition
                     comp_id = random.randint(0, len(target_compositions) - 1)
                     targets = target_compositions[comp_id]
-                    if comp_id not in batch_cache:
-                        batch_cache[comp_id] = build_cache(targets)
-                    minibatches = batch_cache[comp_id]
+                    if comp_id not in self.batch_cache:
+                        self.batch_cache[comp_id] = build_minibatch(targets)
+                    minibatches = self.batch_cache[comp_id]
+                    #minibatches = build_minibatch(targets)
                     reward_amount = 1#1. / (len(targets) - 1)
 
         except Exception as e:
+            print('Agent error', e)
             # Report exceptions to the coordinator.
             coord.request_stop(e)
 
 with tf.Session() as sess, tf.device('/cpu:0'):
     agent = make_agent()
+    agent.agents = []
     agent.add_agent(CloneAgentRunner)
 
     try:
