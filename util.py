@@ -16,6 +16,7 @@ def make_agent():
 
     return A3CAgent(
         lambda: note_model(time_steps),
+        num_workers=multiprocessing.cpu_count() - 1,
         time_steps=time_steps,
         preprocess=note_preprocess,
         entropy_factor=1e-2

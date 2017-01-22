@@ -161,8 +161,6 @@ class CloneAgentRunner(ACAgentRunner):
 
 with tf.Session() as sess, tf.device('/cpu:0'):
     agent = make_agent()
-    # TODO: Remove
-    agent.agents = []
     agent.add_agent(CloneAgentRunner)
 
     try:
