@@ -1,8 +1,3 @@
-import sys
-
-# Import modules
-sys.path.append('../gym-music')
-
 from music import *
 import midi
 from rl import A3CAgent

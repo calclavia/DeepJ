@@ -1,3 +1,5 @@
+# Defines the models used in the experiments
+
 import numpy as np
 from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten
 from keras.models import Model
@@ -40,11 +42,13 @@ def supervised_model(time_steps):
     x = note_input
 
     x = Dropout(0.2)(x)
+    """
     # Conv layer
     for i in range(0):
         x = Convolution1D(64, 8, border_mode='same')(x)
         x = Activation('relu')(x)
         x = Dropout(0.5)(x)
+    """
 
     x = merge([x, beat_input], mode='concat')
 
