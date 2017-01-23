@@ -64,9 +64,9 @@ def supervised_model(time_steps):
 
     # Multi-label
     x = Dense(NUM_CLASSES)(x)
-    x = Activation('sigmoid')(x)
+    x = Activation('softmax')(x)
 
     model = Model([note_input, beat_input], x)
-    model.compile(optimizer='adam', loss='binary_crossentropy',
+    model.compile(optimizer='adam', loss='categorical_crossentropy',
                   metrics=['accuracy'])
     return model
