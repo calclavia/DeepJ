@@ -52,13 +52,13 @@ class MusicTunerEnv(MusicTheoryEnv):
         with g_rnn.as_default():
             s = [np.array([s_i]) for s_i in self.memory.to_states()]
             predictions = supervised_model.predict(s)[0]
-            prob = predictions[action]
+            prob = np.log(np.clip(predictions[action], 1e-20, 1))
 
         # Compute music theory rewards
         state, reward, done, info = super()._step(action)
 
         # Total reward = log(P(a | s)) + r_TM * c
-        reward = np.log(prob) + reward * self.theory_scalar
+        reward = prob + reward * self.theory_scalar
 
         self.memory.remember(self.preprocess(self, state))
         return state, reward, done, info
