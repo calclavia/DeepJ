@@ -1,6 +1,7 @@
 """
 A simple example to run the A3C algorithm on a toy example.
 """
+# TODO: Move to RL lib
 import gym
 import tensorflow as tf
 from rl import A3CAgent

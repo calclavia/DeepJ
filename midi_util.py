@@ -1,3 +1,4 @@
+# TODO: We don't need this anymore...
 import midi
 import numpy as np
 import os

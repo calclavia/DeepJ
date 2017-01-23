@@ -14,4 +14,4 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         print('Starting new session')
 
     agent.compile(sess)
-    agent.train(sess, 'music-theory-v0').join()
+    agent.train(sess, 'music-tuner-v0').join()
