@@ -3,9 +3,10 @@ from collections import deque
 from keras.models import load_model
 from util import *
 from midi_util import *
+from music import NUM_CLASSES, NOTES_PER_BAR
 
 time_steps = 8
-BARS = 64
+BARS = 8
 
 model = load_model('out/model.h5')
 
@@ -13,31 +14,26 @@ model = load_model('out/model.h5')
 prev_notes = deque(maxlen=time_steps)
 prev_beats = deque(maxlen=time_steps)
 
-i = BEATS_PER_BAR - 1
+i = NOTES_PER_BAR - 1
 for _ in range(time_steps):
-    prev_notes.append(np.zeros((NUM_NOTES,)))
-    prev_beats.appendleft(one_hot(i, BEATS_PER_BAR))
+    prev_notes.append(np.zeros((NUM_CLASSES,)))
+    prev_beats.appendleft(one_hot(i, NOTES_PER_BAR))
 
     i -= 1
     if i < 0:
-        i = BEATS_PER_BAR
+        i = NOTES_PER_BAR
 
 composition = []
 
-for i in range(BEATS_PER_BAR * BARS):
+for i in range(NOTES_PER_BAR * BARS):
     results = model.predict([np.array([prev_notes]), np.array([prev_beats])])
-    result = results[0]
+    prob_dist = results[0]
+    note = np.random.choice(len(prob_dist), p=prob_dist)
 
-    # Pick notes from probability distribution
-    for index, p in enumerate(result):
-        if np.random.random() <= p:
-            result[index] = 1
-        else:
-            result[index] = 0
-
+    result = one_hot(note, NUM_CLASSES)
     prev_notes.append(result)
-    prev_beats.append(one_hot(i % BEATS_PER_BAR, BEATS_PER_BAR))
-    composition.append(result)
+    prev_beats.append(one_hot(i % NOTES_PER_BAR, NOTES_PER_BAR))
+    composition.append(note)
 
-mf = midi_encode(composition)
+mf = midi_encode_melody(composition)
 midi.write_midifile('out/output.mid', mf)

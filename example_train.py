@@ -18,6 +18,7 @@ def make_model():
     value = Dense(1, activation='linear')(x)
     return Model([i], [policy, value])
 
-with tf.device('/cpu:0'):
-    agent = A3CAgent(make_model, entropy_factor=0)
-    agent.train(env_name)
+with tf.Session() as sess, tf.device('/cpu:0'):
+    agent = A3CAgent(make_model)
+    agent.compile(sess)
+    agent.train(sess, 'CartPole-v0').join()

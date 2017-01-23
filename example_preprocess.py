@@ -2,7 +2,7 @@ from preprocess import midi_io
 from preprocess import melodies_lib
 
 # Test midi load and save
-seq_pb = midi_io.midi_to_sequence_proto('data/edm/edm_c/rc_3.mid')
+seq_pb = midi_io.midi_to_sequence_proto('data/other/Sweet Home Alabama.1.mid')
 midi_io.sequence_proto_to_midi(seq_pb).write('out/rw_pb.mid')
 
 # Extract melody
