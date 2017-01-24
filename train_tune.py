@@ -1,10 +1,17 @@
 # Trains an agent purely on music theory
 import tensorflow as tf
+from keras.models import load_model
 
 from rl import A3CAgent
 from util import *
+from music import MusicTunerEnv
+from models import note_preprocess
 
-with tf.Session() as sess, tf.device('/cpu:0'):
+g_rnn = tf.Graph()
+with g_rnn.as_default():
+    supervised_model = load_model('data/supervised.h5')
+
+with tf.Session(allow_soft_placement=True) as sess, tf.device('/cpu:0'):
     agent = make_agent()
 
     try:
@@ -14,4 +21,10 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         print('Starting new session')
 
     agent.compile(sess)
-    agent.train(sess, 'music-tuner-v0').join()
+    model_builder = lambda: MusicTunerEnv(
+        g_rnn,
+        supervised_model,
+        preprocess=note_preprocess
+    )
+
+    agent.train(sess, model_builder).join()

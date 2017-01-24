@@ -1,6 +1,7 @@
 import numpy as np
 import midi
 import os
+import tensorflow as tf
 from util import *
 from models import supervised_model
 from music import NUM_CLASSES, NOTES_PER_BAR
@@ -25,6 +26,6 @@ beat_set = np.array(beat_set)
 
 model = supervised_model(time_steps)
 
-model.fit([data_set, beat_set], label_set, nb_epoch=1000)
+model.fit([data_set, beat_set], label_set, nb_epoch=100)
 
 model.save(model_save_file)

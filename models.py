@@ -52,7 +52,7 @@ def supervised_model(time_steps):
 
     x = merge([x, beat_input], mode='concat')
 
-    for i in range(2):
+    for i in range(1):
         x = GRU(256, return_sequences=True, name='lstm' + str(i))(x)
         x = Activation('relu')(x)
         x = Dropout(0.5)(x)
@@ -61,14 +61,13 @@ def supervised_model(time_steps):
     x = Activation('relu')(x)
     x = Dropout(0.5)(x)
 
-    for i in range(2):
+    for i in range(1):
         x = Dense(256, name='dense' + str(i))(x)
         x = Activation('relu')(x)
         x = Dropout(0.5)(x)
 
     # Multi-label
     x = Dense(NUM_CLASSES)(x)
-    x = Activation('softmax')(x)
 
     model = Model([note_input, beat_input], x)
     model.compile(optimizer='adam', loss='categorical_crossentropy',

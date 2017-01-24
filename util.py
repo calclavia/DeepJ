@@ -14,7 +14,7 @@ def make_agent():
         num_workers=3,
         time_steps=time_steps,
         preprocess=note_preprocess,
-        entropy_factor=1e-1
+        entropy_factor=0.05
     )
 
 def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
