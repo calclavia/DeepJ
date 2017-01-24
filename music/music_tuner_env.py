@@ -9,10 +9,9 @@ from keras.models import load_model
 from keras import backend as K
 import tensorflow as tf
 
-# Separate the graph!
+# TODO: Don't hardcode this
 g_rnn = tf.Graph()
 with g_rnn.as_default():
-    # TODO: Don't hardcode this
     supervised_model = load_model('data/supervised.h5')
 
 # TODO: Don't copy this... Hacks.
@@ -25,7 +24,6 @@ def one_hot(i, nb_classes):
     arr[i] = 1
     return arr
 
-
 class MusicTunerEnv(MusicTheoryEnv):
     """
     Music environment that combines tuning rewards and theory rewards
@@ -33,32 +31,34 @@ class MusicTunerEnv(MusicTheoryEnv):
     """
     def __init__(self, theory_scalar=1):
         super().__init__()
+        # Separate the graph!
+        self.g_rnn = g_rnn
+        self.supervised_model = supervised_model
+
         self.theory_scalar = theory_scalar
+        self.time_steps = 8
+        self.memory = Memory(self.time_steps)
 
     def _reset(self):
         state = super()._reset()
         # TODO: Don't hardcode!
         self.preprocess = note_preprocess
-        self.time_steps = 8
-        self.memory = Memory(self.time_steps)
         self.memory.reset(self.preprocess(self, state))
         return state
 
     def _step(self, action):
-        # TODO: Avoid globals!
-        global supervised_model
-
         # Ask the Melody RNN to make a prediction
-        with g_rnn.as_default():
+        with self.g_rnn.as_default():
             s = [np.array([s_i]) for s_i in self.memory.to_states()]
-            predictions = supervised_model.predict(s)[0]
-            prob = np.log(np.clip(predictions[action], 1e-20, 1))
+            predictions = self.supervised_model.predict(s)[0]
+            norm_constant = np.log(np.sum(np.exp(predictions)))
+            prob = predictions[action] - norm_constant #np.log(np.clip(predictions[action], 1e-20, 1))
 
         # Compute music theory rewards
         state, reward, done, info = super()._step(action)
 
         # Total reward = log(P(a | s)) + r_TM * c
-        reward = prob + reward * self.theory_scalar
+        reward = prob #+ reward * self.theory_scalar
 
         self.memory.remember(self.preprocess(self, state))
         return state, reward, done, info

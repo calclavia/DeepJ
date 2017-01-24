@@ -3,7 +3,7 @@ from .music_env import *
 from .music_theory_env import *
 from .music_clone_env import *
 from .music_gen_env import *
-from .music_tuner_env import *
+from .music_tuner_env import MusicTunerEnv
 from .util import *
 
 register(
