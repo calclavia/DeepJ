@@ -8,7 +8,7 @@ from music import NUM_CLASSES, NOTES_PER_BAR
 time_steps = 8
 BARS = 8
 
-model = load_model('data/supervised.h5')
+model = load_model('out/model.h5')#'data/supervised.h5')
 
 # Generate
 prev_notes = deque(maxlen=time_steps)

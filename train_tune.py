@@ -11,7 +11,7 @@ g_rnn = tf.Graph()
 with g_rnn.as_default():
     supervised_model = load_model('data/supervised.h5')
 
-with tf.Session(allow_soft_placement=True) as sess, tf.device('/cpu:0'):
+with tf.Session() as sess, tf.device('/cpu:0'):
     agent = make_agent()
 
     try:

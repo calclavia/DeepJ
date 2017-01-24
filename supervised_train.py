@@ -26,6 +26,6 @@ beat_set = np.array(beat_set)
 
 model = supervised_model(time_steps)
 
-model.fit([data_set, beat_set], label_set, nb_epoch=100)
+model.fit([data_set, beat_set], label_set, nb_epoch=300)
 
 model.save(model_save_file)

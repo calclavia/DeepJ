@@ -5,7 +5,6 @@ from .util import NUM_CLASSES, NOTES_PER_BAR
 
 from rl import Memory
 
-
 class MusicTunerEnv(MusicTheoryEnv):
     """
     Music environment that combines tuning rewards and theory rewards
