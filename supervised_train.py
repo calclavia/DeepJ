@@ -9,9 +9,9 @@ from music import NUM_CLASSES, NOTES_PER_BAR
 from keras.callbacks import ModelCheckpoint
 
 time_steps = 8
-model_save_file = 'out/model.h5'
+model_save_file = 'out/supervised.h5'
 
-melodies = load_melodies('data/edm')
+melodies = load_melodies('data/edm') + load_melodies('data/70s')
 
 # TODO: Use memory
 data_set, beat_set, label_set = [], [], []
@@ -30,13 +30,11 @@ beat_set = np.array(beat_set)
 
 model = supervised_model(time_steps)
 
-cbs = [ModelCheckpoint(filepath='out/supervised.h5', monitor='loss', save_best_only=True)]
+cbs = [ModelCheckpoint(filepath=model_save_file, monitor='loss', save_best_only=True)]
 
 model.fit(
     [data_set, beat_set],
     label_set,
-    nb_epoch=2000,
+    nb_epoch=1000,
     callbacks=cbs
 )
-
-model.save(model_save_file)
