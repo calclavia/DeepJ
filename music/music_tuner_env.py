@@ -15,7 +15,6 @@ class MusicTunerEnv(MusicTheoryEnv):
     def __init__(self,
                  g_rnn,
                  model,
-                 imitation_scalar=1,
                  theory_scalar=1,
                  preprocess=lambda x: x):
         super().__init__()
@@ -23,7 +22,6 @@ class MusicTunerEnv(MusicTheoryEnv):
         self.g_rnn = g_rnn
         self.model = model
         self.preprocess = preprocess
-        self.imitation_scalar = imitation_scalar
         self.theory_scalar = theory_scalar
         #self.memory = Memory(self.time_steps)
 
@@ -45,7 +43,7 @@ class MusicTunerEnv(MusicTheoryEnv):
         state, reward, done, info = super()._step(action)
 
         # Total reward = log(P(a | s)) + r_TM
-        reward = prob * self.imitation_scalar + reward * self.theory_scalar
+        reward = prob + reward * self.theory_scalar
 
         #self.memory.remember(self.preprocess(self, state))
         return state, reward, done, info

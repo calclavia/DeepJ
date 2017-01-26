@@ -97,7 +97,7 @@ class MusicTheoryEnv(MusicEnv):
 
         return False
 
-    def reward_penalize_autocorrelation(self, action):
+    def reward_penalize_autocorrelation(self, action, lags=[1, 2, 3]):
         """
         Reduces the previous reward if the composition is highly autocorrelated.
         Penalizes the model for creating a composition that is highly correlated
@@ -108,13 +108,13 @@ class MusicTheoryEnv(MusicEnv):
         Returns:
           Float reward value.
         """
-        lags = [1, 2, 3]
         sum_penalty = 0
         for lag in lags:
-            coeff = autocorrelate(self.composition, lag=lag)
-            if not np.isnan(coeff):
-                if np.abs(coeff) > 0.15:
-                    sum_penalty += np.abs(coeff)
+            if len(self.composition) > lag:
+                coeff = autocorrelate(self.composition, lag=lag)
+                if not np.isnan(coeff):
+                    if np.abs(coeff) > 0.15:
+                        sum_penalty += np.abs(coeff)
         return -sum_penalty
 
     def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC):

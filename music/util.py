@@ -83,5 +83,4 @@ def autocorrelate(signal, lag=1):
   n = len(signal)
   x = np.asarray(signal) - np.mean(signal)
   c0 = np.var(signal)
-
   return (x[lag:] * x[:n - lag]).sum() / float(n) / c0
