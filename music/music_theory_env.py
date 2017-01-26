@@ -5,6 +5,7 @@ from .util import *
 # TODO: Should make TF optional...
 import tensorflow as tf
 
+
 class MusicTheoryEnv(MusicEnv):
     """
     Award based on music theory.
@@ -16,11 +17,14 @@ class MusicTheoryEnv(MusicEnv):
         state, reward, done, info = super()._step(action)
 
         # Compute total rewards
-        reward += self.reward_key(action) * 2
-        reward += self.reward_tonic(action) * 2
+        reward += self.reward_key(action) * 1.5
+        reward += self.reward_tonic(action) * 2.5
         reward += self.reward_penalize_repeating(action) * 100
+        reward += self.reward_penalize_autocorrelation(action) * 3
         reward += self.reward_motif(action)
         reward += self.reward_repeated_motif(action)
+        # New rewards based on Gauldin's book, "A Practical Approach to Eighteenth
+        # Century Counterpoint"
         reward += self.reward_preferred_intervals(action) * 5
         reward += self.reward_leap_up_back(action) * 5
         reward += self.reward_high_low_unique(action) * 3
@@ -92,6 +96,26 @@ class MusicTheoryEnv(MusicEnv):
                 return True
 
         return False
+
+    def reward_penalize_autocorrelation(self, action):
+        """
+        Reduces the previous reward if the composition is highly autocorrelated.
+        Penalizes the model for creating a composition that is highly correlated
+        with itself at lags of 1, 2, and 3 beats previous. This is meant to
+        encourage variety in compositions.
+        Args:
+          action: Chosen action.
+        Returns:
+          Float reward value.
+        """
+        lags = [1, 2, 3]
+        sum_penalty = 0
+        for lag in lags:
+            coeff = autocorrelate(self.composition, lag=lag)
+            if not np.isnan(coeff):
+                if np.abs(coeff) > 0.15:
+                    sum_penalty += np.abs(coeff)
+        return -sum_penalty
 
     def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC):
         """
@@ -235,48 +259,49 @@ class MusicTheoryEnv(MusicEnv):
 
         c_major = False
         if key is None:
-          key = C_MAJOR_KEY
-          c_notes = [2, 14, 26]
-          g_notes = [9, 21, 33]
-          e_notes = [6, 18, 30]
-          c_major = True
-          tonic_notes = [2, 14, 26]
-          fifth_notes = [9, 21, 33]
+            key = C_MAJOR_KEY
+            c_notes = [2, 14, 26]
+            g_notes = [9, 21, 33]
+            e_notes = [6, 18, 30]
+            c_major = True
+            tonic_notes = [2, 14, 26]
+            fifth_notes = [9, 21, 33]
 
         # get rid of non-notes in prev_note
         prev_note_index = len(self.composition) - 2
         while (prev_note == NO_EVENT or
                prev_note == NOTE_OFF) and prev_note_index >= 0:
-          prev_note = self.composition[prev_note_index]
-          prev_note_index -= 1
+            prev_note = self.composition[prev_note_index]
+            prev_note_index -= 1
         if prev_note == NOTE_OFF or prev_note == NO_EVENT:
-          tf.logging.debug('Action_note: %s, prev_note: %s', action, prev_note)
-          return 0, action, prev_note
+            tf.logging.debug('Action_note: %s, prev_note: %s',
+                             action, prev_note)
+            return 0, action, prev_note
 
         tf.logging.debug('Action_note: %s, prev_note: %s', action, prev_note)
 
         # get rid of non-notes in action
         if action == NO_EVENT:
-          if prev_note in tonic_notes or prev_note in fifth_notes:
-            return (HOLD_INTERVAL_AFTER_THIRD_OR_FIFTH,
-                    action, prev_note)
-          else:
-            return HOLD_INTERVAL, action, prev_note
+            if prev_note in tonic_notes or prev_note in fifth_notes:
+                return (HOLD_INTERVAL_AFTER_THIRD_OR_FIFTH,
+                        action, prev_note)
+            else:
+                return HOLD_INTERVAL, action, prev_note
         elif action == NOTE_OFF:
-          if prev_note in tonic_notes or prev_note in fifth_notes:
-            return (REST_INTERVAL_AFTER_THIRD_OR_FIFTH,
-                    action, prev_note)
-          else:
-            return REST_INTERVAL, action, prev_note
+            if prev_note in tonic_notes or prev_note in fifth_notes:
+                return (REST_INTERVAL_AFTER_THIRD_OR_FIFTH,
+                        action, prev_note)
+            else:
+                return REST_INTERVAL, action, prev_note
 
         interval = abs(action - prev_note)
 
         if c_major and interval == FIFTH and (
-            prev_note in c_notes or prev_note in g_notes):
-          return IN_KEY_FIFTH, action, prev_note
+                prev_note in c_notes or prev_note in g_notes):
+            return IN_KEY_FIFTH, action, prev_note
         if c_major and interval == THIRD and (
-            prev_note in c_notes or prev_note in e_notes):
-          return IN_KEY_THIRD, action, prev_note
+                prev_note in c_notes or prev_note in e_notes):
+            return IN_KEY_THIRD, action, prev_note
 
         return interval, action, prev_note
 
@@ -294,57 +319,57 @@ class MusicTheoryEnv(MusicEnv):
         tf.logging.debug('Interval:', interval)
 
         if interval == 0:  # either no interval or involving uninteresting rests
-          tf.logging.debug('No interval or uninteresting.')
-          return 0.0
+            tf.logging.debug('No interval or uninteresting.')
+            return 0.0
 
         reward = 0.0
 
         # rests can be good
         if interval == REST_INTERVAL:
-          reward = 0.05
-          tf.logging.debug('Rest interval.')
+            reward = 0.05
+            tf.logging.debug('Rest interval.')
         if interval == HOLD_INTERVAL:
-          reward = 0.075
+            reward = 0.075
         if interval == REST_INTERVAL_AFTER_THIRD_OR_FIFTH:
-          reward = 0.15
-          tf.logging.debug('Rest interval after 1st or 5th.')
+            reward = 0.15
+            tf.logging.debug('Rest interval after 1st or 5th.')
         if interval == HOLD_INTERVAL_AFTER_THIRD_OR_FIFTH:
-          reward = 0.3
+            reward = 0.3
 
         # large leaps and awkward intervals bad
         if interval == SEVENTH:
-          reward = -0.3
-          tf.logging.debug('7th')
+            reward = -0.3
+            tf.logging.debug('7th')
         if interval > OCTAVE:
-          reward = -1.0
-          tf.logging.debug('More than octave.')
+            reward = -1.0
+            tf.logging.debug('More than octave.')
 
         # common major intervals are good
         if interval == IN_KEY_FIFTH:
-          reward = 0.1
-          tf.logging.debug('In key 5th')
+            reward = 0.1
+            tf.logging.debug('In key 5th')
         if interval == IN_KEY_THIRD:
-          reward = 0.15
-          tf.logging.debug('In key 3rd')
+            reward = 0.15
+            tf.logging.debug('In key 3rd')
 
         # smaller steps are generally preferred
         if interval == THIRD:
-          reward = 0.09
-          tf.logging.debug('3rd')
+            reward = 0.09
+            tf.logging.debug('3rd')
         if interval == SECOND:
-          reward = 0.08
-          tf.logging.debug('2nd')
+            reward = 0.08
+            tf.logging.debug('2nd')
         if interval == FOURTH:
-          reward = 0.07
-          tf.logging.debug('4th')
+            reward = 0.07
+            tf.logging.debug('4th')
 
         # larger leaps not as good, especially if not in key
         if interval == SIXTH:
-          reward = 0.05
-          tf.logging.debug('6th')
+            reward = 0.05
+            tf.logging.debug('6th')
         if interval == FIFTH:
-          reward = 0.02
-          tf.logging.debug('5th')
+            reward = 0.02
+            tf.logging.debug('5th')
 
         return reward
 
@@ -366,63 +391,64 @@ class MusicTheoryEnv(MusicEnv):
         """
         outcome = 0
 
-        interval, action_note, prev_note = self.detect_sequential_interval(action)
+        interval, action_note, prev_note = self.detect_sequential_interval(
+            action)
 
         if action_note == NOTE_OFF or action_note == NO_EVENT:
-          self.steps_since_last_leap += 1
-          tf.logging.debug('Rest, adding to steps since last leap. It is'
-                           'now: %s', self.steps_since_last_leap)
-          return 0
+            self.steps_since_last_leap += 1
+            tf.logging.debug('Rest, adding to steps since last leap. It is'
+                             'now: %s', self.steps_since_last_leap)
+            return 0
 
         # detect if leap
         if interval >= FIFTH or interval == IN_KEY_FIFTH:
-          if action_note > prev_note:
-            leap_direction = ASCENDING
-            tf.logging.debug('Detected an ascending leap')
-          else:
-            leap_direction = DESCENDING
-            tf.logging.debug('Detected a descending leap')
-
-          # there was already an unresolved leap
-          if self.composition_direction != 0:
-            if self.composition_direction != leap_direction:
-              tf.logging.debug('Detected a resolved leap')
-              tf.logging.debug('Num steps since last leap: %s',
-                               self.steps_since_last_leap)
-              if self.steps_since_last_leap > steps_between_leaps:
-                outcome = LEAP_RESOLVED
-                tf.logging.debug('Sufficient steps before leap resolved, '
-                                 'awarding bonus')
-              self.composition_direction = 0
-              self.leapt_from = None
+            if action_note > prev_note:
+                leap_direction = ASCENDING
+                tf.logging.debug('Detected an ascending leap')
             else:
-              tf.logging.debug('Detected a double leap')
-              outcome = LEAP_DOUBLED
+                leap_direction = DESCENDING
+                tf.logging.debug('Detected a descending leap')
 
-          # the composition had no previous leaps
-          else:
-            tf.logging.debug('There was no previous leap direction')
-            self.composition_direction = leap_direction
-            self.leapt_from = prev_note
+            # there was already an unresolved leap
+            if self.composition_direction != 0:
+                if self.composition_direction != leap_direction:
+                    tf.logging.debug('Detected a resolved leap')
+                    tf.logging.debug('Num steps since last leap: %s',
+                                     self.steps_since_last_leap)
+                    if self.steps_since_last_leap > steps_between_leaps:
+                        outcome = LEAP_RESOLVED
+                        tf.logging.debug('Sufficient steps before leap resolved, '
+                                         'awarding bonus')
+                    self.composition_direction = 0
+                    self.leapt_from = None
+                else:
+                    tf.logging.debug('Detected a double leap')
+                    outcome = LEAP_DOUBLED
 
-          self.steps_since_last_leap = 0
+            # the composition had no previous leaps
+            else:
+                tf.logging.debug('There was no previous leap direction')
+                self.composition_direction = leap_direction
+                self.leapt_from = prev_note
+
+            self.steps_since_last_leap = 0
         # there is no leap
         else:
-          self.steps_since_last_leap += 1
-          tf.logging.debug('No leap, adding to steps since last leap. '
-                           'It is now: %s', self.steps_since_last_leap)
+            self.steps_since_last_leap += 1
+            tf.logging.debug('No leap, adding to steps since last leap. '
+                             'It is now: %s', self.steps_since_last_leap)
 
-          # If there was a leap before, check if composition has gradually returned
-          # This could be changed by requiring you to only go a 5th back in the
-          # opposite direction of the leap.
-          if (self.composition_direction == ASCENDING and
-              action_note <= self.leapt_from) or (
-                  self.composition_direction == DESCENDING and
-                  action_note >= self.leapt_from):
-            tf.logging.debug('detected a gradually resolved leap')
-            outcome = LEAP_RESOLVED
-            self.composition_direction = 0
-            self.leapt_from = None
+            # If there was a leap before, check if composition has gradually returned
+            # This could be changed by requiring you to only go a 5th back in the
+            # opposite direction of the leap.
+            if (self.composition_direction == ASCENDING and
+                action_note <= self.leapt_from) or (
+                    self.composition_direction == DESCENDING and
+                    action_note >= self.leapt_from):
+                tf.logging.debug('detected a gradually resolved leap')
+                outcome = LEAP_RESOLVED
+                self.composition_direction = 0
+                self.leapt_from = None
 
         return outcome
 
@@ -439,11 +465,11 @@ class MusicTheoryEnv(MusicEnv):
 
         leap_outcome = self.detect_leap_up_back(action)
         if leap_outcome == LEAP_RESOLVED:
-          return 1
+            return 1
         elif leap_outcome == LEAP_DOUBLED:
-          return -1
+            return -1
         else:
-          return 0.0
+            return 0.0
 
     def detect_high_unique(self, composition):
         """
@@ -455,9 +481,9 @@ class MusicTheoryEnv(MusicEnv):
         """
         max_note = max(composition)
         if list(composition).count(max_note) == 1:
-          return True
+            return True
         else:
-          return False
+            return False
 
     def detect_low_unique(self, composition):
         """Checks a composition to see if the lowest note within it is repeated.
@@ -469,9 +495,9 @@ class MusicTheoryEnv(MusicEnv):
         no_special_events = [x for x in composition
                              if x != NO_EVENT and x != NOTE_OFF]
         if no_special_events:
-          min_note = min(no_special_events)
-          if list(composition).count(min_note) == 1:
-            return True
+            min_note = min(no_special_events)
+            if list(composition).count(min_note) == 1:
+                return True
         return False
 
     def reward_high_low_unique(self, action):
@@ -483,17 +509,17 @@ class MusicTheoryEnv(MusicEnv):
           Float reward value.
         """
         if len(self.composition) != self.num_notes:
-          return 0.0
+            return 0.0
 
         composition = np.array(self.composition)
 
         reward = 0.0
 
         if self.detect_high_unique(composition):
-          reward += 1
+            reward += 1
 
         if self.detect_low_unique(composition):
-          reward += 1
+            reward += 1
 
         return reward
 

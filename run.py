@@ -7,7 +7,7 @@ from midi_util import *
 import midi
 from music import target_compositions
 
-target_compositions += load_melodies('data/edm/edm_c')
+target_compositions += load_melodies('data/edm/')
 
 with tf.device('/cpu:0'), tf.Session() as sess:
     env = track(gym.make('music-gen-v0'))
