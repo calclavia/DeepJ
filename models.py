@@ -11,7 +11,6 @@ from keras.models import load_model
 
 def note_model(timesteps):
     # TODO Try dropout again?
-    """
     note_input = Input(shape=(timesteps, NUM_CLASSES), name='rl/note_input')
     beat_input = Input(shape=(timesteps, NOTES_PER_BAR), name='rl/beat_input')
 
@@ -34,7 +33,14 @@ def note_model(timesteps):
     return Model([note_input, beat_input], [policy, value])
     """
     supervised_model = load_model('data/supervised.h5')
-    print(supervised_model)
+    print(supervised_model.layers)
+    x = supervised_model.layers[-2]
+    # TODO: Reuse old weights!
+    policy = Dense(NUM_CLASSES, activation='softmax', name='rl/note_policy')(x)
+    value = Dense(1, activation='linear', name='rl/value_output')(x)
+    # Create value output
+    return Model(supervised_model.inputs, [policy, value])
+    """
 
 def note_preprocess(env, x):
     note, beat = x
@@ -66,7 +72,7 @@ def supervised_model(time_steps):
         x = Dropout(0.5)(x)
 
     # Multi-label
-    x = Dense(NUM_CLASSES)(x)
+    x = Dense(NUM_CLASSES, 'policy')(x)
     x = Activation('softmax')(x)
 
     model = Model([note_input, beat_input], x)

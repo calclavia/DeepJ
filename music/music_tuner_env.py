@@ -5,24 +5,31 @@ from .util import NUM_CLASSES, NOTES_PER_BAR
 
 from rl import Memory
 
+
 class MusicTunerEnv(MusicTheoryEnv):
     """
     Music environment that combines tuning rewards and theory rewards
     https://arxiv.org/pdf/1611.02796v4.pdf
     """
-    def __init__(self, g_rnn, model, theory_scalar=1, time_steps=8, preprocess=lambda x: x):
+
+    def __init__(self,
+                 g_rnn,
+                 model,
+                 imitation_scalar=1,
+                 theory_scalar=1,
+                 preprocess=lambda x: x):
         super().__init__()
         # Separate the graph!
         self.g_rnn = g_rnn
         self.model = model
         self.preprocess = preprocess
+        self.imitation_scalar = imitation_scalar
         self.theory_scalar = theory_scalar
-        self.time_steps = time_steps
-        self.memory = Memory(self.time_steps)
+        #self.memory = Memory(self.time_steps)
 
     def _reset(self):
         state = super()._reset()
-        self.memory.reset(self.preprocess(self, state))
+        #self.memory.reset(self.preprocess(self, state))
         return state
 
     def _step(self, action):
@@ -37,8 +44,8 @@ class MusicTunerEnv(MusicTheoryEnv):
         # Compute music theory rewards
         state, reward, done, info = super()._step(action)
 
-        # Total reward = log(P(a | s)) + r_TM * c
-        reward = prob + reward * self.theory_scalar
+        # Total reward = log(P(a | s)) + r_TM
+        reward = prob * self.imitation_scalar + reward * self.theory_scalar
 
-        self.memory.remember(self.preprocess(self, state))
+        #self.memory.remember(self.preprocess(self, state))
         return state, reward, done, info

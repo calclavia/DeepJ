@@ -17,13 +17,13 @@ class MusicTheoryEnv(MusicEnv):
 
         # Compute total rewards
         reward += self.reward_key(action) * 2
-        reward += self.reward_tonic(action)
-        reward += self.reward_penalize_repeating(action)
+        reward += self.reward_tonic(action) * 2
+        reward += self.reward_penalize_repeating(action) * 100
         reward += self.reward_motif(action)
         reward += self.reward_repeated_motif(action)
-        reward += self.reward_preferred_intervals(action)
-        reward += self.reward_leap_up_back(action)
-        reward += self.reward_high_low_unique(action)
+        reward += self.reward_preferred_intervals(action) * 5
+        reward += self.reward_leap_up_back(action) * 5
+        reward += self.reward_high_low_unique(action) * 3
 
         return state, reward, done, info
 
@@ -41,7 +41,7 @@ class MusicTheoryEnv(MusicEnv):
         """
         return -1 if action not in key else 0
 
-    def reward_penalize_repeating(self, action, penalty_amount=-100.0):
+    def reward_penalize_repeating(self, action):
         """
         Sets the previous reward to 0 if the same is played repeatedly.
         Allows more repeated notes if there are held notes or rests in between. If
@@ -54,10 +54,7 @@ class MusicTheoryEnv(MusicEnv):
           Previous reward or 'penalty_amount'.
         """
         is_repeating = self.detect_repeating_notes(action)
-        if is_repeating:
-            return penalty_amount
-        else:
-            return 0.0
+        return -1 if is_repeating else 0
 
     def detect_repeating_notes(self, action):
         """
@@ -96,7 +93,7 @@ class MusicTheoryEnv(MusicEnv):
 
         return False
 
-    def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC, reward_amount=3):
+    def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC):
         """
         Rewards for playing the tonic note at the right times.
         Rewards for playing the tonic as the first note of the first bar, and the
@@ -104,8 +101,6 @@ class MusicTheoryEnv(MusicEnv):
         Args:
           action: Integer of chosen note
           tonic_note: The tonic/1st note of the desired key.
-          reward_amount: The amount the model will be awarded if it plays the
-            tonic note at the right time.
         Returns:
           Float reward value.
         """
@@ -113,14 +108,14 @@ class MusicTheoryEnv(MusicEnv):
 
         if self.beat == 0 or self.beat == first_note_of_final_bar:
             if action == tonic_note:
-                return reward_amount
+                return 1
         elif self.beat == first_note_of_final_bar + 1:
             if action == NO_EVENT:
-                return reward_amount
+                return 1
         elif self.beat > first_note_of_final_bar + 1:
             if action == NO_EVENT or action == NOTE_OFF:
-                return reward_amount
-        return 0.0
+                return 1
+        return 0
 
     def reward_motif(self, action, reward_amount=3.0):
         """
@@ -132,8 +127,6 @@ class MusicTheoryEnv(MusicEnv):
 
         Args:
             action: Integer of chosen action
-            reward_amount: The amount that will be returned if the last note belongs
-            to a motif.
         Returns:
             Float reward value.
         """
@@ -287,12 +280,11 @@ class MusicTheoryEnv(MusicEnv):
 
         return interval, action, prev_note
 
-    def reward_preferred_intervals(self, action, scaler=5.0, key=None):
+    def reward_preferred_intervals(self, action, key=None):
         """
         Dispenses reward based on the melodic interval just played.
         Args:
           action: One-hot encoding of the chosen action.
-          scaler: This value will be multiplied by all rewards in this function.
           key: The numeric values of notes belonging to this key. Defaults to
             C-major if not provided.
         Returns:
@@ -354,8 +346,7 @@ class MusicTheoryEnv(MusicEnv):
           reward = 0.02
           tf.logging.debug('5th')
 
-        tf.logging.debug('Interval reward', reward * scaler)
-        return reward * scaler
+        return reward
 
     def detect_leap_up_back(self, action, steps_between_leaps=6):
         """
@@ -435,29 +426,22 @@ class MusicTheoryEnv(MusicEnv):
 
         return outcome
 
-    def reward_leap_up_back(self, action, resolving_leap_bonus=5.0,
-                          leaping_twice_punishment=-5.0):
+    def reward_leap_up_back(self, action):
         """
         Applies punishment and reward based on the principle leap up leap back.
         Large interval jumps (more than a fifth) should be followed by moving back
         in the same direction.
         Args:
           action: One-hot encoding of the chosen action.
-          resolving_leap_bonus: Amount of reward dispensed for resolving a previous
-            leap.
-          leaping_twice_punishment: Amount of reward received for leaping twice in
-            the same direction.
         Returns:
           Float reward value.
         """
 
         leap_outcome = self.detect_leap_up_back(action)
         if leap_outcome == LEAP_RESOLVED:
-          tf.logging.debug('Leap resolved, awarding %s', resolving_leap_bonus)
-          return resolving_leap_bonus
+          return 1
         elif leap_outcome == LEAP_DOUBLED:
-          tf.logging.debug('Leap doubled, awarding %s', leaping_twice_punishment)
-          return leaping_twice_punishment
+          return -1
         else:
           return 0.0
 
@@ -490,13 +474,11 @@ class MusicTheoryEnv(MusicEnv):
             return True
         return False
 
-    def reward_high_low_unique(self, action, reward_amount=3.0):
+    def reward_high_low_unique(self, action):
         """
         Evaluates if highest and lowest notes in composition occurred once.
         Args:
           action: One-hot encoding of the chosen action.
-          reward_amount: Amount of reward that will be given for the highest note
-            being unique, and again for the lowest note being unique.
         Returns:
           Float reward value.
         """
@@ -508,10 +490,10 @@ class MusicTheoryEnv(MusicEnv):
         reward = 0.0
 
         if self.detect_high_unique(composition):
-          reward += reward_amount
+          reward += 1
 
         if self.detect_low_unique(composition):
-          reward += reward_amount
+          reward += 1
 
         return reward
 
