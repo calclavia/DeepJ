@@ -11,6 +11,7 @@ from keras.models import load_model
 
 def pre_model(time_steps, dropout=True):
     # Multi-hot vector of each note
+    # TODO: Just change this to state for simplicity.
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
 

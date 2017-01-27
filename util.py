@@ -2,7 +2,7 @@ from music import *
 import midi
 from rl import A3CAgent
 from midi_util import *
-from preprocess import midi_io, melodies_lib
+from preprocess import midi_io, melodies_lib, music_pb2
 
 def make_agent():
     from models import note_model, note_preprocess
@@ -17,7 +17,7 @@ def make_agent():
         entropy_factor=0.01
     )
 
-def create_beat_data(composition, beats_per_bar=BEATS_PER_BAR):
+def create_beat_data(composition, beats_per_bar):
     """
     Augment the composition with the beat count in a bar it is in.
     """
@@ -53,15 +53,5 @@ def process_melody(melody):
             res.append(abs(x) - 1)
     return res
 
-def load_melodies(path='data'):
-    out = []
-
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            fname = os.path.join(root, f)
-            if os.path.isfile(fname):
-                seq_pb = midi_io.midi_to_sequence_proto(fname)
-                melody = melodies_lib.midi_file_to_melody(seq_pb)
-                # Pre-process melody
-                out.append(process_melody(melody))
-    return out
+def load_data(path='data/data_cache.npy'):
+    return np.load(path)
