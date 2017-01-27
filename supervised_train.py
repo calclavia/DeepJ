@@ -5,19 +5,19 @@ import tensorflow as tf
 import os.path
 from util import *
 from models import supervised_model
-from music import NUM_CLASSES, NOTES_PER_BAR
+from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint
 
 time_steps = 8
 model_file = 'out/supervised.h5'
 
-melodies = np.random.choice(load_data(), 500)
+melodies = np.random.choice(load_data(), 300)
 
 data_set, beat_set, label_set = [], [], []
 
 for c in melodies:
-    c_hot = [one_hot(x, NUM_CLASSES) for x in c]
+    c_hot = [one_hot(x if x < MAX_NOTE else NO_EVENT, NUM_CLASSES) for x in c]
     x, y = create_dataset(c_hot, time_steps)
     data_set += x
     label_set += y
@@ -44,6 +44,6 @@ cbs = [ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True)
 model.fit(
     [data_set, beat_set],
     label_set,
-    nb_epoch=100,
+    nb_epoch=200,
     callbacks=cbs
 )

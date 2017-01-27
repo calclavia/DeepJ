@@ -34,8 +34,8 @@ def pre_model(time_steps, dropout=True):
     if dropout:
         x = Dropout(0.5)(x)
 
-    for i in range(2):
-        x = Dense(num_units, name='dense' + str(i))(x)
+    for i in range(1):
+        x = Dense(num_units * 2, name='dense' + str(i))(x)
         x = Activation('relu')(x)
         if dropout:
             x = Dropout(0.5)(x)
