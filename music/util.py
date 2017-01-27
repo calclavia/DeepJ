@@ -18,7 +18,7 @@ NOTE_OFF = 0
 NO_EVENT = 1
 
 # Number of octaves supported
-NUM_OCTAVES = 6
+NUM_OCTAVES = 8
 
 # Min note in MIDI supported
 MIN_NOTE = 36

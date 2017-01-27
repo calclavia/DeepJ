@@ -12,7 +12,7 @@ from keras.callbacks import ModelCheckpoint
 time_steps = 8
 model_file = 'out/supervised.h5'
 
-melodies = load_data()
+melodies = np.random.choice(load_data(), 500)
 
 data_set, beat_set, label_set = [], [], []
 
@@ -30,8 +30,10 @@ beat_set = np.array(beat_set)
 
 # Load model to continue training
 if os.path.isfile(model_file):
+    print('Loading model')
     model = load_model(model_file)
 else:
+    print('Creating new model')
     model = supervised_model(time_steps)
 
 # Make dir for model saving
@@ -42,6 +44,6 @@ cbs = [ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True)
 model.fit(
     [data_set, beat_set],
     label_set,
-    nb_epoch=500,
+    nb_epoch=100,
     callbacks=cbs
 )

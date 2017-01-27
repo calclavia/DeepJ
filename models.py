@@ -14,6 +14,7 @@ def pre_model(time_steps, dropout=True):
     # TODO: Just change this to state for simplicity.
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
+    num_units = 256
 
     x = note_input
 
@@ -23,18 +24,18 @@ def pre_model(time_steps, dropout=True):
     x = merge([x, beat_input], mode='concat')
 
     for i in range(2):
-        x = GRU(256, return_sequences=True, name='lstm' + str(i))(x)
+        x = GRU(num_units, return_sequences=True, name='lstm' + str(i))(x)
         x = Activation('relu')(x)
         if dropout:
             x = Dropout(0.5)(x)
 
-    x = GRU(256, name='lstm_last')(x)
+    x = GRU(num_units, name='lstm_last')(x)
     x = Activation('relu')(x)
     if dropout:
         x = Dropout(0.5)(x)
 
-    for i in range(1):
-        x = Dense(256, name='dense' + str(i))(x)
+    for i in range(2):
+        x = Dense(num_units, name='dense' + str(i))(x)
         x = Activation('relu')(x)
         if dropout:
             x = Dropout(0.5)(x)
