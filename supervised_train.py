@@ -17,7 +17,7 @@ melodies = np.random.choice(load_data(), 300)
 data_set, beat_set, label_set = [], [], []
 
 for c in melodies:
-    c_hot = [one_hot(x if x < MAX_NOTE else NO_EVENT, NUM_CLASSES) for x in c]
+    c_hot = [one_hot(x if x < NUM_CLASSES else NO_EVENT, NUM_CLASSES) for x in c]
     x, y = create_dataset(c_hot, time_steps)
     data_set += x
     label_set += y

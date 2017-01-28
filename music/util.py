@@ -18,7 +18,7 @@ NOTE_OFF = 0
 NO_EVENT = 1
 
 # Number of octaves supported
-NUM_OCTAVES = 6
+NUM_OCTAVES = 4
 
 # Min note in MIDI supported
 MIN_NOTE = 36
@@ -34,7 +34,6 @@ BEATS_PER_BAR = 4
 NOTES_PER_BEAT = 4
 # The quickest note is a half-note
 NOTES_PER_BAR = NOTES_PER_BEAT * BEATS_PER_BAR
-
 
 # Music theory constants used in defining reward functions.
 # Actions that are in C major
