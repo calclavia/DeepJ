@@ -13,7 +13,7 @@ class MusicTunerEnv(MusicTheoryEnv):
                  g_rnn,
                  model,
                  memory,
-                 theory_scalar=1,
+                 theory_scalar=2,
                  preprocess=lambda x: x):
         super().__init__()
         # Separate the graph!
@@ -30,9 +30,9 @@ class MusicTunerEnv(MusicTheoryEnv):
 
     def _step(self, action):
         # Ask the Melody RNN to make a prediction
-        #with self.g_rnn.as_default():
-        s = [np.array([s_i]) for s_i in self.memory.to_states()]
-        predictions = self.model.predict(s)[0]
+        with self.g_rnn.as_default():
+            s = [np.array([s_i]) for s_i in self.memory.to_states()]
+            predictions = self.model.predict(s)[0]
         norm_constant = np.log(np.sum(np.exp(predictions)))
         # np.log(np.clip(predictions[action], 1e-20, 1))
         prob = predictions[action] - norm_constant

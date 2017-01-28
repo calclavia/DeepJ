@@ -11,8 +11,8 @@ class MusicGenEnv(MusicEnv):
     """
     def _step(self, action):
         # Force play the first couple of notes as inspiration
-        if self.beat < 4:
-            action = self.target_composition[self.beat]
+        # if self.beat < NOTES_PER_BAR:
+        #    action = self.target_composition[self.beat]
 
         state, reward, done, info = super()._step(action)
         return state, reward, done, {}

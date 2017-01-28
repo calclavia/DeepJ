@@ -35,5 +35,6 @@ for i in range(NOTES_PER_BAR * BARS):
     prev_beats.append(one_hot(i % NOTES_PER_BAR, NOTES_PER_BAR))
     composition.append(note)
 
+print(composition)
 mf = midi_encode_melody(composition)
 midi.write_midifile('out/output.mid', mf)

@@ -7,11 +7,10 @@ from midi_util import *
 import midi
 from music import target_compositions
 
-target_compositions += load_melodies('data/edm/')
+target_compositions += list(np.random.choice(load_data(), 300))
 
 with tf.device('/cpu:0'), tf.Session() as sess:
     env = track(gym.make('music-gen-v0'))
-    env.num_notes = 128
     agent = make_agent()
     agent.load(sess)
     agent.run(sess, env)

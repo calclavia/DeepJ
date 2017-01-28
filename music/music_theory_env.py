@@ -17,10 +17,10 @@ class MusicTheoryEnv(MusicEnv):
         state, reward, done, info = super()._step(action)
 
         # Compute total rewards
-        reward += self.reward_key(action) * 1.5
-        reward += self.reward_tonic(action) * 2.5
+        reward += self.reward_key(action) * 2
+        reward += self.reward_tonic(action) * 2
         reward += self.reward_penalize_repeating(action) * 100
-        reward += self.reward_penalize_autocorrelation(action) * 3
+        reward += self.reward_penalize_autocorrelation(action) * 5
         reward += self.reward_motif(action)
         reward += self.reward_repeated_motif(action)
         # New rewards based on Gauldin's book, "A Practical Approach to Eighteenth
@@ -128,7 +128,7 @@ class MusicTheoryEnv(MusicEnv):
         Returns:
           Float reward value.
         """
-        first_note_of_final_bar = self.num_notes - 4
+        first_note_of_final_bar = self.num_notes - NOTES_PER_BAR
 
         if self.beat == 0 or self.beat == first_note_of_final_bar:
             if action == tonic_note:
@@ -213,7 +213,7 @@ class MusicTheoryEnv(MusicEnv):
         else:
             return 0.0
 
-    def detect_repeated_motif(self, action, bar_length=8):
+    def detect_repeated_motif(self, action, bar_length=NOTES_PER_BAR):
         """
         Detects whether the last motif played repeats an earlier motif played.
 
@@ -255,8 +255,6 @@ class MusicTheoryEnv(MusicEnv):
           An integer value representing the interval, or a constant value for
           special intervals.
         """
-        prev_note = self.composition[-2]
-
         c_major = False
         if key is None:
             key = C_MAJOR_KEY
@@ -266,6 +264,8 @@ class MusicTheoryEnv(MusicEnv):
             c_major = True
             tonic_notes = [2, 14, 26]
             fifth_notes = [9, 21, 33]
+
+        prev_note = self.composition[-2]
 
         # get rid of non-notes in prev_note
         prev_note_index = len(self.composition) - 2
@@ -373,7 +373,7 @@ class MusicTheoryEnv(MusicEnv):
 
         return reward
 
-    def detect_leap_up_back(self, action, steps_between_leaps=6):
+    def detect_leap_up_back(self, action, steps_between_leaps=12):
         """
         Detects when the composition takes a musical leap, and if it is resolved.
         When the composition jumps up or down by an interval of a fifth or more,

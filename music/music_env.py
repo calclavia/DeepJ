@@ -19,7 +19,7 @@ class MusicEnv(Env):
         )
 
         # Total number of notes
-        self.num_notes = 32
+        self.num_notes = 128
         self.key = C_MAJOR_KEY
 
     def _step(self, action):

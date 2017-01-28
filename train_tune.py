@@ -2,7 +2,7 @@
 import tensorflow as tf
 from keras.models import load_model
 
-from rl import A3CAgent
+from rl import A3CAgent, Memory
 from util import *
 from music import MusicTunerEnv
 from models import note_preprocess
@@ -24,6 +24,7 @@ with tf.Session() as sess, tf.device('/cpu:0'):
     model_builder = lambda: MusicTunerEnv(
         g_rnn,
         supervised_model,
+        Memory(8),
         preprocess=note_preprocess
     )
 
