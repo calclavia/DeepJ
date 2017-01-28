@@ -19,7 +19,7 @@ class MusicEnv(Env):
         )
 
         # Total number of notes
-        self.num_notes = 128
+        self.num_notes = 64
         self.key = C_MAJOR_KEY
 
     def _step(self, action):
@@ -33,7 +33,7 @@ class MusicEnv(Env):
 
     def _reset(self):
         # Composition is a list of notes composed
-        self.composition = [random.choice(self.key)]
+        self.composition = [NO_EVENT]
         self.beat = 0
         return self._current_state()
 

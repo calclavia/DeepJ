@@ -17,8 +17,8 @@ class MusicTheoryEnv(MusicEnv):
         state, reward, done, info = super()._step(action)
 
         # Compute total rewards
-        reward += self.reward_key(action) * 2
-        reward += self.reward_tonic(action) * 2
+        reward += self.reward_key(action) * 1
+        reward += self.reward_tonic(action) * 3
         reward += self.reward_penalize_repeating(action) * 100
         reward += self.reward_penalize_autocorrelation(action) * 5
         reward += self.reward_motif(action)
@@ -45,17 +45,40 @@ class MusicTheoryEnv(MusicEnv):
         """
         return -1 if action not in key else 0
 
+    def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC):
+        """
+        Rewards for playing the tonic note at the right times.
+        Rewards for playing the tonic as the first note of the first bar, and the
+        first note of the final bar.
+        Args:
+          action: Integer of chosen note
+          tonic_note: The tonic/1st note of the desired key.
+        Returns:
+          Float reward value.
+        """
+        last_beat = self.beat - 1
+        first_note_of_final_bar = self.num_notes - NOTES_PER_BAR
+        assert last_beat >= 0
+
+        if last_beat == 0 or last_beat == first_note_of_final_bar:
+            if action == tonic_note:
+                return 1
+        elif last_beat == first_note_of_final_bar + 1:
+            if action == NO_EVENT:
+                return 1
+        elif last_beat > first_note_of_final_bar + 1:
+            if action == NO_EVENT or action == NOTE_OFF:
+                return 1
+        return 0
+
     def reward_penalize_repeating(self, action):
         """
-        Sets the previous reward to 0 if the same is played repeatedly.
-        Allows more repeated notes if there are held notes or rests in between. If
-        no penalty is applied will return the previous reward.
+        Penalizes for playing the same note repeatedly.
+        Allows more repeated notes if there are held notes or rests in between.
         Args:
-          action: One-hot encoding of the chosen action.
-          penalty_amount: The amount the model will be penalized if it plays
-            repeating notes.
+          action: Chosen action.
         Returns:
-          Previous reward or 'penalty_amount'.
+          -1 if repetition is detected
         """
         is_repeating = self.detect_repeating_notes(action)
         return -1 if is_repeating else 0
@@ -116,30 +139,6 @@ class MusicTheoryEnv(MusicEnv):
                     if np.abs(coeff) > 0.15:
                         sum_penalty += np.abs(coeff)
         return -sum_penalty
-
-    def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC):
-        """
-        Rewards for playing the tonic note at the right times.
-        Rewards for playing the tonic as the first note of the first bar, and the
-        first note of the final bar.
-        Args:
-          action: Integer of chosen note
-          tonic_note: The tonic/1st note of the desired key.
-        Returns:
-          Float reward value.
-        """
-        first_note_of_final_bar = self.num_notes - NOTES_PER_BAR
-
-        if self.beat == 0 or self.beat == first_note_of_final_bar:
-            if action == tonic_note:
-                return 1
-        elif self.beat == first_note_of_final_bar + 1:
-            if action == NO_EVENT:
-                return 1
-        elif self.beat > first_note_of_final_bar + 1:
-            if action == NO_EVENT or action == NOTE_OFF:
-                return 1
-        return 0
 
     def reward_motif(self, action, reward_amount=3.0):
         """
