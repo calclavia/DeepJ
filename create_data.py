@@ -4,15 +4,13 @@ Preprocesses input MIDI files and converts it as a Numpy file.
 from preprocess import midi_io
 from preprocess import melodies_lib
 from joblib import Parallel, delayed
-from util import process_melody
 import os
 import numpy as np
 
 def load_melody(fname):
     try:
         seq_pb = midi_io.midi_to_sequence_proto(fname)
-        melody = melodies_lib.midi_file_to_melody(seq_pb)
-        return process_melody(melody)
+        return melodies_lib.midi_file_to_melody(seq_pb)
     except Exception as e:
         # print(e)
         return None

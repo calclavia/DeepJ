@@ -48,7 +48,7 @@ def process_melody(melody):
     res = []
     for x in melody:
         if x >= 0:
-            res.append(x - MIN_NOTE)
+            res.append(max(x - MIN_NOTE, MIN_CLASS))
         else:
             res.append(abs(x) - 1)
     return res
