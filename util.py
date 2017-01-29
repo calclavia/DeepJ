@@ -2,7 +2,6 @@ from music import *
 import midi
 from rl import A3CAgent
 from midi_util import *
-from preprocess import midi_io, melodies_lib, music_pb2
 
 def make_agent():
     from models import note_model, note_preprocess
@@ -31,7 +30,7 @@ def create_beat_data(composition, beats_per_bar):
     return beat_patterns
 
 # convert an array of values into a dataset matrix
-def create_dataset(data, look_back=1):
+def create_dataset(data, look_back):
     dataX, dataY = [], []
     for i in range(len(data) - look_back - 1):
         a = data[i:(i + look_back)]
@@ -43,15 +42,6 @@ def one_hot(i, nb_classes):
     arr = np.zeros((nb_classes,))
     arr[i] = 1
     return arr
-
-def process_melody(melody):
-    res = []
-    for x in melody:
-        if x >= 0:
-            res.append(max(x - MIN_NOTE, MIN_CLASS))
-        else:
-            res.append(abs(x) - 1)
-    return res
 
 def load_data(path='data/data_cache.npy'):
     return np.load(path)

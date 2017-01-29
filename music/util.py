@@ -3,6 +3,8 @@ import numpy as np
 Source:
 https://github.com/tensorflow/magenta/blob/master/magenta/models/rl_tuner/rl_tuner_ops.py
 """
+NUM_KEYS = 12
+
 # The number of half-steps in musical intervals, in order of dissonance
 OCTAVE = 12
 FIFTH = 7
@@ -20,7 +22,7 @@ NO_EVENT = 1
 # Number of octaves supported
 NUM_OCTAVES = 4
 
-# Min note in MIDI supported
+# Min and max note (in MIDI note number)
 MIN_NOTE = 36
 MAX_NOTE = MIN_NOTE + NUM_OCTAVES * OCTAVE
 

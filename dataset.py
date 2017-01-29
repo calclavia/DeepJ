@@ -4,6 +4,22 @@ Preprocesses input MIDI files and converts it as a Numpy file.
 from preprocess import midi_io, melodies_lib
 import os
 import numpy as np
+from music import *
+
+def process_melody(melody):
+    """
+    Converts a melody data to be compatible with the neural network.
+    """
+    res = []
+    for x in melody:
+        if x >= MAX_NOTE:
+            res.append(NO_EVENT)
+        elif x >= 0:
+            res.append(max(x - MIN_NOTE, MIN_CLASS))
+        else:
+            # Apply shift to NOTE_OFF and NO_EVENT
+            res.append(abs(x) - 1)
+    return res
 
 def load_melody(fname):
     try:

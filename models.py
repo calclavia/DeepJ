@@ -6,23 +6,22 @@ from keras.models import Model
 from keras.layers.convolutional import Convolution1D
 from keras.layers.recurrent import GRU
 from util import one_hot
-from music import NUM_CLASSES, NOTES_PER_BAR
+from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
-def pre_model(time_steps, dropout=True):
+def pre_model(time_steps, dropout=True, num_units = 256):
     # Multi-hot vector of each note
-    # TODO: Just change this to state for simplicity.
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
+    # One hot vector for current beat
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
-    num_units = 256
+    key_input = Input(shape=(time_steps, NUM_KEYS), name='key_input')
 
-    x = note_input
-    y = GRU(64, return_sequences=True, name='beat_sparse')(beat_input)
+    x1 = note_input
+    x2 = GRU(64, return_sequences=True, name='beat_sparse')(beat_input)
+    x3 = GRU(64, return_sequences=True, name='key_sparse')(key_input)
 
-    if dropout:
-        x = Dropout(0.2)(x)
-
-    x = merge([x, y], mode='concat')
+    # x = merge([x1, x2, x3], mode='concat')
+    x = merge([x1, x2], mode='concat')
 
     for i in range(2):
         x = GRU(num_units, return_sequences=True, name='lstm' + str(i))(x)
