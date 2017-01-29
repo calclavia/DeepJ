@@ -43,7 +43,7 @@ C_MAJOR_KEY = [0, 1]
 for o in range(0, NUM_OCTAVES):
     C_MAJOR_KEY += [MIN_CLASS + o * OCTAVE + i for i in [0, 2, 4, 5, 7, 9, 11]]
 
-C_MAJOR_TONIC = MIN_CLASS + OCTAVE
+C_MAJOR_TONIC = MIN_CLASS + OCTAVE * 2
 A_MINOR_TONIC = C_MAJOR_TONIC + SIXTH
 
 # Special intervals that have unique rewards
