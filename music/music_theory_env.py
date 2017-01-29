@@ -17,7 +17,7 @@ class MusicTheoryEnv(MusicEnv):
         state, reward, done, info = super()._step(action)
 
         # Compute total rewards
-        reward += (self.reward_key(action) - 1) * 1.3
+        reward += self.reward_key(action) - 1
         reward += self.reward_tonic(action) * 3
         reward += self.reward_penalize_repeating(action) * 100
         reward += self.reward_penalize_autocorrelation(action) * 4
@@ -106,7 +106,7 @@ class MusicTheoryEnv(MusicEnv):
 
         return 0
 
-    def reward_penalize_autocorrelation(self, action, lags=[1, 2, 4, 6]):
+    def reward_penalize_autocorrelation(self, action, lags=[1, 2, 3]):
         """
         Reduces the previous reward if the composition is highly autocorrelated.
         Penalizes the model for creating a composition that is highly correlated
