@@ -13,7 +13,7 @@ class MusicTunerEnv(MusicTheoryEnv):
                  g_rnn,
                  model,
                  memory,
-                 theory_scalar=2,
+                 theory_scalar=1,
                  preprocess=lambda x: x):
         super().__init__()
         # Separate the graph!

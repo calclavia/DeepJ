@@ -33,7 +33,7 @@ class MusicEnv(Env):
 
     def _reset(self):
         # Composition is a list of notes composed
-        self.composition = [NO_EVENT]
+        self.composition = [C_MAJOR_TONIC]
         self.beat = 0
         return self._current_state()
 

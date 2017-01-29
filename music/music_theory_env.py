@@ -17,14 +17,14 @@ class MusicTheoryEnv(MusicEnv):
         state, reward, done, info = super()._step(action)
 
         # Compute total rewards
-        reward += self.reward_key(action) * 1
+        reward += (self.reward_key(action) - 1) * 1.3
         reward += self.reward_tonic(action) * 3
         reward += self.reward_penalize_repeating(action) * 100
-        reward += self.reward_penalize_autocorrelation(action) * 5
-        reward += self.reward_motif(action)
-        reward += self.reward_repeated_motif(action)
-        # New rewards based on Gauldin's book, "A Practical Approach to Eighteenth
-        # Century Counterpoint"
+        reward += self.reward_penalize_autocorrelation(action) * 3
+        reward += self.reward_motif(action) * 3
+        reward += self.reward_repeated_motif(action) * 4
+        # Based on Gauldin's book:
+        # "A Practical Approach to Eighteenth Century Counterpoint"
         reward += self.reward_preferred_intervals(action) * 5
         reward += self.reward_leap_up_back(action) * 5
         reward += self.reward_high_low_unique(action) * 3
@@ -43,7 +43,7 @@ class MusicTheoryEnv(MusicEnv):
         Returns:
           Float reward value.
         """
-        return -1 if action not in key else 0
+        return 1 if action in key else 0
 
     def reward_tonic(self, action, tonic_note=C_MAJOR_TONIC):
         """
@@ -54,7 +54,7 @@ class MusicTheoryEnv(MusicEnv):
           action: Integer of chosen note
           tonic_note: The tonic/1st note of the desired key.
         Returns:
-          Float reward value.
+          1 if satisfy tonic reward. 0 otherwise.
         """
         last_beat = self.beat - 1
         first_note_of_final_bar = self.num_notes - NOTES_PER_BAR
@@ -73,23 +73,11 @@ class MusicTheoryEnv(MusicEnv):
 
     def reward_penalize_repeating(self, action):
         """
-        Penalizes for playing the same note repeatedly.
-        Allows more repeated notes if there are held notes or rests in between.
-        Args:
-          action: Chosen action.
-        Returns:
-          -1 if repetition is detected
-        """
-        is_repeating = self.detect_repeating_notes(action)
-        return -1 if is_repeating else 0
-
-    def detect_repeating_notes(self, action):
-        """
         Detects whether the note played is repeating previous notes excessively.
         Args:
           action: An integer representing the note just played.
         Returns:
-          True if the note just played is excessively repeated, False otherwise.
+          -1 if repetition is detected. 0 otherwise.
         """
         num_repeated = 0
         contains_held_notes = False
@@ -106,21 +94,19 @@ class MusicTheoryEnv(MusicEnv):
             else:
                 break
 
-        if action == NOTE_OFF and num_repeated > 1:
-            return True
-        elif not contains_held_notes and not contains_breaks:
-            if num_repeated > 4:
-                return True
+        if not contains_held_notes and not contains_breaks:
+            # Successive note on is not good
+            tolerance = NOTES_PER_BEAT / 2
+            if num_repeated > tolerance:
+                return -(num_repeated - tolerance)
         elif contains_held_notes or contains_breaks:
+            # Non successive repetition of same note
             if num_repeated > 6:
-                return True
-        else:
-            if num_repeated > 8:
-                return True
+                return -(num_repeated - 6)
 
-        return False
+        return 0
 
-    def reward_penalize_autocorrelation(self, action, lags=[1, 2, 3]):
+    def reward_penalize_autocorrelation(self, action, lags=[2, 4, 6]):
         """
         Reduces the previous reward if the composition is highly autocorrelated.
         Penalizes the model for creating a composition that is highly correlated
@@ -129,7 +115,7 @@ class MusicTheoryEnv(MusicEnv):
         Args:
           action: Chosen action.
         Returns:
-          Float reward value.
+          Negative float reward if there is auto correlation
         """
         sum_penalty = 0
         for lag in lags:
@@ -140,7 +126,7 @@ class MusicTheoryEnv(MusicEnv):
                         sum_penalty += np.abs(coeff)
         return -sum_penalty
 
-    def reward_motif(self, action, reward_amount=3.0):
+    def reward_motif(self, action, unique=3):
         """
         Rewards the model for playing any motif.
 
@@ -154,11 +140,10 @@ class MusicTheoryEnv(MusicEnv):
             Float reward value.
         """
         motif, num_notes_in_motif = self.detect_last_motif(self.composition)
-        if motif is not None:
-            motif_complexity_bonus = max((num_notes_in_motif - 3) * .3, 0)
-            return reward_amount + motif_complexity_bonus
-        else:
-            return 0.0
+        if num_notes_in_motif >= unique:
+            motif_complexity_bonus = (num_notes_in_motif - unique) / NOTES_PER_BAR
+            return 1. + motif_complexity_bonus
+        return 0
 
     def detect_last_motif(self, composition, bar_length=NOTES_PER_BAR):
         """
@@ -170,8 +155,7 @@ class MusicTheoryEnv(MusicEnv):
             recent motif. Defaults to the model's composition.
           bar_length: The number of notes in one bar.
         Returns:
-          None if there is no motif, otherwise the motif in the same format as the
-          composition.
+          The motif in the same format as the composition and # of unique notes.
         """
         if len(composition) < bar_length:
             return None, 0
@@ -180,15 +164,11 @@ class MusicTheoryEnv(MusicEnv):
 
         actual_notes = [a for a in last_bar if a != NO_EVENT and a != NOTE_OFF]
         num_unique_notes = len(set(actual_notes))
-        if num_unique_notes >= 3:
-            return last_bar, num_unique_notes
-        else:
-            return None, num_unique_notes
+        return last_bar, num_unique_notes
 
     def reward_repeated_motif(self,
                               action,
-                              bar_length=NOTES_PER_BAR,
-                              reward_amount=4.0):
+                              unique=3):
         """
         Adds a big bonus to previous reward if the model plays a repeated motif.
         Checks if the model has just played a motif that repeats an ealier motif in
@@ -202,24 +182,18 @@ class MusicTheoryEnv(MusicEnv):
         Returns:
           Float reward value.
         """
-        is_repeated, motif = self.detect_repeated_motif(action, bar_length)
-        if is_repeated:
-            actual_notes = [a for a in motif if a !=
-                            NO_EVENT and a != NOTE_OFF]
-            num_notes_in_motif = len(set(actual_notes))
-            motif_complexity_bonus = max(num_notes_in_motif - 3, 0)
-            return reward_amount + motif_complexity_bonus
-        else:
-            return 0.0
+        is_repeated, num_notes_in_motif = self.detect_repeated_motif(action)
+        if is_repeated and num_notes_in_motif >= unique:
+            motif_complexity_bonus = (num_notes_in_motif - unique) / NOTES_PER_BAR
+            return 1. + motif_complexity_bonus
+        return 0
 
-    def detect_repeated_motif(self, action, bar_length=NOTES_PER_BAR):
+    def detect_repeated_motif(self, action, unique=3, bar_length=NOTES_PER_BAR):
         """
         Detects whether the last motif played repeats an earlier motif played.
 
         Args:
           action: One-hot encoding of the chosen action.
-          bar_length: The number of beats in one bar. This determines how many beats
-            the model has in which to play the motif.
         Returns:
           True if the note just played belongs to a motif that is repeated. False
           otherwise.
@@ -227,8 +201,8 @@ class MusicTheoryEnv(MusicEnv):
         if len(self.composition) < bar_length:
             return False, None
 
-        motif, _ = self.detect_last_motif(self.composition, bar_length)
-        if motif is None:
+        motif, num_notes_in_motif = self.detect_last_motif(self.composition)
+        if num_notes_in_motif < unique:
             return False, None
 
         prev_composition = self.composition[:-(bar_length - 1) - 1]
@@ -239,7 +213,7 @@ class MusicTheoryEnv(MusicEnv):
                 if prev_composition[i + j] != motif[j]:
                     break
             else:
-                return True, motif
+                return True, num_notes_in_motif
         return False, None
 
     def detect_sequential_interval(self, action, key=None):
@@ -325,15 +299,15 @@ class MusicTheoryEnv(MusicEnv):
 
         # rests can be good
         if interval == REST_INTERVAL:
-            reward = 0.05
+            reward = 0.07
             tf.logging.debug('Rest interval.')
         if interval == HOLD_INTERVAL:
-            reward = 0.075
+            reward = 0.1
         if interval == REST_INTERVAL_AFTER_THIRD_OR_FIFTH:
             reward = 0.15
             tf.logging.debug('Rest interval after 1st or 5th.')
         if interval == HOLD_INTERVAL_AFTER_THIRD_OR_FIFTH:
-            reward = 0.3
+            reward = 0.4
 
         # large leaps and awkward intervals bad
         if interval == SEVENTH:
