@@ -17,11 +17,12 @@ def pre_model(time_steps, dropout=True):
     num_units = 256
 
     x = note_input
+    y = GRU(64, return_sequences=True, name='beat_sparse')(beat_input)
 
     if dropout:
         x = Dropout(0.2)(x)
 
-    x = merge([x, beat_input], mode='concat')
+    x = merge([x, y], mode='concat')
 
     for i in range(2):
         x = GRU(num_units, return_sequences=True, name='lstm' + str(i))(x)
@@ -56,7 +57,7 @@ def note_model(time_steps):
 
 
 def supervised_model(time_steps):
-    inputs, x = pre_model(time_steps)
+    inputs, x = pre_model(time_steps, False)
 
     # Multi-label
     x = Dense(NUM_CLASSES, name='policy', activation='softmax')(x)

@@ -8,11 +8,12 @@ from models import supervised_model
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint
+from dataset import load_melodies
 
 time_steps = 8
 model_file = 'out/supervised.h5'
 
-melodies = load_data()[:200]
+melodies = load_melodies(['data/edm'])
 
 data_set, beat_set, label_set = [], [], []
 
