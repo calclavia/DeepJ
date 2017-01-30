@@ -1,3 +1,4 @@
+# TODO: We don't need this anymore...
 import midi
 import numpy as np
 import os
@@ -23,7 +24,7 @@ def midi_encode_melody(melody,
     # Append the track to the pattern
     pattern.append(track)
 
-    # track.append(midi.SetTempoEvent(bpm=40))
+    track.append(midi.SetTempoEvent(bpm=100))
 
     velocity = 127
     last_note = None

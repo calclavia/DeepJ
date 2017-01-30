@@ -4,17 +4,22 @@ import gym
 from rl import A3CAgent, track
 from util import *
 from midi_util import *
+from music import MusicGenEnv
 import midi
-from music import target_compositions
+from dataset import load_melodies, process_melody
 
-target_compositions += load_melodies('data/edm/edm_c')
+melodies = list(map(process_melody, load_melodies(['data/edm'])))
+samples = 5
 
 with tf.device('/cpu:0'), tf.Session() as sess:
-    env = track(gym.make('music-gen-v0'))
-    env.num_notes = 128
     agent = make_agent()
     agent.load(sess)
-    agent.run(sess, env)
-    print('Composition', env.composition)
-    mf = midi_encode_melody(env.composition)
-    midi.write_midifile('out/output.mid', mf)
+
+    for sample_count in range(samples):
+        # A priming melody
+        inspiration = np.random.choice(melodies)
+        env = track(MusicGenEnv(inspiration))
+        agent.run(sess, env)
+        print('Composition', env.composition)
+        mf = midi_encode_melody(env.composition)
+        midi.write_midifile('out/tune_{}.mid'.format(sample_count), mf)
