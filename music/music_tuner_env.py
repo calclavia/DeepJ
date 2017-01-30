@@ -13,7 +13,7 @@ class MusicTunerEnv(MusicTheoryEnv):
                  g_rnn,
                  model,
                  memory,
-                 theory_scalar=1.2,
+                 theory_scalar=1,
                  preprocess=lambda x: x):
         super().__init__()
         # Separate the graph!
@@ -22,6 +22,7 @@ class MusicTunerEnv(MusicTheoryEnv):
         self.preprocess = preprocess
         self.theory_scalar = theory_scalar
         self.memory = memory
+
 
     def _reset(self):
         state = super()._reset()
@@ -34,7 +35,7 @@ class MusicTunerEnv(MusicTheoryEnv):
             s = [np.array([s_i]) for s_i in self.memory.to_states()]
             predictions = self.model.predict(s)[0]
         norm_constant = np.log(np.sum(np.exp(predictions)))
-        # np.log(np.clip(predictions[action], 1e-20, 1))
+        # prob = np.log(np.clip(predictions[action], 1e-20, 1))
         prob = predictions[action] - norm_constant
 
         # Compute music theory rewards
