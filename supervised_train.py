@@ -13,7 +13,7 @@ from dataset import load_melodies, process_melody
 time_steps = 8
 model_file = 'out/supervised.h5'
 
-melodies = list(map(process_melody, load_melodies(['data/edm'])))
+melodies = list(map(process_melody, load_melodies(['data/edm', 'data/70s'])))
 
 data_set, beat_set, label_set = [], [], []
 
