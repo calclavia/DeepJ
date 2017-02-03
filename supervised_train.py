@@ -45,6 +45,6 @@ cbs = [ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True)
 model.fit(
     [data_set, beat_set],
     label_set,
-    nb_epoch=1000,
+    nb_epoch=300,
     callbacks=cbs
 )

@@ -24,7 +24,9 @@ def process_melody(melody):
 def load_melody(fname):
     try:
         seq_pb = midi_io.midi_to_sequence_proto(fname)
-        return melodies_lib.midi_file_to_melody(seq_pb)
+        melody = melodies_lib.midi_file_to_melody(seq_pb)
+        melody.squash(MIN_NOTE, MAX_NOTE, 0)
+        return melody
     except Exception as e:
         # print(e)
         return None

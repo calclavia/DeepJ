@@ -85,3 +85,20 @@ def autocorrelate(signal, lag=1):
   x = np.asarray(signal) - np.mean(signal)
   c0 = np.var(signal)
   return (x[lag:] * x[:n - lag]).sum() / float(n) / c0
+
+def is_sublist(li, sublist):
+    if len(li) == 0:
+        return None
+
+    # Sublist current index
+    j = 0
+
+    for i, x in enumerate(li):
+        if x == sublist[j]:
+            j += 1
+
+            if j == len(sublist):
+                return i - (j - 1)
+        else:
+            j = 0
+    return None
