@@ -10,7 +10,7 @@ from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
 
-def gru_stack(time_steps, dropout=True, num_units=128, layers=5):
+def gru_stack(time_steps, dropout=True, num_units=256, layers=3):
     # Multi-hot vector of each note
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
     # One hot vector for current beat

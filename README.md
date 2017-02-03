@@ -6,5 +6,5 @@
 
 Custom versions of:
 
-- MIDO (https://github.com/calclavia/mido/tree/patch-1)
+- Python MIDI (https://github.com/vishnubob/python-midi)
 - Latest version of PrettyMIDI (https://github.com/craffel/pretty-midi)
