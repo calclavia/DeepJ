@@ -88,22 +88,32 @@ def autocorrelate(signal, lag=1):
     return (x[lag:] * x[:n - lag]).sum() / float(n) / c0
 
 
-def is_sublist(li, sublist):
+def similarity(li, sublist):
+    """
+    Return:
+        An integer between 0 and len(sublist).
+        Number of elements in the sublist equal to the main list from
+        the tail of the list to the end.
+    """
     assert type(li) is list
     assert type(sublist) is list
 
     if len(li) == 0:
-        return None
+        return 0
 
     # Sublist current index
-    j = 0
+    j = len(sublist) - 1
+    max_len = 0
 
-    for i, x in enumerate(li):
+    for x in reversed(li):
+        if x != sublist[j]:
+            j = len(sublist) - 1
+
         if x == sublist[j]:
-            j += 1
+            j -= 1
+            max_len = max((len(sublist) - 1) - j, max_len)
+            # This is the max possible length. Break fast.
+            if j == -1:
+                return max_len
 
-            if j == len(sublist):
-                return i - (j - 1)
-        else:
-            j = 0
-    return None
+    return max_len

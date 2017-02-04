@@ -1,7 +1,8 @@
 import numpy as np
 import random
 from .music_env import MusicEnv
-from .util import NOTES_PER_BAR, is_sublist
+from .util import NOTES_PER_BAR, similarity
+
 
 class MusicCloneEnv(MusicEnv):
     """
@@ -22,13 +23,13 @@ class MusicCloneEnv(MusicEnv):
         state, reward, done, info = super()._step(action)
 
         # Reward by pattern matching with target compositions.
-        # A match is defined as 3 consecutive notes.
-        if self.beat >= 3:
-            last_notes = self.composition[:-3]
+        # TODO: Avoid local optima?
+        for t in self.targets:
+            similar = similarity(t, self.composition[-8:])
 
-            for target in self.targets:
-                if is_sublist(target, last_notes):
-                    reward += 1
-                    break
+            if similar >= 3:
+                reward += similar
+
+        reward /= len(self.targets)
 
         return state, reward, done, info
