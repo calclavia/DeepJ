@@ -7,7 +7,7 @@ from util import *
 from models import supervised_model
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from dataset import load_melodies, process_melody
 
 time_steps = 8
@@ -40,11 +40,16 @@ else:
 # Make dir for model saving
 os.makedirs(os.path.dirname(model_file), exist_ok=True)
 
-cbs = [ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True)]
+cbs = [
+    ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True),
+    TensorBoard(log_dir='./out/supervised/summary', histogram_freq=1),
+    ReduceLROnPlateau(monitor='loss'),
+    EarlyStopping(monitor='loss', patience=10)
+]
 
 model.fit(
     [data_set, beat_set],
     label_set,
-    nb_epoch=300,
+    nb_epoch=1000,
     callbacks=cbs
 )
