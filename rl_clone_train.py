@@ -2,11 +2,13 @@ import tensorflow as tf
 
 from rl import A3CAgent
 from util import *
-from music import NOTES_PER_BAR
+from music import MusicCloneEnv
+from dataset import load_melodies, process_melody
+
+melodies = list(map(process_melody, load_melodies(['data/edm', 'data/70s'])))
 
 with tf.Session() as sess, tf.device('/cpu:0'):
     agent = make_agent()
-    agent.add_agent(CloneAgentRunner)
 
     try:
         agent.load(sess)
@@ -15,4 +17,6 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         print('Starting new session')
 
     agent.compile(sess)
-    agent.train(sess, 'music-theory-v0').join()
+    model_builder = lambda: MusicCloneEnv(melodies)
+
+    agent.train(sess, model_builder).join()

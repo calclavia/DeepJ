@@ -70,23 +70,28 @@ def one_hot(i, nb_classes):
     arr[i] = 1
     return arr
 
+
 def autocorrelate(signal, lag=1):
-  """
-  Gives the correlation coefficient for the signal's correlation with itself.
-  Args:
-    signal: The signal on which to compute the autocorrelation. Can be a list.
-    lag: The offset at which to correlate the signal with itself. E.g. if lag
-      is 1, will compute the correlation between the signal and itself 1 beat
-      later.
-  Returns:
-    Correlation coefficient.
-  """
-  n = len(signal)
-  x = np.asarray(signal) - np.mean(signal)
-  c0 = np.var(signal)
-  return (x[lag:] * x[:n - lag]).sum() / float(n) / c0
+    """
+    Gives the correlation coefficient for the signal's correlation with itself.
+    Args:
+      signal: The signal on which to compute the autocorrelation. Can be a list.
+      lag: The offset at which to correlate the signal with itself. E.g. if lag
+        is 1, will compute the correlation between the signal and itself 1 beat
+        later.
+    Returns:
+      Correlation coefficient.
+    """
+    n = len(signal)
+    x = np.asarray(signal) - np.mean(signal)
+    c0 = np.var(signal)
+    return (x[lag:] * x[:n - lag]).sum() / float(n) / c0
+
 
 def is_sublist(li, sublist):
+    assert type(li) is list
+    assert type(sublist) is list
+
     if len(li) == 0:
         return None
 
