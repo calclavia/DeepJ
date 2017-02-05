@@ -117,3 +117,23 @@ def similarity(li, sublist):
                 return max_len
 
     return max_len
+
+def is_sublist(li, sublist):
+    assert type(li) is list
+    assert type(sublist) is list
+
+    if len(li) == 0:
+        return None
+
+    # Sublist current index
+    j = 0
+
+    for i, x in enumerate(li):
+        if x == sublist[j]:
+            j += 1
+
+            if j == len(sublist):
+                return i - (j - 1)
+        else:
+            j = 0
+    return None
