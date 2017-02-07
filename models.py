@@ -52,7 +52,7 @@ def note_model(time_steps):
     value = Dense(1, name='value', activation='linear')(x)
 
     model = Model(inputs, [policy, value])
-    model.load_weights('data/supervised.h5', by_name=True)
+    #model.load_weights('data/supervised.h5', by_name=True)
     # Create value output
     return model
 

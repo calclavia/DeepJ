@@ -19,10 +19,10 @@ class MusicTheoryEnv(MusicEnv):
         # Compute total rewards
         reward += self.reward_key(action) - 1
         reward += self.reward_tonic(action) * 3
-        reward += self.reward_penalize_repeating(action) * 100
-        reward += self.reward_penalize_autocorrelation(action) * 4
-        reward += self.reward_motif(action) * 3
-        reward += self.reward_repeated_motif(action) * 4
+        reward += self.reward_penalize_repeating(action) * -100
+        reward += self.reward_penalize_autocorrelation(action) * 3
+        reward += self.reward_motif(action)  # * 3
+        reward += self.reward_repeated_motif(action)# * 4
         # Based on Gauldin's book:
         # "A Practical Approach to Eighteenth Century Counterpoint"
         reward += self.reward_preferred_intervals(action) * 5
@@ -57,7 +57,7 @@ class MusicTheoryEnv(MusicEnv):
           1 if satisfy tonic reward. 0 otherwise.
         """
         last_beat = self.beat - 1
-        first_note_of_final_bar = self.num_notes - NOTES_PER_BAR
+        first_note_of_final_bar = self.num_notes - NOTES_PER_BAR // 2
         assert last_beat >= 0
 
         if last_beat == 0 or last_beat == first_note_of_final_bar:
@@ -94,15 +94,28 @@ class MusicTheoryEnv(MusicEnv):
             else:
                 break
 
+        if action == NOTE_OFF and num_repeated > 1:
+            return 1
+        elif not contains_held_notes and not contains_breaks:
+            if num_repeated > 4:
+                return 1
+        elif contains_held_notes or contains_breaks:
+            if num_repeated > 6:
+                return 1
+        else:
+            if num_repeated > 8:
+                return 1
+        """
         if not contains_held_notes and not contains_breaks:
             # Successive note on is not good
-            tolerance = NOTES_PER_BEAT / 2
+            tolerance = NOTES_PER_BEAT // 2
             if num_repeated > tolerance:
                 return -(num_repeated - tolerance)
         elif contains_held_notes or contains_breaks:
             # Non successive repetition of same note
             if num_repeated > 6:
                 return -(num_repeated - 6)
+        """
 
         return 0
 
@@ -119,11 +132,10 @@ class MusicTheoryEnv(MusicEnv):
         """
         sum_penalty = 0
         for lag in lags:
-            if len(self.composition) > lag:
-                coeff = autocorrelate(self.composition, lag=lag)
-                if not np.isnan(coeff):
-                    if np.abs(coeff) > 0.15:
-                        sum_penalty += np.abs(coeff)
+            coeff = autocorrelate(self.composition, lag=lag)
+            if not np.isnan(coeff):
+                if np.abs(coeff) > 0.15:
+                    sum_penalty += np.abs(coeff)
         return -sum_penalty
 
     def reward_motif(self, action, unique=3):
@@ -141,8 +153,12 @@ class MusicTheoryEnv(MusicEnv):
         """
         motif, num_notes_in_motif = self.detect_last_motif(self.composition)
         if num_notes_in_motif >= unique:
+            motif_complexity_bonus = max((num_notes_in_motif - 3) * .3, 0)
+            return 3 + motif_complexity_bonus
+            """
             motif_complexity_bonus = (num_notes_in_motif - unique) / NOTES_PER_BAR
             return 1. + motif_complexity_bonus
+            """
         return 0
 
     def detect_last_motif(self, composition, bar_length=NOTES_PER_BAR):
@@ -184,8 +200,12 @@ class MusicTheoryEnv(MusicEnv):
         """
         is_repeated, num_notes_in_motif = self.detect_repeated_motif(action)
         if is_repeated and num_notes_in_motif >= unique:
+            motif_complexity_bonus = max(num_notes_in_motif - 3, 0)
+            return 4 + motif_complexity_bonus
+            """
             motif_complexity_bonus = (num_notes_in_motif - unique) / NOTES_PER_BAR
             return 1. + motif_complexity_bonus
+            """
         return 0
 
     def detect_repeated_motif(self, action, unique=3, bar_length=NOTES_PER_BAR):
@@ -299,15 +319,15 @@ class MusicTheoryEnv(MusicEnv):
 
         # rests can be good
         if interval == REST_INTERVAL:
-            reward = 0.07
+            reward = 0.05
             tf.logging.debug('Rest interval.')
         if interval == HOLD_INTERVAL:
-            reward = 0.1
+            reward = 0.075
         if interval == REST_INTERVAL_AFTER_THIRD_OR_FIFTH:
             reward = 0.15
             tf.logging.debug('Rest interval after 1st or 5th.')
         if interval == HOLD_INTERVAL_AFTER_THIRD_OR_FIFTH:
-            reward = 0.4
+            reward = 0.3
 
         # large leaps and awkward intervals bad
         if interval == SEVENTH:
@@ -344,9 +364,10 @@ class MusicTheoryEnv(MusicEnv):
             reward = 0.02
             tf.logging.debug('5th')
 
+        tf.logging.debug('Interval reward', reward)
         return reward
 
-    def detect_leap_up_back(self, action, steps_between_leaps=12):
+    def detect_leap_up_back(self, action, steps_between_leaps=6):
         """
         Detects when the composition takes a musical leap, and if it is resolved.
         When the composition jumps up or down by an interval of a fifth or more,
@@ -364,10 +385,10 @@ class MusicTheoryEnv(MusicEnv):
         """
         outcome = 0
 
-        interval, action_note, prev_note = self.detect_sequential_interval(
+        interval, action, prev_note = self.detect_sequential_interval(
             action)
 
-        if action_note == NOTE_OFF or action_note == NO_EVENT:
+        if action == NOTE_OFF or action == NO_EVENT:
             self.steps_since_last_leap += 1
             tf.logging.debug('Rest, adding to steps since last leap. It is'
                              'now: %s', self.steps_since_last_leap)
@@ -375,7 +396,7 @@ class MusicTheoryEnv(MusicEnv):
 
         # detect if leap
         if interval >= FIFTH or interval == IN_KEY_FIFTH:
-            if action_note > prev_note:
+            if action > prev_note:
                 leap_direction = ASCENDING
                 tf.logging.debug('Detected an ascending leap')
             else:
@@ -415,9 +436,9 @@ class MusicTheoryEnv(MusicEnv):
             # This could be changed by requiring you to only go a 5th back in the
             # opposite direction of the leap.
             if (self.composition_direction == ASCENDING and
-                action_note <= self.leapt_from) or (
+                action <= self.leapt_from) or (
                     self.composition_direction == DESCENDING and
-                    action_note >= self.leapt_from):
+                    action >= self.leapt_from):
                 tf.logging.debug('detected a gradually resolved leap')
                 outcome = LEAP_RESOLVED
                 self.composition_direction = 0

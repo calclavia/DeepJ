@@ -24,7 +24,7 @@ class MusicCloneEnv(MusicEnv):
 
         # Reward by pattern matching with target compositions.
         if self.beat >= 3:  # and self.beat % 3 == 0:
-            last_notes = self.composition[-3:]
+            last_notes = self.composition[-8:]
             """
             for t in self.targets:
                  if is_sublist(t, last_notes):
@@ -37,5 +37,5 @@ class MusicCloneEnv(MusicEnv):
                 if similar >= 3:
                     reward += 1 #max(reward, similar - 2)
                     break
-            
+
         return state, reward, done, info
