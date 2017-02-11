@@ -5,12 +5,13 @@ from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten
 from keras.models import Model
 from keras.layers.convolutional import Convolution1D
 from keras.layers.recurrent import GRU
+from keras.layers.normalization import BatchNormalization
 from util import one_hot
 from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
 
-def gru_stack(time_steps, dropout=True, num_units=256, layers=3):
+def gru_stack(time_steps, dropout=False, batch_norm=True, num_units=256, layers=5):
     # Multi-hot vector of each note
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
     # One hot vector for current beat
@@ -35,6 +36,9 @@ def gru_stack(time_steps, dropout=True, num_units=256, layers=3):
         # Residual connection
         if i > 0 and i < layers - 1:
             x = merge([x, y], mode='sum')
+
+        if batch_norm:
+            x = BatchNormalization()(x)
 
         x = Activation('relu')(x)
 

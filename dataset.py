@@ -5,6 +5,7 @@ from preprocess import midi_io, melodies_lib
 import os
 import numpy as np
 from music import *
+from tqdm import tqdm
 
 def process_melody(melody):
     """
@@ -41,10 +42,14 @@ def get_all_files(paths):
                     potential_files.append(fname)
     return potential_files
 
-def load_melodies(paths):
+def load_melodies(paths, limit=None):
     files = get_all_files(paths)
+
+    if limit is not None:
+        files = files[:limit]
+
     print('Loading melodies from {} files'.format(len(files)))
-    res = [load_melody(f) for f in files]
+    res = [load_melody(f) for f in tqdm(files)]
 
     out = []
     skipped = 0

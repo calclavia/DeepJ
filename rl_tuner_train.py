@@ -25,7 +25,7 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         g_rnn,
         supervised_model,
         Memory(8),
-        theory_scalar=1.8,
+        theory_scalar=1,
         preprocess=note_preprocess
     )
 
