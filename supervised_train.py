@@ -10,12 +10,8 @@ from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from dataset import load_melodies, process_melody, dataset_generator
 
-time_steps = 8
+time_steps = 10
 model_file = 'out/supervised.h5'
-
-# Define the musical styles
-styles = ['data/edm', 'data/southern_rock']
-NUM_STYLES = len(styles)
 
 # A list of styles, each containing melodies
 melody_styles = [list(map(process_melody, load_melodies([style]))) for style in styles]

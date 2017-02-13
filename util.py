@@ -20,3 +20,7 @@ def one_hot(i, nb_classes):
     arr = np.zeros((nb_classes,))
     arr[i] = 1
     return arr
+
+# Define the musical styles
+styles = ['data/edm', 'data/southern_rock', 'data/southern_rock']
+NUM_STYLES = len(styles)

@@ -11,7 +11,7 @@ from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
 
-def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256]):
+def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256, 256]):
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
     # TODO: Don't hardcode this
