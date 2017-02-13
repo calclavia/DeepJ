@@ -1,7 +1,7 @@
 # Defines the models used in the experiments
 
 import numpy as np
-from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten
+from keras.layers import Dense, Input, merge, Activation, Dropout, RepeatVector
 from keras.models import Model
 from keras.layers.convolutional import Convolution1D
 from keras.layers.recurrent import GRU
@@ -11,30 +11,29 @@ from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
 
-def gru_stack(time_steps, dropout=False, batch_norm=True, num_units=256, layers=5):
-    # Multi-hot vector of each note
+def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256]):
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
-    # One hot vector for current beat
+
+    NUM_STYLES = 2
+    # Context inputs
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
-    # key_input = Input(shape=(time_steps, NUM_KEYS), name='key_input')
+    # TODO: Don't hardcode this
+    style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
+    context = merge([beat_input, style_input], mode='concat')
+    #context = RepeatVector(time_steps)(context)
 
-    x1 = note_input
-    x2 = beat_input
-    # x3 = GRU(64, return_sequences=True, name='key_sparse')(key_input)
+    x = merge([note_input, context], mode='concat')
 
-    # x = merge([x1, x2, x3], mode='concat')
-    x = merge([x1, x2], mode='concat')
-
-    for i in range(layers):
+    for i, num_units in enumerate(layers):
         y = x
         x = GRU(
             num_units,
-            return_sequences=i != layers - 1,
+            return_sequences=i != len(layers) - 1,
             name='lstm' + str(i)
         )(x)
 
         # Residual connection
-        if i > 0 and i < layers - 1:
+        if i > 0 and i < len(layers) - 1:
             x = merge([x, y], mode='sum')
 
         if batch_norm:
@@ -45,7 +44,7 @@ def gru_stack(time_steps, dropout=False, batch_norm=True, num_units=256, layers=
         if dropout:
             x = Dropout(0.5)(x)
 
-    return [note_input, beat_input], x
+    return [note_input, beat_input, style_input], x
 
 
 def note_model(time_steps):

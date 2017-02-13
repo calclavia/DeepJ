@@ -6,6 +6,8 @@ import os
 import numpy as np
 from music import *
 from tqdm import tqdm
+from collections import deque
+
 
 def process_melody(melody):
     """
@@ -22,6 +24,7 @@ def process_melody(melody):
             res.append(abs(x) - 1)
     return res
 
+
 def load_melody(fname):
     try:
         seq_pb = midi_io.midi_to_sequence_proto(fname)
@@ -32,6 +35,7 @@ def load_melody(fname):
         # print(e)
         return None
 
+
 def get_all_files(paths):
     potential_files = []
     for path in paths:
@@ -41,6 +45,7 @@ def get_all_files(paths):
                 if os.path.isfile(fname):
                     potential_files.append(fname)
     return potential_files
+
 
 def load_melodies(paths, limit=None):
     files = get_all_files(paths)
@@ -62,6 +67,7 @@ def load_melodies(paths, limit=None):
     print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
     return out
 
+
 def load_melodies_thread(paths):
     from joblib import Parallel, delayed
     files = get_all_files(paths)
@@ -78,6 +84,41 @@ def load_melodies_thread(paths):
 
     print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
     return out
+
+
+def build_history_buffer(time_steps, num_classes, notes_in_bar):
+    history = deque(maxlen=time_steps)
+    for i in range(time_steps):
+        history.appendleft([
+            np.zeros(num_classes),
+            one_hot(notes_in_bar - 1 - i, notes_in_bar),
+            style_hot
+        ])
+    return history
+
+
+def dataset_generator(melody_styles, time_steps, num_classes, notes_in_bar):
+    for s, style in enumerate(melody_styles):
+        style_hot = one_hot(s, len(melody_styles))
+
+        for melody in style:
+            # Recurrent history
+            history(time_steps, num_classes, notes_in_bar)
+
+            for beat, note in enumerate(melody):
+                note_hot = one_hot(note, num_classes)
+                beat_hot = one_hot(beat % notes_in_bar, notes_in_bar)
+
+                # Wrap around
+                next_note_index = 0 if beat + 1 >= len(melody) else beat + 1
+                next_note_hot = one_hot(melody[next_note_index], num_classes)
+
+                history.append([note_hot, beat_hot, style_hot])
+
+                # Yield the current input with target
+                # yield [list(hist_buff), beat_hot, style_hot], [next_note_hot]
+                yield zip(*history), [next_note_hot]
+
 
 def main():
     loaded_data = load_melodies_thread(['data/edm', 'data/clean_midi'])

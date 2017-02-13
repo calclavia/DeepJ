@@ -8,26 +8,22 @@ from models import supervised_model
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
-from dataset import load_melodies, process_melody
+from dataset import load_melodies, process_melody, dataset_generator
 
 time_steps = 8
 model_file = 'out/supervised.h5'
 
-melodies = list(map(process_melody, load_melodies(['data/edm', 'data/clean_midi'], 1000)))
+# Define the musical styles
+styles = ['data/edm', 'data/country_rock']
+NUM_STYLES = len(styles)
 
-data_set, beat_set, label_set = [], [], []
+# A list of styles, each containing melodies
+melody_styles = [list(map(process_melody, load_melodies([style]))) for style in styles]
 
-for c in melodies:
-    c_hot = [one_hot(x, NUM_CLASSES) for x in c]
-    x, y = create_dataset(c_hot, time_steps)
-    data_set += x
-    label_set += y
-    beat_data = create_beat_data(c, NOTES_PER_BAR)
-    beat_set += create_dataset(beat_data, time_steps)[0]
-
-data_set = np.array(data_set)
-label_set = np.array(label_set)
-beat_set = np.array(beat_set)
+print('Processing dataset')
+input_set, target_set = zip(*dataset_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR))
+input_set = [np.array(i) for i in zip(*input_set)]
+target_set = [np.array(i) for i in zip(*target_set)]
 
 # Load model to continue training
 if os.path.isfile(model_file):
@@ -37,19 +33,21 @@ else:
     print('Creating new model')
     model = supervised_model(time_steps)
 
+model.summary()
+
 # Make dir for model saving
 os.makedirs(os.path.dirname(model_file), exist_ok=True)
 
 cbs = [
     ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True),
-    TensorBoard(log_dir='./out/supervised/summary', histogram_freq=1),
-    ReduceLROnPlateau(monitor='loss'),
+    #TensorBoard(log_dir='./out/supervised/summary', histogram_freq=1),
+    ReduceLROnPlateau(monitor='loss', patience=5, verbose=1),
     EarlyStopping(monitor='loss', patience=10)
 ]
 
 model.fit(
-    [data_set, beat_set],
-    label_set,
+    input_set,
+    target_set,
     nb_epoch=1000,
     callbacks=cbs
 )
