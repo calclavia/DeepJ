@@ -6,16 +6,13 @@ from keras.models import Model
 from keras.layers.convolutional import Convolution1D
 from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
-from util import one_hot
+from util import one_hot, NUM_STYLES
 from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
-
 
 def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256, 256]):
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
-    # TODO: Don't hardcode this
-    NUM_STYLES = 2
     # Context inputs
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
