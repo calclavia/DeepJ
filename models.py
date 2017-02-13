@@ -14,15 +14,15 @@ from keras.models import load_model
 def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256]):
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
+    # TODO: Don't hardcode this
     NUM_STYLES = 2
     # Context inputs
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
-    # TODO: Don't hardcode this
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
     context = merge([beat_input, style_input], mode='concat')
-    #context = RepeatVector(time_steps)(context)
 
-    x = merge([note_input, context], mode='concat')
+    note_x = note_input# Convolution1D(64, 3, border_mode='same')(note_input)
+    x = merge([note_x, context], mode='concat')
 
     for i, num_units in enumerate(layers):
         y = x

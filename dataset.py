@@ -86,7 +86,7 @@ def load_melodies_thread(paths):
     return out
 
 
-def build_history_buffer(time_steps, num_classes, notes_in_bar):
+def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     history = deque(maxlen=time_steps)
     for i in range(time_steps):
         history.appendleft([
@@ -103,7 +103,7 @@ def dataset_generator(melody_styles, time_steps, num_classes, notes_in_bar):
 
         for melody in style:
             # Recurrent history
-            history(time_steps, num_classes, notes_in_bar)
+            history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
             for beat, note in enumerate(melody):
                 note_hot = one_hot(note, num_classes)

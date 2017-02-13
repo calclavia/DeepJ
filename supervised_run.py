@@ -8,6 +8,9 @@ from music import NUM_CLASSES, NOTES_PER_BAR
 from dataset import load_melodies, process_melody
 
 melodies = list(map(process_melody, load_melodies(['data/edm'])))
+# TODO: Harcode
+style = [0.2, 0.8]
+prev_styles = [style for _ in range(time_steps)]
 
 with tf.device('/cpu:0'):
     samples = 5
@@ -21,12 +24,14 @@ with tf.device('/cpu:0'):
         # A priming melody
         inspiration = np.random.choice(melodies)
 
+        # TODO: Refactor this with data set function calls
         prev_notes = deque(maxlen=time_steps)
         prev_beats = deque(maxlen=time_steps)
 
         i = NOTES_PER_BAR - 1
         for t in range(time_steps):
-            prev_notes.append(one_hot(inspiration[t], NUM_CLASSES,))
+            # prev_notes.append(one_hot(inspiration[t], NUM_CLASSES))
+            prev_notes.append(np.zeros(NUM_CLASSES))
             prev_beats.appendleft(one_hot(i, NOTES_PER_BAR))
 
             i -= 1
@@ -38,7 +43,8 @@ with tf.device('/cpu:0'):
         for i in range(NOTES_PER_BAR * BARS):
             results = model.predict([
                 np.array([prev_notes]),
-                np.array([prev_beats])
+                np.array([prev_beats]),
+                np.array([prev_styles])
             ])
             prob_dist = results[0]
             note = np.random.choice(len(prob_dist), p=prob_dist)

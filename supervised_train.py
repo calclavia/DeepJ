@@ -14,7 +14,7 @@ time_steps = 8
 model_file = 'out/supervised.h5'
 
 # Define the musical styles
-styles = ['data/edm', 'data/country_rock']
+styles = ['data/edm', 'data/southern_rock']
 NUM_STYLES = len(styles)
 
 # A list of styles, each containing melodies
