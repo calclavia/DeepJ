@@ -9,8 +9,7 @@ from dataset import load_melodies, process_melody
 
 melodies = list(map(process_melody, load_melodies(['data/edm'])))
 # TODO: Harcode
-style = [0.2, 0.8]
-prev_styles = [style for _ in range(time_steps)]
+style = [0.5, 0.5]
 
 with tf.device('/cpu:0'):
     samples = 5
@@ -18,6 +17,7 @@ with tf.device('/cpu:0'):
     BARS = 8
 
     model = load_model('data/supervised.h5')
+    prev_styles = [style for _ in range(time_steps)]
 
     # Generate
     for sample_count in range(samples):
