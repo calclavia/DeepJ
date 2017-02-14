@@ -22,5 +22,5 @@ def one_hot(i, nb_classes):
     return arr
 
 # Define the musical styles
-styles = ['data/edm', 'data/southern_rock', 'data/southern_rock']
+styles = ['data/edm', 'data/southern_rock', 'data/hard_rock']
 NUM_STYLES = len(styles)

@@ -18,11 +18,15 @@ def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256,
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
     context = merge([beat_input, style_input], mode='concat')
 
-    note_x = note_input# Convolution1D(64, 3, border_mode='same')(note_input)
-    x = merge([note_x, context], mode='concat')
+    x = note_input # Convolution1D(64, 3, border_mode='same')(note_input)
+
+    # Create a distributerd representation of context
+    context = GRU(64, return_sequences=True, name='context')(context)
 
     for i, num_units in enumerate(layers):
         y = x
+        x = merge([x, context], mode='concat')
+
         x = GRU(
             num_units,
             return_sequences=i != len(layers) - 1,

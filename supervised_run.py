@@ -19,7 +19,7 @@ args = parser.parse_args()
 style = list(map(float, args.style))
 print('Generating music with style: ', style)
 assert len(style) == NUM_STYLES
-assert sum(style) == 1
+assert (1 - sum(style)) < 1e-2
 
 # Inspiration melodies
 inspirations = list(map(process_melody, load_melodies(styles)))
