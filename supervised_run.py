@@ -7,17 +7,22 @@ from midi_util import *
 from music import NUM_CLASSES, NOTES_PER_BAR
 from dataset import load_melodies, process_melody
 
-# TODO: Harcode
 import argparse
 
 parser = argparse.ArgumentParser(description='Generates music.')
-parser.add_argument('style', metavar='S', default=[], type=str, nargs='+',
+parser.add_argument('style', metavar='S', default=[], type=float, nargs='+',
                     help='A list that defines the weights of style')
+parser.add_argument('--bars', default=8, type=int, dest='bars',
+                    help='How many bars of music to generate.')
 
 args = parser.parse_args()
 
-style = list(map(float, args.style))
-print('Generating music with style: ', style)
+style = args.style
+samples = 5
+time_steps = 10
+BARS = args.bars
+
+print('Generating music with style {} for {} bars'.format(style, BARS))
 assert len(style) == NUM_STYLES
 assert (1 - sum(style)) < 1e-2
 
@@ -25,17 +30,16 @@ assert (1 - sum(style)) < 1e-2
 inspirations = list(map(process_melody, load_melodies(styles)))
 
 with tf.device('/cpu:0'):
-    samples = 5
-    time_steps = 10
-    BARS = 8
-
     model = load_model('data/supervised.h5')
     prev_styles = [style for _ in range(time_steps)]
 
     # Generate
     for sample_count in range(samples):
         # A priming melody
-        inspiration = np.random.choice(inspirations)
+        inspiration = None
+
+        while inspiration is None or len(inspiration) < time_steps:
+            inspiration = np.random.choice(inspirations)
 
         # TODO: Refactor this with data set function calls
         prev_notes = deque(maxlen=time_steps)
@@ -49,7 +53,7 @@ with tf.device('/cpu:0'):
 
             i -= 1
             if i < 0:
-                i = NOTES_PER_BAR
+                i = NOTES_PER_BAR - 1
 
         composition = []
 
