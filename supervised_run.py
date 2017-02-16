@@ -67,7 +67,7 @@ with tf.device('/cpu:0'):
             note = np.random.choice(len(prob_dist), p=prob_dist)
 
             note_hot = one_hot(note, NUM_CLASSES)
-            beat_input = compute_beat(i, N)
+            beat_input = compute_beat(i, NOTES_PER_BAR)
             completion_input = np.array([i / (N - 1)])
             history.append([note_hot, beat_input, completion_input, style])
 

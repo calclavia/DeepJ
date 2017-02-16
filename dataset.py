@@ -86,14 +86,17 @@ def load_melodies_thread(paths):
     return out
 
 def compute_beat(beat, notes_in_bar):
+    """
+    # Angle method
     angle = (beat % notes_in_bar) / (notes_in_bar - 1) * 2 * math.pi
     return np.array([math.cos(angle), math.sin(angle)])
+    """
+    return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     history = deque(maxlen=time_steps)
+    current_beat = NOTES_PER_BAR - 1
     for i in range(time_steps):
-        # TODO: Would this be negative?
-        current_beat = notes_in_bar - 1 - i
         assert current_beat >= 0
         history.appendleft([
             np.zeros(num_classes),
@@ -101,6 +104,10 @@ def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
             np.zeros(1),
             style_hot
         ])
+
+        current_beat -= 1
+        if current_beat < 0:
+            current_beat = NOTES_PER_BAR - 1
     return history
 
 
