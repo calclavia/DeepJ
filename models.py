@@ -14,9 +14,10 @@ def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256,
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
     # Context inputs
-    beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
+    beat_input = Input(shape=(time_steps, 2), name='beat_input')
+    completion_input = Input(shape=(time_steps, 1), name='completion_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
-    context = merge([beat_input, style_input], mode='concat')
+    context = merge([completion_input, beat_input, style_input], mode='concat')
 
     x = note_input # Convolution1D(64, 3, border_mode='same')(note_input)
 
@@ -45,7 +46,7 @@ def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256,
         if dropout:
             x = Dropout(0.5)(x)
 
-    return [note_input, beat_input, style_input], x
+    return [note_input, beat_input, completion_input, style_input], x
 
 
 def note_model(time_steps):

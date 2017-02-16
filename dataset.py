@@ -7,7 +7,7 @@ import numpy as np
 from music import *
 from tqdm import tqdm
 from collections import deque
-
+import math
 
 def process_melody(melody):
     """
@@ -85,13 +85,20 @@ def load_melodies_thread(paths):
     print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
     return out
 
+def compute_beat(beat, notes_in_bar):
+    angle = (beat % notes_in_bar) / (notes_in_bar - 1) * 2 * math.pi
+    return np.array([math.cos(angle), math.sin(angle)])
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     history = deque(maxlen=time_steps)
     for i in range(time_steps):
+        # TODO: Would this be negative?
+        current_beat = notes_in_bar - 1 - i
+        assert current_beat >= 0
         history.appendleft([
             np.zeros(num_classes),
-            one_hot(notes_in_bar - 1 - i, notes_in_bar),
+            compute_beat(current_beat, notes_in_bar),
+            np.zeros(1),
             style_hot
         ])
     return history
@@ -107,16 +114,17 @@ def dataset_generator(melody_styles, time_steps, num_classes, notes_in_bar):
 
             for beat, note in enumerate(melody):
                 note_hot = one_hot(note, num_classes)
-                beat_hot = one_hot(beat % notes_in_bar, notes_in_bar)
+                beat_input = compute_beat(beat, notes_in_bar)
+                completion_input = np.array([beat / (len(melody) - 1)])
 
                 # Wrap around
                 next_note_index = 0 if beat + 1 >= len(melody) else beat + 1
                 next_note_hot = one_hot(melody[next_note_index], num_classes)
 
-                history.append([note_hot, beat_hot, style_hot])
+                history.append([note_hot, beat_input, completion_input, style_hot])
 
                 # Yield the current input with target
-                # yield [list(hist_buff), beat_hot, style_hot], [next_note_hot]
+                # yield [list(hist_buff), beat_input, style_hot], [next_note_hot]
                 yield zip(*history), [next_note_hot]
 
 

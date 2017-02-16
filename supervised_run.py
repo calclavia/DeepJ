@@ -5,8 +5,8 @@ from keras.models import load_model
 from util import *
 from midi_util import *
 from music import NUM_CLASSES, NOTES_PER_BAR
-from dataset import load_melodies, process_melody
-
+from dataset import load_melodies, process_melody, compute_beat
+import math
 import argparse
 
 parser = argparse.ArgumentParser(description='Generates music.')
@@ -41,34 +41,36 @@ with tf.device('/cpu:0'):
         while inspiration is None or len(inspiration) < time_steps:
             inspiration = np.random.choice(inspirations)
 
-        # TODO: Refactor this with data set function calls
-        prev_notes = deque(maxlen=time_steps)
-        prev_beats = deque(maxlen=time_steps)
-
+        # Prime the RNN
+        history = deque(maxlen=time_steps)
+        # TODO: Not DRY
         i = NOTES_PER_BAR - 1
         for t in range(time_steps):
-            prev_notes.append(one_hot(inspiration[t], NUM_CLASSES))
-            # prev_notes.append(np.zeros(NUM_CLASSES))
-            prev_beats.appendleft(one_hot(i, NOTES_PER_BAR))
+            history.appendleft([
+                np.zeros(NUM_CLASSES),
+                compute_beat(i, NOTES_PER_BAR),
+                np.zeros(1),
+                style
+            ])
 
             i -= 1
             if i < 0:
                 i = NOTES_PER_BAR - 1
 
+        # Compose
         composition = []
 
-        for i in range(NOTES_PER_BAR * BARS):
-            results = model.predict([
-                np.array([prev_notes]),
-                np.array([prev_beats]),
-                np.array([prev_styles])
-            ])
+        N = NOTES_PER_BAR * BARS
+        for i in range(N):
+            results = model.predict([np.array([x]) for x in zip(*history)])
             prob_dist = results[0]
             note = np.random.choice(len(prob_dist), p=prob_dist)
 
-            result = one_hot(note, NUM_CLASSES)
-            prev_notes.append(result)
-            prev_beats.append(one_hot(i % NOTES_PER_BAR, NOTES_PER_BAR))
+            note_hot = one_hot(note, NUM_CLASSES)
+            beat_input = compute_beat(i, N)
+            completion_input = np.array([i / (N - 1)])
+            history.append([note_hot, beat_input, completion_input, style])
+
             composition.append(note)
 
         print('Composition', composition)
