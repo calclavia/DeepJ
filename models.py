@@ -14,7 +14,8 @@ def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256,
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
     # Context inputs
-    beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
+    # beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
+    beat_input = Input(shape=(time_steps, 2), name='beat_input')
     completion_input = Input(shape=(time_steps, 1), name='completion_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
@@ -22,7 +23,8 @@ def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256,
     x = note_input # Convolution1D(64, 3, border_mode='same')(note_input)
 
     # Create a distributerd representation of context
-    context = GRU(64, return_sequences=True, name='context')(context)
+    context = GRU(32, return_sequences=True, name='context_1')(context)
+    context = GRU(64, return_sequences=True, name='context_2')(context)
 
     for i, num_units in enumerate(layers):
         y = x

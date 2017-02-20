@@ -11,7 +11,7 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         agent.load(sess)
         print('Loading last saved session')
     except:
+        agent.compile(sess)
         print('Starting new session')
 
-    agent.compile(sess)
     agent.train(sess, lambda: gym.make('music-theory-v0')).join()

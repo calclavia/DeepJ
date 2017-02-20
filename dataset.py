@@ -86,12 +86,11 @@ def load_melodies_thread(paths):
     return out
 
 def compute_beat(beat, notes_in_bar):
-    """
     # Angle method
-    angle = (beat % notes_in_bar) / (notes_in_bar - 1) * 2 * math.pi
+    angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
     return np.array([math.cos(angle), math.sin(angle)])
-    """
-    return one_hot(beat % notes_in_bar, notes_in_bar)
+
+    #return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     history = deque(maxlen=time_steps)

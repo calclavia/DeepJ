@@ -10,6 +10,8 @@ import math
 import argparse
 
 parser = argparse.ArgumentParser(description='Generates music.')
+parser.add_argument('model', metavar='M', type=str,
+                    help='Path to the model file')
 parser.add_argument('style', metavar='S', default=[], type=float, nargs='+',
                     help='A list that defines the weights of style')
 parser.add_argument('--bars', default=8, type=int, dest='bars',
@@ -30,7 +32,7 @@ assert (1 - sum(style)) < 1e-2
 inspirations = list(map(process_melody, load_melodies(styles)))
 
 with tf.device('/cpu:0'):
-    model = load_model('data/supervised.h5')
+    model = load_model(args.model)
     prev_styles = [style for _ in range(time_steps)]
 
     # Generate

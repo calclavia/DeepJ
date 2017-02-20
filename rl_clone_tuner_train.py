@@ -16,9 +16,9 @@ with tf.Session() as sess, tf.device('/cpu:0'):
         agent.load(sess)
         print('Loading last saved session')
     except:
+        agent.compile(sess)
         print('Starting new session')
 
-    agent.compile(sess)
     model_builder = lambda: MusicCloneTunerEnv(melodies, theory_scalar=1)
 
     agent.train(sess, model_builder).join()
