@@ -6,6 +6,7 @@ from util import *
 from midi_util import *
 from music import NUM_CLASSES, NOTES_PER_BAR
 from dataset import load_melodies, process_melody, compute_beat
+from models import supervised_model
 import math
 import argparse
 
@@ -32,7 +33,8 @@ assert (1 - sum(style)) < 1e-2
 inspirations = list(map(process_melody, load_melodies(styles)))
 
 with tf.device('/cpu:0'):
-    model = load_model(args.model)
+    model = supervised_model(time_steps)
+    model.load_weights(args.model)
     prev_styles = [style for _ in range(time_steps)]
 
     # Generate

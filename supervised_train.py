@@ -22,12 +22,13 @@ input_set = [np.array(i) for i in zip(*input_set)]
 target_set = [np.array(i) for i in zip(*target_set)]
 
 # Load model to continue training
+model = supervised_model(time_steps)
+
 if os.path.isfile(model_file):
     print('Loading model')
-    model = load_model(model_file)
+    model.load_weights(model_file)
 else:
     print('Creating new model')
-    model = supervised_model(time_steps)
 
 model.summary()
 
