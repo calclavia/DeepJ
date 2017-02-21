@@ -72,7 +72,7 @@ def load_melodies_thread(paths):
     from joblib import Parallel, delayed
     files = get_all_files(paths)
     print('Loading melodies from {} files'.format(len(files)))
-    res = Parallel(n_jobs=4, verbose=5)(delayed(load_melody)(f) for f in files)
+    res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(load_melody)(f) for f in files)
 
     out = []
     skipped = 0

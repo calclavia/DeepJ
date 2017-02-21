@@ -3,7 +3,7 @@
 import numpy as np
 from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten
 from keras.models import Model
-from keras.layers.convolutional import AtrousConvolution1D
+from keras.layers.convolutional import AtrousConvolution1D, Convolution1D
 from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
@@ -44,28 +44,26 @@ class CausalAtrousConvolution1D(AtrousConvolution1D):
             x = K.asymmetric_temporal_padding(x, self.atrous_rate * (self.filter_length - 1), 0)
         return super(CausalAtrousConvolution1D, self).call(x, mask)
 
-def residual_block(x):
+def residual_block(x, nb_filters, s, dilation):
     original_x = x
     # TODO: initalization, regularization?
     # Note: The AtrousConvolution1D with the 'causal' flag is implemented in github.com/basveeling/keras#@wavenet.
-    tanh_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** i, border_mode='valid', causal=True,
-                                         bias=use_bias,
-                                         name='dilated_conv_%d_tanh_s%d' % (2 ** i, s), activation='tanh',
-                                         W_regularizer=l2(res_l2))(x)
-    sigm_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** i, border_mode='valid', causal=True,
-                                         bias=use_bias,
-                                         name='dilated_conv_%d_sigm_s%d' % (2 ** i, s), activation='sigmoid',
-                                         W_regularizer=l2(res_l2))(x)
-    x = layers.Merge(mode='mul', name='gated_activation_%d_s%d' % (i, s))([tanh_out, sigm_out])
+    tanh_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True,
+                                         name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s), activation='tanh')(x)
+    # TODO: Batch norm
+    sigm_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True,
+                                         name='dilated_conv_%d_sigm_s%d' % (2 ** dilation, s), activation='sigmoid')(x)
+    # TODO: Batch norm
+    x = merge([tanh_out, sigm_out], mode='mul', name='gated_activation_%d_s%d' % (dilation, s))
 
-    res_x = layers.Convolution1D(nb_filters, 1, border_mode='same', bias=use_bias,
-                                 W_regularizer=l2(res_l2))(x)
-    skip_x = layers.Convolution1D(nb_filters, 1, border_mode='same', bias=use_bias,
-                                  W_regularizer=l2(res_l2))(x)
-    res_x = layers.Merge(mode='sum')([original_x, res_x])
+    res_x = Convolution1D(nb_filters, 1, border_mode='same')(x)
+    # TODO: Batch norm
+    skip_x = Convolution1D(nb_filters, 1, border_mode='same')(x)
+    # TODO: Batch norm
+    res_x = merge([original_x, res_x], mode='sum')
     return res_x, skip_x
 
-def pre_model(time_steps):
+def supervised_model(time_steps, nb_stacks=4, dilation_depth=8, nb_filters=64, nb_output_bins=NUM_CLASSES):
     # Primary input
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
@@ -76,35 +74,38 @@ def pre_model(time_steps):
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
 
-    # Build network stack
-    x = note_input
-
     # Create a distributerd representation of context
     context = GRU(128, return_sequences=True)(context)
     context = BatchNormalization()(context)
     context = Activation('relu')(context)
 
-    """
+    out = note_input
+    out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=1, border_mode='valid',
+                                    causal=True, name='initial_causal_conv')(out)
     skip_connections = []
 
     for s in range(nb_stacks):
-        for i in range(0, dilation_depth + 1):
-            out, skip_out = residual_block(out)
+        for i in range(dilation_depth + 1):
+            out, skip_out = residual_block(out, nb_filters, s, i)
             skip_connections.append(skip_out)
-    """
 
-    # Simple convs
-    for i, nb_filters in enumerate([32, 64, 128, 256]):
-        x = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** i, causal=True)(x)
-        x = BatchNormalization()(x)
-        x = Activation('relu')(x)
+    # TODO: This is optinal. Experiment with it...
+    out = merge(skip_connections, mode='sum')
+    out = Activation('relu')(out)
+    out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
+    out = Activation('relu')(out)
+    out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
+    out = Activation('softmax')(out)
+    # TODO: Add context
 
-    x = merge([x, context], mode='concat')
-    x = GRU(nb_filters)(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
+    model = Model([note_input, beat_input, completion_input, style_input], out)
+    model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
 
-    return [note_input, beat_input, completion_input, style_input], x
+    return model
 
 
 def note_model(time_steps):
@@ -118,19 +119,6 @@ def note_model(time_steps):
     #model.load_weights('data/supervised.h5', by_name=True)
     # Create value output
     return model
-
-
-def supervised_model(time_steps):
-    inputs, x = pre_model(time_steps)
-
-    # Multi-label
-    x = Dense(NUM_CLASSES, name='policy', activation='softmax')(x)
-
-    model = Model(inputs, x)
-    model.compile(optimizer='adam', loss='categorical_crossentropy',
-                  metrics=['accuracy'])
-    return model
-
 
 def note_preprocess(env, x):
     note, beat = x
