@@ -47,24 +47,32 @@ class CausalAtrousConvolution1D(AtrousConvolution1D):
 
 def residual_block(x, nb_filters, s, dilation):
     original_x = x
-    # TODO: initalization, regularization?
-    # Note: The AtrousConvolution1D with the 'causal' flag is implemented in github.com/basveeling/keras#@wavenet.
+    # Tanh + Sigmoid gating
+    """
     tanh_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True,
                                          name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s), activation='tanh')(x)
-    # TODO: Batch norm
+    tanh_out = BatchNormalization()(tanh_out)
+
     sigm_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True,
                                          name='dilated_conv_%d_sigm_s%d' % (2 ** dilation, s), activation='sigmoid')(x)
-    # TODO: Batch norm
+    sigm_out = BatchNormalization()(sigm_out)
+
     x = merge([tanh_out, sigm_out], mode='mul', name='gated_activation_%d_s%d' % (dilation, s))
+    """
+    # ReLU Alternative
+    x = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True, name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s), activation='tanh')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
 
     res_x = Convolution1D(nb_filters, 1, border_mode='same')(x)
-    # TODO: Batch norm
+    res_x = BatchNormalization()(res_x)
     skip_x = Convolution1D(nb_filters, 1, border_mode='same')(x)
-    # TODO: Batch norm
+    skip_x = BatchNormalization()(skip_x)
+
     res_x = merge([original_x, res_x], mode='sum')
     return res_x, skip_x
 
-def supervised_model(time_steps, nb_stacks=2, dilation_depth=4, nb_filters=32, nb_output_bins=NUM_CLASSES):
+def supervised_model(time_steps, nb_stacks=4, dilation_depth=4, nb_filters=32, nb_output_bins=NUM_CLASSES):
     # Primary input
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
@@ -76,9 +84,10 @@ def supervised_model(time_steps, nb_stacks=2, dilation_depth=4, nb_filters=32, n
     context = merge([completion_input, beat_input, style_input], mode='concat')
 
     # Create a distributerd representation of context
-    context = GRU(nb_output_bins, return_sequences=True)(context)
-    context = BatchNormalization()(context)
-    context = Activation('relu')(context)
+    for i in range(2):
+        context = GRU(nb_output_bins, return_sequences=True)(context)
+        context = BatchNormalization()(context)
+        context = Activation('relu')(context)
 
     out = note_input
     out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=1, border_mode='valid',
@@ -92,18 +101,19 @@ def supervised_model(time_steps, nb_stacks=2, dilation_depth=4, nb_filters=32, n
 
     # TODO: This is optinal. Experiment with it...
     out = merge(skip_connections, mode='sum')
-    out = Activation('relu')(out)
-    out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
-    out = Activation('relu')(out)
-    out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
 
+    for i in range(3):
+        if i > 0:
+            # Combine contextual inputs
+            out = merge([context, out], mode='sum')
+        out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
+        context = BatchNormalization()(context)
+        out = Activation('relu')(out)
+
+    out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
     # TODO: Not efficient to learn one thing at a time.
     # out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
-    # TODO: Not sure if this is good...
-    out = merge([context, out], mode='sum')
-
     out = Activation('softmax')(out)
-    # TODO: Add context
 
     model = Model([note_input, beat_input, completion_input, style_input], out)
     model.compile(
