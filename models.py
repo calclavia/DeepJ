@@ -1,7 +1,7 @@
 # Defines the models used in the experiments
 
 import numpy as np
-from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten
+from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten, Lambda
 from keras.models import Model
 from keras.layers.convolutional import AtrousConvolution1D, Convolution1D
 from keras.layers.recurrent import GRU
@@ -9,7 +9,8 @@ from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 from keras.utils.np_utils import conv_output_length
 
-from util import one_hot, NUM_STYLES
+from util import one_hot
+from constants import NUM_STYLES
 from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
@@ -63,7 +64,7 @@ def residual_block(x, nb_filters, s, dilation):
     res_x = merge([original_x, res_x], mode='sum')
     return res_x, skip_x
 
-def supervised_model(time_steps, nb_stacks=4, dilation_depth=8, nb_filters=64, nb_output_bins=NUM_CLASSES):
+def supervised_model(time_steps, nb_stacks=2, dilation_depth=4, nb_filters=32, nb_output_bins=NUM_CLASSES):
     # Primary input
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
 
@@ -95,6 +96,10 @@ def supervised_model(time_steps, nb_stacks=4, dilation_depth=8, nb_filters=64, n
     out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
     out = Activation('relu')(out)
     out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
+
+    # TODO: Not efficient to learn one thing at a time.
+    out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
+
     out = Activation('softmax')(out)
     # TODO: Add context
 

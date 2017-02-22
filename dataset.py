@@ -7,6 +7,7 @@ import numpy as np
 from music import *
 from tqdm import tqdm
 from collections import deque
+from joblib import Parallel, delayed
 import math
 
 def process_melody(melody):
@@ -24,7 +25,6 @@ def process_melody(melody):
             res.append(abs(x) - 1)
     return res
 
-
 def load_melody(fname):
     try:
         seq_pb = midi_io.midi_to_sequence_proto(fname)
@@ -34,7 +34,6 @@ def load_melody(fname):
     except Exception as e:
         # print(e)
         return None
-
 
 def get_all_files(paths):
     potential_files = []
@@ -46,15 +45,23 @@ def get_all_files(paths):
                     potential_files.append(fname)
     return potential_files
 
+def load_then_process(f):
+    melody = load_melody(f)
+    if melody:
+        return process_melody(melody)
+    else:
+        return None
 
-def load_melodies(paths, limit=None):
+def load_melodies(paths, process=True, limit=None):
+    assert len(paths) > 0
     files = get_all_files(paths)
 
     if limit is not None:
         files = files[:limit]
 
     print('Loading melodies from {} files'.format(len(files)))
-    res = [load_melody(f) for f in tqdm(files)]
+    fn = load_then_process if process else load_melody
+    res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(fn)(f) for f in files)
 
     out = []
     skipped = 0
@@ -68,22 +75,6 @@ def load_melodies(paths, limit=None):
     return out
 
 
-def load_melodies_thread(paths):
-    from joblib import Parallel, delayed
-    files = get_all_files(paths)
-    print('Loading melodies from {} files'.format(len(files)))
-    res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(load_melody)(f) for f in files)
-
-    out = []
-    skipped = 0
-    for melody in res:
-        if melody == None:
-            skipped += 1
-        else:
-            out.append(melody)
-
-    print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
-    return out
 
 def compute_beat(beat, notes_in_bar):
     # Angle method

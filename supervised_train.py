@@ -4,37 +4,28 @@ import os
 import tensorflow as tf
 import os.path
 from util import *
-from models import supervised_model
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
-from dataset import load_melodies_thread, process_melody, dataset_generator
+from dataset import load_melodies, dataset_generator
+from constants import NUM_STYLES, styles
 
-def main():
-    time_steps = NOTES_PER_BAR
-    model_file = 'out/supervised.h5'
+time_steps = NOTES_PER_BAR
+model_file = 'out/supervised.h5'
 
+def load_data():
     # A list of styles, each containing melodies
-    melody_styles = [list(map(process_melody, load_melodies_thread([style]))) for style in styles]
+    melody_styles = [load_melodies([style]) for style in styles]
 
     print('Processing dataset')
     input_set, target_set = zip(*dataset_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR))
     input_set = [np.array(i) for i in zip(*input_set)]
     target_set = [np.array(i) for i in zip(*target_set)]
+    return input_set, target_set
 
-    # Load model to continue training
-    model = supervised_model(time_steps)
-
-    if os.path.isfile(model_file):
-        print('Loading model')
-        model.load_weights(model_file)
-    else:
-        print('Creating new model')
-
-    model.summary()
-
-    # Make dir for model saving
-    os.makedirs(os.path.dirname(model_file), exist_ok=True)
+def main():
+    model = load_supervised_model(time_steps, model_file)
+    input_set, target_set = load_data()
 
     cbs = [
         ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True),
