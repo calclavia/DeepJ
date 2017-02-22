@@ -48,21 +48,21 @@ class CausalAtrousConvolution1D(AtrousConvolution1D):
 def residual_block(x, nb_filters, s, dilation):
     original_x = x
     # Tanh + Sigmoid gating
-    """
     tanh_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True,
-                                         name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s), activation='tanh')(x)
+                                         name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s))(x)
     tanh_out = BatchNormalization()(tanh_out)
+    tanh_out = Activation('tanh')(tanh_out)
 
     sigm_out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True,
-                                         name='dilated_conv_%d_sigm_s%d' % (2 ** dilation, s), activation='sigmoid')(x)
+                                         name='dilated_conv_%d_sigm_s%d' % (2 ** dilation, s))(x)
     sigm_out = BatchNormalization()(sigm_out)
+    sigm_out = Activation('sigmoid')(sigm_out)
 
     x = merge([tanh_out, sigm_out], mode='mul', name='gated_activation_%d_s%d' % (dilation, s))
-    """
     # ReLU Alternative
-    x = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True, name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s), activation='tanh')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
+    # x = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True, name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s))(x)
+    # x = BatchNormalization()(x)
+    # x = Activation('relu')(x)
 
     res_x = Convolution1D(nb_filters, 1, border_mode='same')(x)
     res_x = BatchNormalization()(res_x)
@@ -72,26 +72,15 @@ def residual_block(x, nb_filters, s, dilation):
     res_x = merge([original_x, res_x], mode='sum')
     return res_x, skip_x
 
-def build_inputs(time_steps):
-    # Primary input
-    note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
-    # Context inputs
-    beat_input = Input(shape=(time_steps, 2), name='beat_input')
-    completion_input = Input(shape=(time_steps, 1), name='completion_input')
-    style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
-    return note_input, beat_input, completion_input, style_input
-
-def wavenet(time_steps, nb_stacks=8, dilation_depth=5, nb_filters=32, nb_output_bins=NUM_CLASSES):
-    note_input, beat_input, completion_input, style_input = build_inputs(time_steps)
-    context = merge([completion_input, beat_input, style_input], mode='concat')
+def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_bins=NUM_CLASSES):
+    inputs, primary, context = build_inputs(time_steps)
 
     # Create a distributerd representation of context
-    for i in range(2):
-        context = Convolution1D(nb_output_bins, 1)(context)
-        context = BatchNormalization()(context)
-        context = Activation('relu')(context)
+    context = Convolution1D(nb_output_bins, 1)(context)
+    context = BatchNormalization()(context)
+    context = Activation('relu')(context)
 
-    out = note_input
+    out = primary
     out = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=1, border_mode='valid',
                                     causal=True, name='initial_causal_conv')(out)
     skip_connections = []
@@ -119,7 +108,7 @@ def wavenet(time_steps, nb_stacks=8, dilation_depth=5, nb_filters=32, nb_output_
         else:
             out = Activation('relu')(out)
 
-    model = Model([note_input, beat_input, completion_input, style_input], out)
+    model = Model(inputs, out)
     model.compile(
         optimizer='adam',
         loss='categorical_crossentropy',
@@ -127,37 +116,54 @@ def wavenet(time_steps, nb_stacks=8, dilation_depth=5, nb_filters=32, nb_output_
     )
     return model
 
-def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256, 256]):
-    note_input, beat_input, completion_input, style_input = build_inputs(time_steps)
-    context = merge([completion_input, beat_input, style_input], mode='concat')
+def gru_stack(time_steps, layers=[256, 256, 256, 256, 256]):
+    inputs, primary, context = build_inputs(time_steps)
+
+    out = primary
 
     # Create a distributerd representation of context
     context = GRU(32, return_sequences=True, name='context_1')(context)
     context = GRU(64, return_sequences=True, name='context_2')(context)
 
     for i, num_units in enumerate(layers):
-        y = x
-        x = merge([x, context], mode='concat')
+        y = out
+        out = merge([out, context], mode='concat')
 
-        x = GRU(
+        out = GRU(
             num_units,
             return_sequences=i != len(layers) - 1,
             name='lstm' + str(i)
-        )(x)
+        )(out)
 
         # Residual connection
         if i > 0 and i < len(layers) - 1:
-            x = merge([x, y], mode='sum')
+            out = merge([out, y], mode='sum')
 
-        if batch_norm:
-            x = BatchNormalization()(x)
+        out = BatchNormalization()(out)
 
-        x = Activation('relu')(x)
+        if i == len(layers) - 1:
+            out = Activation('softmax')(out)
+        else:
+            out = Activation('relu')(out)
 
-        if dropout:
-            x = Dropout(0.5)(x)
+    model = Model(inputs, out)
+    model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    return model
 
-    return Model([note_input, beat_input, completion_input, style_input], x)
+def build_inputs(time_steps):
+    # Primary input
+    note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
+    primary = note_input
+    # Context inputs
+    beat_input = Input(shape=(time_steps, 2), name='beat_input')
+    completion_input = Input(shape=(time_steps, 1), name='completion_input')
+    style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
+    context = merge([completion_input, beat_input, style_input], mode='concat')
+    return [note_input, beat_input, completion_input, style_input], primary, context
 
 def supervised_model(time_steps):
     return wavenet(time_steps)

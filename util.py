@@ -29,13 +29,14 @@ def load_supervised_model(time_steps, model_file):
 
     if os.path.isfile(model_file):
         print('Loading model')
-        """
-        model = load_model(model_file, custom_objects={
-            'CausalAtrousConvolution1D': CausalAtrousConvolution1D
-        })
-        """
-        model = supervised_model(time_steps)
-        model.load_weights(model_file)
+        try:
+            model = load_model(model_file, custom_objects={
+                'CausalAtrousConvolution1D': CausalAtrousConvolution1D
+            })
+        except Exception as e:
+            print(e)
+            model = supervised_model(time_steps)
+            model.load_weights(model_file)
     else:
         print('Creating new model')
         model = supervised_model(time_steps)
