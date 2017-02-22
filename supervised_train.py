@@ -18,7 +18,7 @@ def load_data():
     melody_styles = [load_melodies([style]) for style in styles]
 
     print('Processing dataset')
-    input_set, target_set = zip(*dataset_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR))
+    input_set, target_set = zip(*dataset_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR, True))
     input_set = [np.array(i) for i in zip(*input_set)]
     target_set = [np.array(i) for i in zip(*target_set)]
     return input_set, target_set

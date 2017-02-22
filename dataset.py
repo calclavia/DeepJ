@@ -101,13 +101,20 @@ def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     return history
 
 
-def dataset_generator(melody_styles, time_steps, num_classes, notes_in_bar):
+def dataset_generator(melody_styles,
+                      time_steps,
+                      num_classes,
+                      notes_in_bar,
+                      train_all=False):
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
             # Recurrent history
             history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
+
+            if train_all:
+                target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
             for beat, note in enumerate(melody):
                 note_hot = one_hot(note, num_classes)
@@ -121,8 +128,11 @@ def dataset_generator(melody_styles, time_steps, num_classes, notes_in_bar):
                 history.append([note_hot, beat_input, completion_input, style_hot])
 
                 # Yield the current input with target
-                # yield [list(hist_buff), beat_input, style_hot], [next_note_hot]
-                yield zip(*history), [next_note_hot]
+                if train_all:
+                    target_history.append([next_note_hot])
+                    yield zip(*history), zip(*target_history)
+                else:
+                    yield zip(*history), [next_note_hot]
 
 
 def main():

@@ -76,7 +76,7 @@ def supervised_model(time_steps, nb_stacks=2, dilation_depth=4, nb_filters=32, n
     context = merge([completion_input, beat_input, style_input], mode='concat')
 
     # Create a distributerd representation of context
-    context = GRU(128, return_sequences=True)(context)
+    context = GRU(nb_output_bins, return_sequences=True)(context)
     context = BatchNormalization()(context)
     context = Activation('relu')(context)
 
@@ -98,7 +98,9 @@ def supervised_model(time_steps, nb_stacks=2, dilation_depth=4, nb_filters=32, n
     out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
 
     # TODO: Not efficient to learn one thing at a time.
-    out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
+    # out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
+    # TODO: Not sure if this is good...
+    out = merge([context, out], mode='sum')
 
     out = Activation('softmax')(out)
     # TODO: Add context
