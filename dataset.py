@@ -9,6 +9,7 @@ from tqdm import tqdm
 from collections import deque
 from joblib import Parallel, delayed
 import math
+import random
 
 def process_melody(melody):
     """
@@ -55,6 +56,7 @@ def load_then_process(f):
 def load_melodies(paths, process=True, limit=None):
     assert len(paths) > 0
     files = get_all_files(paths)
+    random.shuffle(files)
 
     if limit is not None:
         files = files[:limit]
@@ -73,8 +75,6 @@ def load_melodies(paths, process=True, limit=None):
 
     print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
     return out
-
-
 
 def compute_beat(beat, notes_in_bar):
     # Angle method

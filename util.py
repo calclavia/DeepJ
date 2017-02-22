@@ -2,7 +2,8 @@ from music import *
 import midi
 from rl import A3CAgent
 from midi_util import *
-from models import supervised_model
+from keras.models import load_model
+from models import supervised_model, CausalAtrousConvolution1D
 
 def make_agent():
     from models import note_model, note_preprocess
@@ -23,18 +24,21 @@ def one_hot(i, nb_classes):
     return arr
 
 def load_supervised_model(time_steps, model_file):
-    print('Attempting to load model')
-    # Load model to continue training
-    model = supervised_model(time_steps)
-
     # Make dir for model saving
     os.makedirs(os.path.dirname(model_file), exist_ok=True)
 
     if os.path.isfile(model_file):
         print('Loading model')
+        """
+        model = load_model(model_file, custom_objects={
+            'CausalAtrousConvolution1D': CausalAtrousConvolution1D
+        })
+        """
+        model = supervised_model(time_steps)
         model.load_weights(model_file)
     else:
         print('Creating new model')
+        model = supervised_model(time_steps)
 
     model.summary()
     return model

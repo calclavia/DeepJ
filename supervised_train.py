@@ -10,7 +10,7 @@ from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, Ear
 from dataset import load_melodies, dataset_generator
 from constants import NUM_STYLES, styles
 
-time_steps = NOTES_PER_BAR
+time_steps = 32
 model_file = 'out/supervised.h5'
 
 def load_data():

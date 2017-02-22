@@ -72,20 +72,22 @@ def residual_block(x, nb_filters, s, dilation):
     res_x = merge([original_x, res_x], mode='sum')
     return res_x, skip_x
 
-def supervised_model(time_steps, nb_stacks=4, dilation_depth=4, nb_filters=32, nb_output_bins=NUM_CLASSES):
+def build_inputs(time_steps):
     # Primary input
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
-
     # Context inputs
-    # beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
     beat_input = Input(shape=(time_steps, 2), name='beat_input')
     completion_input = Input(shape=(time_steps, 1), name='completion_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
+    return note_input, beat_input, completion_input, style_input
+
+def wavenet(time_steps, nb_stacks=8, dilation_depth=5, nb_filters=32, nb_output_bins=NUM_CLASSES):
+    note_input, beat_input, completion_input, style_input = build_inputs(time_steps)
     context = merge([completion_input, beat_input, style_input], mode='concat')
 
     # Create a distributerd representation of context
     for i in range(2):
-        context = GRU(nb_output_bins, return_sequences=True)(context)
+        context = Convolution1D(nb_output_bins, 1)(context)
         context = BatchNormalization()(context)
         context = Activation('relu')(context)
 
@@ -102,18 +104,20 @@ def supervised_model(time_steps, nb_stacks=4, dilation_depth=4, nb_filters=32, n
     # TODO: This is optinal. Experiment with it...
     out = merge(skip_connections, mode='sum')
 
-    for i in range(3):
+    nb_final_layers = 3
+
+    for i in range(nb_final_layers):
         if i > 0:
             # Combine contextual inputs
             out = merge([context, out], mode='sum')
+
         out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
         context = BatchNormalization()(context)
-        out = Activation('relu')(out)
 
-    out = Convolution1D(nb_output_bins, 1, border_mode='same')(out)
-    # TODO: Not efficient to learn one thing at a time.
-    # out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
-    out = Activation('softmax')(out)
+        if i == nb_final_layers - 1:
+            out = Activation('softmax')(out)
+        else:
+            out = Activation('relu')(out)
 
     model = Model([note_input, beat_input, completion_input, style_input], out)
     model.compile(
@@ -121,10 +125,44 @@ def supervised_model(time_steps, nb_stacks=4, dilation_depth=4, nb_filters=32, n
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
-
     return model
 
+def gru_stack(time_steps, dropout=False, batch_norm=True, layers=[256, 256, 256, 256, 256]):
+    note_input, beat_input, completion_input, style_input = build_inputs(time_steps)
+    context = merge([completion_input, beat_input, style_input], mode='concat')
 
+    # Create a distributerd representation of context
+    context = GRU(32, return_sequences=True, name='context_1')(context)
+    context = GRU(64, return_sequences=True, name='context_2')(context)
+
+    for i, num_units in enumerate(layers):
+        y = x
+        x = merge([x, context], mode='concat')
+
+        x = GRU(
+            num_units,
+            return_sequences=i != len(layers) - 1,
+            name='lstm' + str(i)
+        )(x)
+
+        # Residual connection
+        if i > 0 and i < len(layers) - 1:
+            x = merge([x, y], mode='sum')
+
+        if batch_norm:
+            x = BatchNormalization()(x)
+
+        x = Activation('relu')(x)
+
+        if dropout:
+            x = Dropout(0.5)(x)
+
+    return Model([note_input, beat_input, completion_input, style_input], x)
+
+def supervised_model(time_steps):
+    return wavenet(time_steps)
+
+# RL Tuner
 def note_model(time_steps):
     inputs, x = pre_model(time_steps, False)
 
