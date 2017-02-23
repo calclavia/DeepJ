@@ -3,29 +3,24 @@ import midi
 import os
 import tensorflow as tf
 import os.path
+import random
+import itertools
 from util import *
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
-from dataset import load_melodies, dataset_generator
-from constants import NUM_STYLES, styles
+from dataset import load_training_seq
+from tqdm import tqdm
 
-time_steps = 32
+time_steps = 1
 model_file = 'out/supervised.h5'
-
-def load_data():
-    # A list of styles, each containing melodies
-    melody_styles = [load_melodies([style]) for style in styles]
-
-    print('Processing dataset')
-    input_set, target_set = zip(*dataset_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR, True))
-    input_set = [np.array(i) for i in zip(*input_set)]
-    target_set = [np.array(i) for i in zip(*target_set)]
-    return input_set, target_set
+nb_epochs = 1000
 
 def main():
     model = load_supervised_model(time_steps, model_file)
-    input_set, target_set = load_data()
+    sequences = load_training_seq()
+    """
+    input_set, target_set = load_training_data()
 
     cbs = [
         ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True),
@@ -40,6 +35,30 @@ def main():
         nb_epoch=1000,
         callbacks=cbs
     )
+    """
+    print('Training...')
+    for epoch in itertools.count():
+        print('Epoch {}:'.format(epoch))
+        acc = 0
+        loss = 0
+        count = 0
+
+        order = np.random.permutation(len(sequences))
+        t = tqdm(order)
+        for s in t:
+            melody_inputs = sequences[s]
+            for i in range(len(melody_inputs) - 1):
+                tr_loss, tr_acc = model.train_on_batch(
+                    melody_inputs[i],
+                    np.reshape(melody_inputs[i + 1][0], [1, -1])
+                )
+                acc += tr_acc
+                loss += tr_loss
+                t.set_postfix(loss=loss/count, acc=acc/count)
+                count += 1
+            model.reset_states()
+
+        # TODO: Save model, stop early
 
 if __name__ == '__main__':
     main()

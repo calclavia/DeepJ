@@ -10,6 +10,8 @@ from collections import deque
 from joblib import Parallel, delayed
 import math
 import random
+from constants import NUM_STYLES, styles
+
 
 def process_melody(melody):
     """
@@ -26,15 +28,18 @@ def process_melody(melody):
             res.append(abs(x) - 1)
     return res
 
+
 def load_melody(fname):
     try:
         seq_pb = midi_io.midi_to_sequence_proto(fname)
-        melody = melodies_lib.midi_file_to_melody(seq_pb, steps_per_quarter=NOTES_PER_BEAT)
+        melody = melodies_lib.midi_file_to_melody(
+            seq_pb, steps_per_quarter=NOTES_PER_BEAT)
         melody.squash(MIN_NOTE, MAX_NOTE, 0)
         return melody
     except Exception as e:
         # print(e)
         return None
+
 
 def get_all_files(paths):
     potential_files = []
@@ -46,12 +51,14 @@ def get_all_files(paths):
                     potential_files.append(fname)
     return potential_files
 
+
 def load_then_process(f):
     melody = load_melody(f)
     if melody:
         return process_melody(melody)
     else:
         return None
+
 
 def load_melodies(paths, process=True, limit=None):
     assert len(paths) > 0
@@ -63,7 +70,8 @@ def load_melodies(paths, process=True, limit=None):
 
     print('Loading melodies from {} files'.format(len(files)))
     fn = load_then_process if process else load_melody
-    res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(fn)(f) for f in files)
+    res = Parallel(n_jobs=8, verbose=5, backend='threading')(
+        delayed(fn)(f) for f in files)
 
     out = []
     skipped = 0
@@ -76,12 +84,51 @@ def load_melodies(paths, process=True, limit=None):
     print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
     return out
 
+
 def compute_beat(beat, notes_in_bar):
     # Angle method
     angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
     return np.array([math.cos(angle), math.sin(angle)])
+    # return one_hot(beat % notes_in_bar, notes_in_bar)
 
-    #return one_hot(beat % notes_in_bar, notes_in_bar)
+
+def beat_generator(notes_in_bar, notes_in_melody):
+    """
+    Generates a sequence of beat inputs
+    """
+    for i in range(notes_in_melody):
+        yield compute_beat(i, notes_in_bar)
+
+
+def completion_generator(notes_in_melody):
+    """
+    Generates a sequence of completion inputs
+    """
+    for i in range(notes_in_melody):
+        yield np.array([i / (notes_in_melody - 1)])
+
+
+def stateful_generator(melody_styles):
+    # Process the data into a list of sequences.
+    # Each trainin sequence is a tuple of various inputs, including contexts
+    for s, style in enumerate(melody_styles):
+        style_hot = one_hot(s, len(melody_styles))
+        for melody in style:
+            reshape = lambda seq: [np.reshape(x, [1, 1, -1]) for x in seq]
+            yield [list(x) for x in zip(*map(reshape, (
+                    [one_hot(m, NUM_CLASSES) for m in melody],
+                    beat_generator(NOTES_PER_BAR, len(melody)),
+                    completion_generator(len(melody)),
+                    [style_hot for i in range(len(melody))]
+                  )))]
+
+
+def load_training_seq():
+    # A list of styles, each containing melodies
+    melody_styles = [load_melodies([style]) for style in styles]
+    print('Processing dataset')
+    return list(stateful_generator(melody_styles))
+
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     history = deque(maxlen=time_steps)
@@ -101,20 +148,22 @@ def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
     return history
 
 
-def dataset_generator(melody_styles,
-                      time_steps,
-                      num_classes,
-                      notes_in_bar,
-                      train_all=False):
+def stateless_generator(melody_styles,
+                        time_steps,
+                        num_classes,
+                        notes_in_bar,
+                        train_all=False):
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
             # Recurrent history
-            history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
+            history = build_history_buffer(
+                time_steps, num_classes, notes_in_bar, style_hot)
 
             if train_all:
-                target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
+                target_history = build_history_buffer(
+                    time_steps, num_classes, notes_in_bar, style_hot)
 
             for beat, note in enumerate(melody):
                 note_hot = one_hot(note, num_classes)
@@ -125,7 +174,8 @@ def dataset_generator(melody_styles,
                 next_note_index = 0 if beat + 1 >= len(melody) else beat + 1
                 next_note_hot = one_hot(melody[next_note_index], num_classes)
 
-                history.append([note_hot, beat_input, completion_input, style_hot])
+                history.append(
+                    [note_hot, beat_input, completion_input, style_hot])
 
                 # Yield the current input with target
                 if train_all:
@@ -135,9 +185,12 @@ def dataset_generator(melody_styles,
                     yield zip(*history), [next_note_hot]
 
 
-def main():
-    loaded_data = load_melodies_thread(['data/edm', 'data/clean_midi'])
-    np.save('data/data_cache.npy', loaded_data)
+def load_training_data():
+    # A list of styles, each containing melodies
+    melody_styles = [load_melodies([style]) for style in styles]
 
-if __name__ == '__main__':
-    main()
+    input_set, target_set = zip(
+        *stateless_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR, True))
+    input_set = [np.array(i) for i in zip(*input_set)]
+    target_set = [np.array(i) for i in zip(*target_set)]
+    return input_set, target_set

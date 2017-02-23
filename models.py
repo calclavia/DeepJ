@@ -14,7 +14,9 @@ from constants import NUM_STYLES
 from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
+
 class CausalAtrousConvolution1D(AtrousConvolution1D):
+
     def __init__(self, nb_filter, filter_length, init='glorot_uniform', activation=None, weights=None,
                  border_mode='valid', subsample_length=1, atrous_rate=1, W_regularizer=None, b_regularizer=None,
                  activity_regularizer=None, W_constraint=None, b_constraint=None, bias=True, causal=False, **kwargs):
@@ -42,8 +44,10 @@ class CausalAtrousConvolution1D(AtrousConvolution1D):
 
     def call(self, x, mask=None):
         if self.causal:
-            x = K.asymmetric_temporal_padding(x, self.atrous_rate * (self.filter_length - 1), 0)
+            x = K.asymmetric_temporal_padding(
+                x, self.atrous_rate * (self.filter_length - 1), 0)
         return super(CausalAtrousConvolution1D, self).call(x, mask)
+
 
 def residual_block(x, nb_filters, s, dilation):
     original_x = x
@@ -58,7 +62,8 @@ def residual_block(x, nb_filters, s, dilation):
     sigm_out = BatchNormalization()(sigm_out)
     sigm_out = Activation('sigmoid')(sigm_out)
 
-    x = merge([tanh_out, sigm_out], mode='mul', name='gated_activation_%d_s%d' % (dilation, s))
+    x = merge([tanh_out, sigm_out], mode='mul',
+              name='gated_activation_%d_s%d' % (dilation, s))
     # ReLU Alternative
     # x = CausalAtrousConvolution1D(nb_filters, 2, atrous_rate=2 ** dilation, causal=True, name='dilated_conv_%d_tanh_s%d' % (2 ** dilation, s))(x)
     # x = BatchNormalization()(x)
@@ -71,6 +76,7 @@ def residual_block(x, nb_filters, s, dilation):
 
     res_x = merge([original_x, res_x], mode='sum')
     return res_x, skip_x
+
 
 def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_bins=NUM_CLASSES):
     inputs, primary, context = build_inputs(time_steps)
@@ -116,35 +122,47 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(time_steps, layers=[256, 256, 256, 256, 256]):
-    inputs, primary, context = build_inputs(time_steps)
+
+def gru_stack(time_steps, layers=3, num_units=256):
+    # Primary input
+    note_input = Input(batch_shape=(1, time_steps, NUM_CLASSES), name='note_input')
+    primary = note_input
+    # Context inputs
+    beat_input = Input(batch_shape=(1, time_steps, 2), name='beat_input')
+    completion_input = Input(batch_shape=(1, time_steps, 1), name='completion_input')
+    style_input = Input(batch_shape=(1, time_steps, NUM_STYLES), name='style_input')
+    context = merge([completion_input, beat_input, style_input], mode='concat')
+
+    inputs = [note_input, beat_input, completion_input, style_input]
 
     out = primary
 
     # Create a distributerd representation of context
-    context = GRU(32, return_sequences=True, name='context_1')(context)
-    context = GRU(64, return_sequences=True, name='context_2')(context)
+    context = GRU(num_units, return_sequences=True, stateful=True)(context)
 
-    for i, num_units in enumerate(layers):
+    for i in range(layers):
         y = out
-        out = merge([out, context], mode='concat')
+        # Contextual connections
+        if i > 0:
+            out = merge([out, context], mode='sum')
 
         out = GRU(
             num_units,
-            return_sequences=i != len(layers) - 1,
-            name='lstm' + str(i)
+            return_sequences=True,
+            stateful=True,
+            name='rnn_' + str(i)
         )(out)
 
         # Residual connection
-        if i > 0 and i < len(layers) - 1:
+        if i > 0:
             out = merge([out, y], mode='sum')
 
         out = BatchNormalization()(out)
+        out = Activation('relu')(out)
 
-        if i == len(layers) - 1:
-            out = Activation('softmax')(out)
-        else:
-            out = Activation('relu')(out)
+    out = GRU(NUM_CLASSES, stateful=True, name='final')(out)
+    out = BatchNormalization()(out)
+    out = Activation('softmax')(out)
 
     model = Model(inputs, out)
     model.compile(
@@ -153,6 +171,7 @@ def gru_stack(time_steps, layers=[256, 256, 256, 256, 256]):
         metrics=['accuracy']
     )
     return model
+
 
 def build_inputs(time_steps):
     # Primary input
@@ -165,10 +184,13 @@ def build_inputs(time_steps):
     context = merge([completion_input, beat_input, style_input], mode='concat')
     return [note_input, beat_input, completion_input, style_input], primary, context
 
+
 def supervised_model(time_steps):
-    return wavenet(time_steps)
+    return gru_stack(time_steps)
 
 # RL Tuner
+
+
 def note_model(time_steps):
     inputs, x = pre_model(time_steps, False)
 
@@ -180,6 +202,7 @@ def note_model(time_steps):
     #model.load_weights('data/supervised.h5', by_name=True)
     # Create value output
     return model
+
 
 def note_preprocess(env, x):
     note, beat = x
