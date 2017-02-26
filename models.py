@@ -123,7 +123,7 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     return model
 
 
-def gru_stateful(time_steps, layers=3, num_units=256):
+def gru_stateful(time_steps, layers=2, num_units=256):
     # Primary input
     note_input = Input(batch_shape=(1, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
@@ -137,10 +137,12 @@ def gru_stateful(time_steps, layers=3, num_units=256):
 
     out = primary
 
+    #out = merge([out, context], mode='concat')
+
     # Create a distributerd representation of context
     context = GRU(64, return_sequences=True, stateful=True)(context)
     context = BatchNormalization()(context)
-    context = Activation('relu')(context)
+    context = Activation('tanh')(context)
 
     for i in range(layers):
         y = out
@@ -149,25 +151,28 @@ def gru_stateful(time_steps, layers=3, num_units=256):
 
         out = GRU(
             num_units,
-            return_sequences=True,
+            return_sequences=i != layers - 1,
             stateful=True,
             name='rnn_' + str(i)
         )(out)
 
         # Residual connection
-        if i > 0:
-            out = merge([out, y], mode='sum')
+        #if i > 0:
+        #   out = merge([out, y], mode='sum')
 
-        out = BatchNormalization()(out)
-        out = Activation('relu')(out)
+        # out = BatchNormalization()(out)
+        out = Activation('tanh')(out)
+        out = Dropout(0.2)(out)
 
-    out = GRU(NUM_CLASSES, stateful=True, name='final')(out)
-    out = BatchNormalization()(out)
+    out = Dense(NUM_CLASSES)(out)
+    # TODO: Batchnorm doesn't work when batch size = 1
+    #out = BatchNormalization()(out)
     out = Activation('softmax')(out)
 
     model = Model(inputs, out)
     model.compile(
-        optimizer='adam',
+        #optimizer='adam',
+        optimizer='rmsprop',
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )

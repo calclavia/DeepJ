@@ -23,7 +23,7 @@ def main():
 
     style = args.style
     samples = 5
-    time_steps = 1
+    time_steps = 4
     BARS = args.bars
 
     print('Generating music with style {} for {} bars'.format(style, BARS))

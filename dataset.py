@@ -60,12 +60,15 @@ def load_then_process(f):
         return None
 
 
-def load_melodies(paths, process=True, limit=None):
+def load_melodies(paths, process=True, limit=None, shuffle=True):
     assert len(paths) > 0
     files = get_all_files(paths)
-    random.shuffle(files)
+
+    if shuffle:
+        random.shuffle(files)
 
     if limit is not None:
+        print('Limiting to {} files'.format(limit))
         files = files[:limit]
 
     print('Loading melodies from {} files'.format(len(files)))
@@ -120,15 +123,6 @@ def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
         for melody in style:
-            """
-            reshape = lambda seq: np.array([np.reshape(x, [1, 1, -1]) for x in seq])
-            yield [list(x) for x in zip(*map(reshape, (
-                    [one_hot(m, NUM_CLASSES) for m in melody],
-                    beat_generator(NOTES_PER_BAR, len(melody)),
-                    completion_generator(len(melody)),
-                    [style_hot for i in range(len(melody))]
-                  )))]
-            """
             # Timestep history. We have one per input.
             # Prime timestep history
             histories = [
@@ -157,17 +151,16 @@ def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar
                     seqs[i].append(np.expand_dims(np.array(histories[i]), axis=0))
 
                 targets.append(np.reshape(one_hot(melody[beat + 1], num_classes), [1, -1]))
-
             # A sequence where each element contains 4 inputs to feed into network
             yield [list(s) for s in zip(*seqs)], targets
 
-def load_training_seq(time_steps):
+def load_training_seq(time_steps, limit=None, shuffle=True):
     """
     Return:
         A list of sequences.
     """
     # A list of styles, each containing melodies
-    melody_styles = [load_melodies([style]) for style in styles]
+    melody_styles = [load_melodies([style], limit=limit, shuffle=shuffle) for style in styles]
     print('Processing dataset')
     return list(context_seq(melody_styles, time_steps))
 

@@ -14,8 +14,7 @@ from dataset import load_training_seq
 from tqdm import tqdm
 from models import *
 
-time_steps = 8
-nb_epochs = 1000
+time_steps = 4
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -47,11 +46,12 @@ def train_stateless(model, model_file):
     )
 
 def train_stateful(model, model_file):
-    sequences = load_training_seq(time_steps)
-    # Keep track of lowest loss
-    prev_loss = float('inf')
+    # TODO: Remove limit
+    sequences = load_training_seq(time_steps, limit=20, shuffle=False)
+    # Keep track of best metrics
+    best_accuracy = 0
     no_improvements = 0
-    patience = 3
+    patience = 10
 
     for epoch in itertools.count():
         print('Epoch {}:'.format(epoch))
@@ -65,21 +65,22 @@ def train_stateful(model, model_file):
             inputs, targets = sequences[s]
             for x, y in zip(inputs, targets):
                 tr_loss, tr_acc = model.train_on_batch(x, y)
-                
+
                 acc += tr_acc
                 loss += tr_loss
                 count += 1
                 t.set_postfix(loss=loss/count, acc=acc/count)
             model.reset_states()
 
-        # TODO: Save model, stop early
-        if loss < prev_loss:
-            prev_loss = loss
+        # Save model
+        if acc > best_accuracy:
+            best_accuracy = acc
             no_improvements = 0
             model.save(model_file)
         else:
             no_improvements += 1
 
+        # Stop early
         if no_improvements > patience:
             break
 
