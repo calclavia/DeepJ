@@ -47,7 +47,7 @@ def get_all_files(paths):
         for root, dirs, files in os.walk(path):
             for f in files:
                 fname = os.path.join(root, f)
-                if os.path.isfile(fname):
+                if os.path.isfile(fname) and fname.endswith('.mid'):
                     potential_files.append(fname)
     return potential_files
 
@@ -76,7 +76,7 @@ def load_melodies(paths, process=True, limit=None):
     out = []
     skipped = 0
     for melody in res:
-        if melody == None:
+        if melody == None or len(melody) <= 1:
             skipped += 1
         else:
             out.append(melody)
@@ -108,26 +108,43 @@ def completion_generator(notes_in_melody):
         yield np.array([i / (notes_in_melody - 1)])
 
 
-def stateful_generator(melody_styles):
+def context_gen(melody_styles):
+    """
+    For every single melody style, yield the melody along
+    with its contextual inputs.
+    """
     # Process the data into a list of sequences.
-    # Each trainin sequence is a tuple of various inputs, including contexts
+    # Each sequence contains input tracks
+    # Each training sequence is a tuple of various inputs, including contexts
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
         for melody in style:
-            reshape = lambda seq: [np.reshape(x, [1, 1, -1]) for x in seq]
+            reshape = lambda seq: np.array([np.reshape(x, [1, 1, -1]) for x in seq])
             yield [list(x) for x in zip(*map(reshape, (
                     [one_hot(m, NUM_CLASSES) for m in melody],
                     beat_generator(NOTES_PER_BAR, len(melody)),
                     completion_generator(len(melody)),
                     [style_hot for i in range(len(melody))]
                   )))]
+            """
+            yield list(map(np.array, (
+                [one_hot(m, NUM_CLASSES) for m in melody],
+                list(beat_generator(NOTES_PER_BAR, len(melody))),
+                list(completion_generator(len(melody))),
+                [style_hot for i in range(len(melody))]
+            )))
+            """
 
 
 def load_training_seq():
+    """
+    Return:
+        A list of sequences.
+    """
     # A list of styles, each containing melodies
     melody_styles = [load_melodies([style]) for style in styles]
     print('Processing dataset')
-    return list(stateful_generator(melody_styles))
+    return list(context_gen(melody_styles))
 
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):

@@ -123,7 +123,7 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     return model
 
 
-def gru_stack(time_steps, layers=3, num_units=256):
+def gru_stack(time_steps, layers=2, num_units=256):
     # Primary input
     note_input = Input(batch_shape=(1, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
@@ -139,7 +139,10 @@ def gru_stack(time_steps, layers=3, num_units=256):
 
     # Create a distributerd representation of context
     context = GRU(num_units, return_sequences=True, stateful=True)(context)
+    context = Activation('relu')(context)
 
+    out = merge([out, context], mode='concat')
+    """
     for i in range(layers):
         y = out
         # Contextual connections
@@ -159,7 +162,7 @@ def gru_stack(time_steps, layers=3, num_units=256):
 
         out = BatchNormalization()(out)
         out = Activation('relu')(out)
-
+    """
     out = GRU(NUM_CLASSES, stateful=True, name='final')(out)
     out = BatchNormalization()(out)
     out = Activation('softmax')(out)

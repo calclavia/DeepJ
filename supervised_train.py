@@ -16,10 +16,7 @@ time_steps = 1
 model_file = 'out/supervised.h5'
 nb_epochs = 1000
 
-def main():
-    model = load_supervised_model(time_steps, model_file)
-    sequences = load_training_seq()
-    """
+def train_stateless(model):
     input_set, target_set = load_training_data()
 
     cbs = [
@@ -35,8 +32,17 @@ def main():
         nb_epoch=1000,
         callbacks=cbs
     )
-    """
-    print('Training...')
+
+def main():
+    model = load_supervised_model(time_steps, model_file)
+
+def train_stateful(model):
+    sequences = load_training_seq()
+    # Keep track of lowest loss
+    prev_loss = float('inf')
+    no_improvements = 0
+    patience = 3
+
     for epoch in itertools.count():
         print('Epoch {}:'.format(epoch))
         acc = 0
@@ -54,11 +60,20 @@ def main():
                 )
                 acc += tr_acc
                 loss += tr_loss
-                t.set_postfix(loss=loss/count, acc=acc/count)
                 count += 1
+                t.set_postfix(loss=loss/count, acc=acc/count)
             model.reset_states()
 
         # TODO: Save model, stop early
+        if loss < prev_loss:
+            prev_loss = loss
+            no_improvements = 0
+            model.save(model_file)
+        else:
+            no_improvements += 1
+
+        if no_improvements > patience:
+            break
 
 if __name__ == '__main__':
     main()

@@ -23,7 +23,7 @@ def main():
 
     style = args.style
     samples = 5
-    time_steps = 16
+    time_steps = 1
     BARS = args.bars
 
     print('Generating music with style {} for {} bars'.format(style, BARS))
@@ -70,7 +70,7 @@ def main():
             N = NOTES_PER_BAR * BARS
             for i in range(N):
                 results = model.predict([np.array([x]) for x in zip(*history)])
-                prob_dist = results[0][-1]
+                prob_dist = results[0]#[-1] # TODO: Used for old model architecture
                 note = np.random.choice(len(prob_dist), p=prob_dist)
 
                 note_hot = one_hot(note, NUM_CLASSES)
@@ -80,6 +80,7 @@ def main():
 
                 composition.append(note)
 
+            model.reset_states()
             print('Composition', composition)
             mf = midi_encode_melody(composition)
             midi.write_midifile('out/melody_{}.mid'.format(sample_count), mf)
