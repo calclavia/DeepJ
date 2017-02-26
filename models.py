@@ -8,6 +8,7 @@ from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 from keras.utils.np_utils import conv_output_length
+from keras.optimizers import RMSprop, Adam
 
 from util import one_hot
 from constants import NUM_STYLES
@@ -123,12 +124,12 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     return model
 
 
-def gru_stateful(time_steps, layers=2, num_units=256):
+def gru_stateful(time_steps, rnn_layers=2, d_layers=0, num_units=256):
     # Primary input
     note_input = Input(batch_shape=(1, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
     # Context inputs
-    beat_input = Input(batch_shape=(1, time_steps, 2), name='beat_input')
+    beat_input = Input(batch_shape=(1, time_steps, NOTES_PER_BAR), name='beat_input')
     completion_input = Input(batch_shape=(1, time_steps, 1), name='completion_input')
     style_input = Input(batch_shape=(1, time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
@@ -137,42 +138,42 @@ def gru_stateful(time_steps, layers=2, num_units=256):
 
     out = primary
 
-    #out = merge([out, context], mode='concat')
-
     # Create a distributerd representation of context
-    context = GRU(64, return_sequences=True, stateful=True)(context)
-    context = BatchNormalization()(context)
+    context = GRU(num_units, return_sequences=True, stateful=True)(context)
     context = Activation('tanh')(context)
-
-    for i in range(layers):
+    #context = Dropout(0.2)(context)
+    # RNN layer stasck
+    for i in range(rnn_layers):
         y = out
-        # Contextual connections
-        out = merge([out, context], mode='concat')
+        if i > 0:
+            # Contextual connections
+            out = merge([out, context], mode='sum')
 
         out = GRU(
             num_units,
-            return_sequences=i != layers - 1,
+            return_sequences=i != rnn_layers - 1,
             stateful=True,
             name='rnn_' + str(i)
         )(out)
 
         # Residual connection
-        #if i > 0:
-        #   out = merge([out, y], mode='sum')
+        if i > 0 and i < rnn_layers - 1:
+           out = merge([out, y], mode='sum')
 
-        # out = BatchNormalization()(out)
         out = Activation('tanh')(out)
-        out = Dropout(0.2)(out)
+        #out = Dropout(0.2)(out)
+
+    # Dense layer stack
+    for i in range(d_layers):
+        out = Dense(num_units)(out)
+        out = Activation('tanh')(out)
 
     out = Dense(NUM_CLASSES)(out)
-    # TODO: Batchnorm doesn't work when batch size = 1
-    #out = BatchNormalization()(out)
     out = Activation('softmax')(out)
 
     model = Model(inputs, out)
     model.compile(
-        #optimizer='adam',
-        optimizer='rmsprop',
+        optimizer=Adam(lr=1e-4),
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )

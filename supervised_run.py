@@ -4,7 +4,7 @@ from collections import deque
 from util import *
 from midi_util import *
 from music import NUM_CLASSES, NOTES_PER_BAR
-from dataset import load_melodies, process_melody, compute_beat
+from dataset import load_melodies, process_melody, compute_beat, build_history_buffer
 from constants import *
 import math
 import argparse
@@ -49,20 +49,16 @@ def main():
                 inspiration = np.random.choice(inspirations)
 
             # Prime the time steps
-            history = deque(maxlen=time_steps)
-            # TODO: Not DRY
-            i = NOTES_PER_BAR - 1
-            for t in range(time_steps):
-                history.appendleft([
-                    np.zeros(NUM_CLASSES),
-                    compute_beat(i, NOTES_PER_BAR),
-                    np.zeros(1),
-                    style
-                ])
+            history = build_history_buffer(time_steps, NUM_CLASSES, NOTES_PER_BAR, style, prime_beats=False)
 
-                i -= 1
-                if i < 0:
-                    i = NOTES_PER_BAR - 1
+            # Prime the RNN for one bar
+            for i in range(NOTES_PER_BAR):
+                model.predict([np.array([x]) for x in zip(*history)])
+                note_hot = one_hot(inspiration[i], NUM_CLASSES)
+                beat_input = compute_beat(i, NOTES_PER_BAR)
+                completion_input = np.array([i / (len(inspiration) - 1)])
+                # TODO: This completion may not be good, since it resets to 0 later.
+                history.append([note_hot, beat_input, completion_input, style])
 
             # Compose
             composition = []

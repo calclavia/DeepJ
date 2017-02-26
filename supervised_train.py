@@ -10,6 +10,7 @@ from util import *
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
+from keras import backend as K
 from dataset import load_training_seq
 from tqdm import tqdm
 from models import *
@@ -47,11 +48,13 @@ def train_stateless(model, model_file):
 
 def train_stateful(model, model_file):
     # TODO: Remove limit
-    sequences = load_training_seq(time_steps, limit=20, shuffle=False)
+    sequences = load_training_seq(time_steps, shuffle=False)
     # Keep track of best metrics
     best_accuracy = 0
     no_improvements = 0
+
     patience = 10
+    lr_patience = 7
 
     for epoch in itertools.count():
         print('Epoch {}:'.format(epoch))
@@ -79,6 +82,12 @@ def train_stateful(model, model_file):
             model.save(model_file)
         else:
             no_improvements += 1
+
+        # Lower learning rate
+        if no_improvements > lr_patience:
+            new_lr = K.get_value(model.optimizer.lr) * 0.1
+            K.set_value(model.optimizer.lr, new_lr)
+            print('Lowering learning rate to {}'.format(new_lr))
 
         # Stop early
         if no_improvements > patience:

@@ -89,27 +89,11 @@ def load_melodies(paths, process=True, limit=None, shuffle=True):
 
 
 def compute_beat(beat, notes_in_bar):
+    # TODO: Compare methods
     # Angle method
-    angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
-    return np.array([math.cos(angle), math.sin(angle)])
-    # return one_hot(beat % notes_in_bar, notes_in_bar)
-
-
-def beat_generator(notes_in_bar, notes_in_melody):
-    """
-    Generates a sequence of beat inputs
-    """
-    for i in range(notes_in_melody):
-        yield compute_beat(i, notes_in_bar)
-
-
-def completion_generator(notes_in_melody):
-    """
-    Generates a sequence of completion inputs
-    """
-    for i in range(notes_in_melody):
-        yield np.array([i / (notes_in_melody - 1)])
-
+    #angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
+    #return np.array([math.cos(angle), math.sin(angle)])
+    return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR):
     """
@@ -127,7 +111,7 @@ def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar
             # Prime timestep history
             histories = [
                 deque([np.zeros(num_classes) for _ in range(time_steps)], maxlen=time_steps),
-                deque([np.zeros(2) for _ in range(time_steps)], maxlen=time_steps),
+                deque([np.zeros(notes_in_bar) for _ in range(time_steps)], maxlen=time_steps),
                 deque([np.zeros(1) for _ in range(time_steps)], maxlen=time_steps),
                 deque([style_hot for _ in range(time_steps)], maxlen=time_steps),
             ]
@@ -165,14 +149,15 @@ def load_training_seq(time_steps, limit=None, shuffle=True):
     return list(context_seq(melody_styles, time_steps))
 
 
-def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
+def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot, prime_beats=True):
     history = deque(maxlen=time_steps)
     current_beat = NOTES_PER_BAR - 1
     for i in range(time_steps):
         assert current_beat >= 0
+        beat_input = compute_beat(current_beat, notes_in_bar)
         history.appendleft([
             np.zeros(num_classes),
-            compute_beat(current_beat, notes_in_bar),
+            beat_input if prime_beats else np.zeros_like(beat_input),
             np.zeros(1),
             style_hot
         ])
@@ -193,8 +178,7 @@ def stateless_generator(melody_styles,
 
         for melody in style:
             # Recurrent history
-            history = build_history_buffer(
-                time_steps, num_classes, notes_in_bar, style_hot)
+            history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
             if train_all:
                 target_history = build_history_buffer(
