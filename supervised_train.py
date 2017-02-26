@@ -5,18 +5,31 @@ import tensorflow as tf
 import os.path
 import random
 import itertools
+import argparse
 from util import *
 from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from dataset import load_training_seq
 from tqdm import tqdm
+from models import *
 
-time_steps = 1
-model_file = 'out/supervised.h5'
+time_steps = 8
 nb_epochs = 1000
 
-def train_stateless(model):
+def main():
+    parser = argparse.ArgumentParser(description='Generates music.')
+    parser.add_argument('--type', metavar='T', default='gru_stateful', type=str,
+                        help='Type of model to use')
+    parser.add_argument('--file', metavar='F', type=str,
+                        default='out/supervised.h5',
+                        help='Path to the model file')
+    args = parser.parse_args()
+
+    model = load_supervised_model(time_steps, args.file, globals()[args.type])
+    train_stateful(model, args.file)
+
+def train_stateless(model, model_file):
     input_set, target_set = load_training_data()
 
     cbs = [
@@ -33,11 +46,8 @@ def train_stateless(model):
         callbacks=cbs
     )
 
-def main():
-    model = load_supervised_model(time_steps, model_file)
-
-def train_stateful(model):
-    sequences = load_training_seq()
+def train_stateful(model, model_file):
+    sequences = load_training_seq(time_steps)
     # Keep track of lowest loss
     prev_loss = float('inf')
     no_improvements = 0
@@ -52,12 +62,10 @@ def train_stateful(model):
         order = np.random.permutation(len(sequences))
         t = tqdm(order)
         for s in t:
-            melody_inputs = sequences[s]
-            for i in range(len(melody_inputs) - 1):
-                tr_loss, tr_acc = model.train_on_batch(
-                    melody_inputs[i],
-                    np.reshape(melody_inputs[i + 1][0], [1, -1])
-                )
+            inputs, targets = sequences[s]
+            for x, y in zip(inputs, targets):
+                tr_loss, tr_acc = model.train_on_batch(x, y)
+                
                 acc += tr_acc
                 loss += tr_loss
                 count += 1

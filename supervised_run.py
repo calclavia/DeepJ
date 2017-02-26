@@ -48,7 +48,7 @@ def main():
             while inspiration is None or len(inspiration) < time_steps:
                 inspiration = np.random.choice(inspirations)
 
-            # Prime the RNN
+            # Prime the time steps
             history = deque(maxlen=time_steps)
             # TODO: Not DRY
             i = NOTES_PER_BAR - 1

@@ -108,17 +108,19 @@ def completion_generator(notes_in_melody):
         yield np.array([i / (notes_in_melody - 1)])
 
 
-def context_gen(melody_styles):
+def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR):
     """
     For every single melody style, yield the melody along
     with its contextual inputs.
     """
+    num_inputs = 4
     # Process the data into a list of sequences.
     # Each sequence contains input tracks
     # Each training sequence is a tuple of various inputs, including contexts
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
         for melody in style:
+            """
             reshape = lambda seq: np.array([np.reshape(x, [1, 1, -1]) for x in seq])
             yield [list(x) for x in zip(*map(reshape, (
                     [one_hot(m, NUM_CLASSES) for m in melody],
@@ -127,16 +129,39 @@ def context_gen(melody_styles):
                     [style_hot for i in range(len(melody))]
                   )))]
             """
-            yield list(map(np.array, (
-                [one_hot(m, NUM_CLASSES) for m in melody],
-                list(beat_generator(NOTES_PER_BAR, len(melody))),
-                list(completion_generator(len(melody))),
-                [style_hot for i in range(len(melody))]
-            )))
-            """
+            # Timestep history. We have one per input.
+            # Prime timestep history
+            histories = [
+                deque([np.zeros(num_classes) for _ in range(time_steps)], maxlen=time_steps),
+                deque([np.zeros(2) for _ in range(time_steps)], maxlen=time_steps),
+                deque([np.zeros(1) for _ in range(time_steps)], maxlen=time_steps),
+                deque([style_hot for _ in range(time_steps)], maxlen=time_steps),
+            ]
 
+            # One sequence per input track
+            seqs = [[] for _ in range(num_inputs)]
+            targets = []
 
-def load_training_seq():
+            for beat, note in enumerate(melody[:-1]):
+                note_hot = one_hot(note, num_classes)
+                beat_input = compute_beat(beat, notes_in_bar)
+                completion_input = np.array([beat / (len(melody) - 1)])
+
+                # Record into histories
+                histories[0].append(note_hot)
+                histories[1].append(beat_input)
+                histories[2].append(completion_input)
+                histories[3].append(style_hot)
+
+                for i in range(num_inputs):
+                    seqs[i].append(np.expand_dims(np.array(histories[i]), axis=0))
+
+                targets.append(np.reshape(one_hot(melody[beat + 1], num_classes), [1, -1]))
+
+            # A sequence where each element contains 4 inputs to feed into network
+            yield [list(s) for s in zip(*seqs)], targets
+
+def load_training_seq(time_steps):
     """
     Return:
         A list of sequences.
@@ -144,7 +169,7 @@ def load_training_seq():
     # A list of styles, each containing melodies
     melody_styles = [load_melodies([style]) for style in styles]
     print('Processing dataset')
-    return list(context_gen(melody_styles))
+    return list(context_seq(melody_styles, time_steps))
 
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot):
