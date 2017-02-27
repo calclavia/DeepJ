@@ -95,12 +95,14 @@ def compute_beat(beat, notes_in_bar):
     #return np.array([math.cos(angle), math.sin(angle)])
     return one_hot(beat % notes_in_bar, notes_in_bar)
 
+def compute_completion(beat, len_melody):
+    return np.array([beat / (len_melody - 1)])
+
 def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR):
     """
     For every single melody style, yield the melody along
     with its contextual inputs.
     """
-    num_inputs = 4
     # Process the data into a list of sequences.
     # Each sequence contains input tracks
     # Each training sequence is a tuple of various inputs, including contexts
@@ -117,21 +119,21 @@ def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar
             ]
 
             # One sequence per input track
-            seqs = [[] for _ in range(num_inputs)]
+            seqs = [[] for _ in range(len(histories))]
             targets = []
 
             for beat, note in enumerate(melody[:-1]):
                 note_hot = one_hot(note, num_classes)
                 beat_input = compute_beat(beat, notes_in_bar)
-                completion_input = np.array([beat / (len(melody) - 1)])
+                completion_input = compute_completion(beat, len(melody))
 
                 # Record into histories
                 histories[0].append(note_hot)
                 histories[1].append(beat_input)
                 histories[2].append(completion_input)
-                histories[3].append(style_hot)
+                # histories[3].append(style_hot)
 
-                for i in range(num_inputs):
+                for i in range(len(histories)):
                     seqs[i].append(np.expand_dims(np.array(histories[i]), axis=0))
 
                 targets.append(np.reshape(one_hot(melody[beat + 1], num_classes), [1, -1]))

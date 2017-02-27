@@ -141,7 +141,7 @@ def gru_stateful(time_steps, rnn_layers=2, d_layers=0, num_units=256):
     # Create a distributerd representation of context
     context = GRU(num_units, return_sequences=True, stateful=True)(context)
     context = Activation('tanh')(context)
-    #context = Dropout(0.2)(context)
+    context = Dropout(0.2)(context)
     # RNN layer stasck
     for i in range(rnn_layers):
         y = out
@@ -161,19 +161,20 @@ def gru_stateful(time_steps, rnn_layers=2, d_layers=0, num_units=256):
            out = merge([out, y], mode='sum')
 
         out = Activation('tanh')(out)
-        #out = Dropout(0.2)(out)
+        out = Dropout(0.2)(out)
 
     # Dense layer stack
     for i in range(d_layers):
         out = Dense(num_units)(out)
         out = Activation('tanh')(out)
+        out = Dropout(0.2)(out)
 
     out = Dense(NUM_CLASSES)(out)
     out = Activation('softmax')(out)
 
     model = Model(inputs, out)
     model.compile(
-        optimizer=Adam(lr=1e-4),
+        optimizer='adam',
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -195,10 +196,10 @@ def build_inputs(time_steps):
 def supervised_model(time_steps):
     return gru_stateful(time_steps)
 
-# RL Tuner
-
-
 def note_model(time_steps):
+    """
+    RL Tuner
+    """
     inputs, x = pre_model(time_steps, False)
 
     # Multi-label

@@ -16,16 +16,16 @@ def main():
                         help='Path to the model file')
     parser.add_argument('--style', metavar='S', default=None, type=float, nargs='+',
                         help='A list that defines the weights of style')
-    parser.add_argument('--bars', default=8, type=int, dest='bars',
+    parser.add_argument('--bars', default=32, type=int, dest='bars',
                         help='How many bars of music to generate.')
-    parser.add_argument('--prime', default=True, type=bool, dest='prime',
+    parser.add_argument('--prime', default=False, type=bool, dest='prime',
                         help='Prime the generator with inspiration?')
 
     args = parser.parse_args()
 
     style = args.style
     samples = 5
-    time_steps = 4
+    time_steps = 8
     bars = args.bars
 
     if style is None:
@@ -34,9 +34,10 @@ def main():
     assert len(style) == NUM_STYLES
 
     # Normalize style
-    style /= np.linalg.norm(style)
+    style /= np.sum(style)
 
     if args.prime:
+        print('Loading priming melodies')
         # Inspiration melodies
         inspirations = list(map(process_melody, load_melodies(styles, limit=samples * 10)))
 
@@ -46,7 +47,7 @@ def main():
     for sample_count in range(samples):
         # A priming melody
         inspiration = None
-        
+
         if args.prime:
             while inspiration is None or len(inspiration) < time_steps:
                 inspiration = np.random.choice(inspirations)

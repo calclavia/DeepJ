@@ -15,14 +15,14 @@ from dataset import load_training_seq
 from tqdm import tqdm
 from models import *
 
-time_steps = 4
+time_steps = 8
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--type', metavar='T', default='gru_stateful', type=str,
                         help='Type of model to use')
     parser.add_argument('--file', metavar='F', type=str,
-                        default='out/supervised.h5',
+                        default='out/model.h5',
                         help='Path to the model file')
     args = parser.parse_args()
 
@@ -48,7 +48,7 @@ def train_stateless(model, model_file):
 
 def train_stateful(model, model_file):
     # TODO: Remove limit
-    sequences = load_training_seq(time_steps, shuffle=False)
+    sequences = load_training_seq(time_steps, limit=20, shuffle=False)
     # Keep track of best metrics
     best_accuracy = 0
     no_improvements = 0
