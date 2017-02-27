@@ -91,65 +91,12 @@ def load_melodies(paths, process=True, limit=None, shuffle=True):
 def compute_beat(beat, notes_in_bar):
     # TODO: Compare methods
     # Angle method
-    #angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
-    #return np.array([math.cos(angle), math.sin(angle)])
-    return one_hot(beat % notes_in_bar, notes_in_bar)
+    angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
+    return np.array([math.cos(angle), math.sin(angle)])
+    # return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def compute_completion(beat, len_melody):
     return np.array([beat / (len_melody - 1)])
-
-def context_seq(melody_styles, time_steps, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR):
-    """
-    For every single melody style, yield the melody along
-    with its contextual inputs.
-    """
-    # Process the data into a list of sequences.
-    # Each sequence contains input tracks
-    # Each training sequence is a tuple of various inputs, including contexts
-    for s, style in enumerate(melody_styles):
-        style_hot = one_hot(s, len(melody_styles))
-        for melody in style:
-            # Timestep history. We have one per input.
-            # Prime timestep history
-            histories = [
-                deque([np.zeros(num_classes) for _ in range(time_steps)], maxlen=time_steps),
-                deque([np.zeros(notes_in_bar) for _ in range(time_steps)], maxlen=time_steps),
-                deque([np.zeros(1) for _ in range(time_steps)], maxlen=time_steps),
-                deque([style_hot for _ in range(time_steps)], maxlen=time_steps),
-            ]
-
-            # One sequence per input track
-            seqs = [[] for _ in range(len(histories))]
-            targets = []
-
-            for beat, note in enumerate(melody[:-1]):
-                note_hot = one_hot(note, num_classes)
-                beat_input = compute_beat(beat, notes_in_bar)
-                completion_input = compute_completion(beat, len(melody))
-
-                # Record into histories
-                histories[0].append(note_hot)
-                histories[1].append(beat_input)
-                histories[2].append(completion_input)
-                # histories[3].append(style_hot)
-
-                for i in range(len(histories)):
-                    seqs[i].append(np.expand_dims(np.array(histories[i]), axis=0))
-
-                targets.append(np.reshape(one_hot(melody[beat + 1], num_classes), [1, -1]))
-            # A sequence where each element contains 4 inputs to feed into network
-            yield [list(s) for s in zip(*seqs)], targets
-
-def load_training_seq(time_steps, limit=None, shuffle=True):
-    """
-    Return:
-        A list of sequences.
-    """
-    # A list of styles, each containing melodies
-    melody_styles = [load_melodies([style], limit=limit, shuffle=shuffle) for style in styles]
-    print('Processing dataset')
-    return list(context_seq(melody_styles, time_steps))
-
 
 def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot, prime_beats=True):
     history = deque(maxlen=time_steps)
@@ -169,8 +116,48 @@ def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot, prime
             current_beat = NOTES_PER_BAR - 1
     return history
 
+def melody_data_gen(melody,
+                    style_hot,
+                    time_steps,
+                    num_classes,
+                    notes_in_bar,
+                    target_all):
+    """
+    Generates training and label data for a given melody sequence.
 
-def stateless_generator(melody_styles,
+    Return:
+        A list of samples. Each sample consist of inputs for each time step
+        and a target level as a tuple.
+    """
+    # Recurrent history
+    history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
+
+    if train_all:
+        target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
+
+    for beat, note in enumerate(melody[:-1]):
+        note_hot = one_hot(note, num_classes)
+        beat_input = compute_beat(beat, notes_in_bar)
+        completion_input = compute_completion(beat, len(melody))
+
+        # Wrap around
+        next_note_hot = one_hot(melody[beat + 1 ], num_classes)
+
+        history.append(
+            [note_hot, beat_input, completion_input, style_hot]
+        )
+
+        # Yield the current input with target
+        if target_all:
+            # Yield a list of targets for each time step
+            target_history.append([next_note_hot])
+            yield zip(*history), zip(*target_history)
+        else:
+            # Yield the target to predict
+            yield zip(*history), [next_note_hot]
+
+
+def stateless_gen(melody_styles,
                         time_steps,
                         num_classes,
                         notes_in_bar,
@@ -179,39 +166,41 @@ def stateless_generator(melody_styles,
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
-            # Recurrent history
-            history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
-
-            if train_all:
-                target_history = build_history_buffer(
-                    time_steps, num_classes, notes_in_bar, style_hot)
-
-            for beat, note in enumerate(melody):
-                note_hot = one_hot(note, num_classes)
-                beat_input = compute_beat(beat, notes_in_bar)
-                completion_input = np.array([beat / (len(melody) - 1)])
-
-                # Wrap around
-                next_note_index = 0 if beat + 1 >= len(melody) else beat + 1
-                next_note_hot = one_hot(melody[next_note_index], num_classes)
-
-                history.append(
-                    [note_hot, beat_input, completion_input, style_hot])
-
-                # Yield the current input with target
-                if train_all:
-                    target_history.append([next_note_hot])
-                    yield zip(*history), zip(*target_history)
-                else:
-                    yield zip(*history), [next_note_hot]
+            yield melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, train_all)
 
 
-def load_training_data():
+def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR):
+    """
+    For every single melody style, yield the melody along
+    with its contextual inputs.
+    """
+    # Process the data into a list of sequences.
+    # Each sequence contains input tracks
+    # Each training sequence is a tuple of various inputs, including contexts
+    for s, style in enumerate(melody_styles):
+        style_hot = one_hot(s, len(melody_styles))
+
+        for melody in style:
+            m_data = list(melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, train_all))
+            # A list of sample inputs and targets
+            inputs, targets = zip(*m_data)
+
+            # Chunk input and targets into batch size
+            inputs = [np.split(x, batch_size) for x in inputs]
+            targets = np.split(targets, batch_size)
+
+            yield inputs, targets
+
+def load_styles():
     # A list of styles, each containing melodies
-    melody_styles = [load_melodies([style]) for style in styles]
+    return [load_melodies([style]) for style in styles]
 
-    input_set, target_set = zip(
-        *stateless_generator(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR, True))
-    input_set = [np.array(i) for i in zip(*input_set)]
-    target_set = [np.array(i) for i in zip(*target_set)]
-    return input_set, target_set
+def process_data(melody_styles, time_steps, stateful=True, limit=None, shuffle=True):
+    print('Processing dataset')
+    if stateful:
+        return list(stateful_gen(melody_styles, time_steps))
+    else:
+        input_set, target_set = zip(*stateless_gen(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR))
+        input_set = [np.array(i) for i in zip(*input_set)]
+        target_set = [np.array(i) for i in zip(*target_set)]
+        return input_set, target_set

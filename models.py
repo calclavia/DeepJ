@@ -18,9 +18,12 @@ from keras.models import load_model
 
 class CausalAtrousConvolution1D(AtrousConvolution1D):
 
-    def __init__(self, nb_filter, filter_length, init='glorot_uniform', activation=None, weights=None,
-                 border_mode='valid', subsample_length=1, atrous_rate=1, W_regularizer=None, b_regularizer=None,
-                 activity_regularizer=None, W_constraint=None, b_constraint=None, bias=True, causal=False, **kwargs):
+    def __init__(self, nb_filter, filter_length, init='glorot_uniform',
+                 activation=None, weights=None, border_mode='valid',
+                 subsample_length=1, atrous_rate=1, W_regularizer=None,
+                 b_regularizer=None, activity_regularizer=None,
+                 W_constraint=None, b_constraint=None, bias=True,
+                 causal=False, **kwargs):
         super(CausalAtrousConvolution1D, self).__init__(nb_filter, filter_length, init, activation, weights,
                                                         border_mode, subsample_length, atrous_rate, W_regularizer,
                                                         b_regularizer, activity_regularizer, W_constraint, b_constraint,
@@ -123,8 +126,45 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
+def gru_stack(primary, context, stateful, rnn_layers=2, num_units=256, batch_norm=False):
+    out = primary
 
-def gru_stateful(time_steps, rnn_layers=2, d_layers=0, num_units=256):
+    # Create a distributerd representation of context
+    context = GRU(num_units, return_sequences=True, stateful=stateful)(context)
+    if batch_norm:
+        out = BatchNormalization()(out)
+    context = Activation('tanh')(context)
+
+    # RNN layer stasck
+    for i in range(rnn_layers):
+        y = out
+        if i > 0:
+            # Contextual connections
+            out = merge([out, context], mode='sum')
+
+        out = GRU(
+            num_units,
+            return_sequences=i != rnn_layers - 1,
+            stateful=stateful,
+            name='rnn_' + str(i)
+        )(out)
+
+        # Residual connection
+        if i > 0 and i < rnn_layers - 1:
+           out = merge([out, y], mode='sum')
+
+        if batch_norm:
+            out = BatchNormalization()(out)
+        out = Activation('tanh')(out)
+
+    # Output dense layer
+    out = Dense(NUM_CLASSES)(out)
+    if batch_norm:
+        out = BatchNormalization()(out)
+    out = Activation('softmax')(out)
+    return out
+
+def gru_stateful(time_steps):
     # Primary input
     note_input = Input(batch_shape=(1, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
@@ -136,43 +176,7 @@ def gru_stateful(time_steps, rnn_layers=2, d_layers=0, num_units=256):
 
     inputs = [note_input, beat_input, completion_input, style_input]
 
-    out = primary
-
-    # Create a distributerd representation of context
-    context = GRU(num_units, return_sequences=True, stateful=True)(context)
-    context = Activation('tanh')(context)
-    context = Dropout(0.2)(context)
-    # RNN layer stasck
-    for i in range(rnn_layers):
-        y = out
-        if i > 0:
-            # Contextual connections
-            out = merge([out, context], mode='sum')
-
-        out = GRU(
-            num_units,
-            return_sequences=i != rnn_layers - 1,
-            stateful=True,
-            name='rnn_' + str(i)
-        )(out)
-
-        # Residual connection
-        if i > 0 and i < rnn_layers - 1:
-           out = merge([out, y], mode='sum')
-
-        out = Activation('tanh')(out)
-        out = Dropout(0.2)(out)
-
-    # Dense layer stack
-    for i in range(d_layers):
-        out = Dense(num_units)(out)
-        out = Activation('tanh')(out)
-        out = Dropout(0.2)(out)
-
-    out = Dense(NUM_CLASSES)(out)
-    out = Activation('softmax')(out)
-
-    model = Model(inputs, out)
+    model = Model(inputs, gru_stack(primary, context, True))
     model.compile(
         optimizer='adam',
         loss='categorical_crossentropy',
@@ -180,6 +184,15 @@ def gru_stateful(time_steps, rnn_layers=2, d_layers=0, num_units=256):
     )
     return model
 
+def gru_stateless(time_steps):
+    inputs, primary, context = build_inputs(time_steps)
+    model = Model(inputs, gru_stack(primary, context, False, batch_norm=True))
+    model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    return model
 
 def build_inputs(time_steps):
     # Primary input
@@ -191,10 +204,6 @@ def build_inputs(time_steps):
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
     return [note_input, beat_input, completion_input, style_input], primary, context
-
-
-def supervised_model(time_steps):
-    return gru_stateful(time_steps)
 
 def note_model(time_steps):
     """

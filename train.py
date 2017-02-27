@@ -11,11 +11,9 @@ from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from keras import backend as K
-from dataset import load_training_seq
+from dataset import load_training_seq, load_training_data
 from tqdm import tqdm
 from models import *
-
-time_steps = 8
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -24,13 +22,22 @@ def main():
     parser.add_argument('--file', metavar='F', type=str,
                         default='out/model.h5',
                         help='Path to the model file')
+    parser.add_argument('--timesteps', metavar='t', type=int,
+                        default=8,
+                        help='Number of timesteps')
     args = parser.parse_args()
 
-    model = load_supervised_model(time_steps, args.file, globals()[args.type])
-    train_stateful(model, args.file)
+    time_steps = args.timesteps
 
-def train_stateless(model, model_file):
-    input_set, target_set = load_training_data()
+    model = load_supervised_model(time_steps, args.file, globals()[args.type])
+
+    if args.type == 'gru_stateful':
+        train_stateful(model, args.file, time_steps)
+    else:
+        train_stateless(model, args.file, time_steps)
+
+def train_stateless(model, model_file, time_steps):
+    input_set, target_set = load_training_data(time_steps)
 
     cbs = [
         ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True),
@@ -46,14 +53,13 @@ def train_stateless(model, model_file):
         callbacks=cbs
     )
 
-def train_stateful(model, model_file):
-    # TODO: Remove limit
-    sequences = load_training_seq(time_steps, limit=20, shuffle=False)
+def train_stateful(model, model_file, time_steps):
+    sequences = load_training_seq(time_steps, shuffle=False)
     # Keep track of best metrics
     best_accuracy = 0
     no_improvements = 0
 
-    lr_patience = 3
+    lr_patience = 4
     patience = lr_patience * 2
 
     for epoch in itertools.count():
@@ -66,7 +72,8 @@ def train_stateful(model, model_file):
         t = tqdm(order)
         for s in t:
             inputs, targets = sequences[s]
-            for x, y in zip(inputs, targets):
+            # Long sequence training
+            for x, y in tqdm(zip(inputs, targets)):
                 tr_loss, tr_acc = model.train_on_batch(x, y)
 
                 acc += tr_acc
@@ -74,6 +81,19 @@ def train_stateful(model, model_file):
                 count += 1
                 t.set_postfix(loss=loss/count, acc=acc/count)
             model.reset_states()
+            """
+            # Bar based training
+            for i, (x, y) in tqdm(enumerate(zip(inputs, targets))):
+                if i % NOTES_PER_BAR == 0:
+                    model.reset_states()
+
+                tr_loss, tr_acc = model.train_on_batch(x, y)
+
+                acc += tr_acc
+                loss += tr_loss
+                count += 1
+                t.set_postfix(loss=loss/count, acc=acc/count)
+            """
 
         # Save model
         if acc > best_accuracy:
@@ -85,7 +105,7 @@ def train_stateful(model, model_file):
 
         # Lower learning rate
         if no_improvements > lr_patience:
-            new_lr = K.get_value(model.optimizer.lr) * 0.1
+            new_lr = K.get_value(model.optimizer.lr) * 0.2
             K.set_value(model.optimizer.lr, new_lr)
             print('Lowering learning rate to {}'.format(new_lr))
 
