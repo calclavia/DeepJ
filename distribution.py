@@ -17,7 +17,7 @@ NOTE_LEN_RANGE = ['0', '',
                     'C']
 
 def plot_note_distribution(paths):
-    melody_list = dataset.load_melodies(paths)
+    melody_list = dataset.load_melodies(paths, shuffle=False)
     for i, melody in enumerate(melody_list):
         fig = plt.figure(figsize=(12, 5))
         # Filter out 0's and 1's
@@ -29,10 +29,10 @@ def plot_note_distribution(paths):
         plt.ylabel('Number of note occurances')
         plt.xticks(range(len(MIDI_NOTE_RANGE)), MIDI_NOTE_RANGE)
         # plt.show()
-        plt.savefig('note_dist_' + str(i) + '.png')
+        plt.savefig('out/note_dist_' + str(i) + '.png')
 
 def plot_note_length(paths):
-    melody_list = dataset.load_melodies(paths)
+    melody_list = dataset.load_melodies(paths, shuffle=False)
     for i, melody in enumerate(melody_list):
         # Dict that stores notes and their lengths
         note_len_dict = {}
@@ -65,7 +65,7 @@ def plot_note_length(paths):
         plt.ylabel('Duration in eigth notes')
         plt.xticks(range(len(NOTE_LEN_RANGE)), NOTE_LEN_RANGE)
         # plt.show()
-        plt.savefig('note_len_dist_' + str(i) + '.png')
+        plt.savefig('out/note_len_dist_' + str(i) + '.png')
 
 def distributions(paths):
     plot_note_distribution(paths)
