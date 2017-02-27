@@ -10,7 +10,7 @@ from collections import deque
 from joblib import Parallel, delayed
 import math
 import random
-from constants import NUM_STYLES, styles
+from constants import styles
 
 
 def process_melody(melody):
@@ -132,7 +132,7 @@ def melody_data_gen(melody,
     # Recurrent history
     history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
-    if train_all:
+    if target_all:
         target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
     for beat, note in enumerate(melody[:-1]):
@@ -161,15 +161,14 @@ def stateless_gen(melody_styles,
                         time_steps,
                         num_classes,
                         notes_in_bar,
-                        train_all=False):
+                        target_all=False):
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
-            yield melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, train_all)
+            yield each in melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all)
 
-
-def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR):
+def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
     """
     For every single melody style, yield the melody along
     with its contextual inputs.
@@ -181,7 +180,7 @@ def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSE
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
-            m_data = list(melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, train_all))
+            m_data = list(melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all))
             # A list of sample inputs and targets
             inputs, targets = zip(*m_data)
 
@@ -200,7 +199,7 @@ def process_data(melody_styles, time_steps, stateful=True, limit=None, shuffle=T
     if stateful:
         return list(stateful_gen(melody_styles, time_steps))
     else:
-        input_set, target_set = zip(*stateless_gen(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR))
+        input_set, target_set = zip(*list(stateless_gen(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR)))
         input_set = [np.array(i) for i in zip(*input_set)]
         target_set = [np.array(i) for i in zip(*target_set)]
         return input_set, target_set

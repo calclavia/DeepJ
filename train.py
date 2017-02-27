@@ -11,7 +11,7 @@ from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from keras import backend as K
-from dataset import load_training_seq, load_training_data
+from dataset import load_styles, process_data
 from tqdm import tqdm
 from models import *
 
@@ -37,13 +37,13 @@ def main():
         train_stateless(model, args.file, time_steps)
 
 def train_stateless(model, model_file, time_steps):
-    input_set, target_set = load_training_data(time_steps)
+    input_set, target_set = process_data(load_styles(), time_steps, stateful=False)
 
     cbs = [
-        ModelCheckpoint(filepath=model_file, monitor='loss', save_best_only=True),
+        ModelCheckpoint(filepath=model_file, monitor='acc', save_best_only=True),
         #TensorBoard(log_dir='./out/supervised/summary', histogram_freq=1),
-        ReduceLROnPlateau(monitor='loss', patience=5, verbose=1),
-        EarlyStopping(monitor='loss', patience=10)
+        ReduceLROnPlateau(monitor='acc', patience=5, verbose=1),
+        EarlyStopping(monitor='acc', patience=10)
     ]
 
     model.fit(
@@ -54,7 +54,7 @@ def train_stateless(model, model_file, time_steps):
     )
 
 def train_stateful(model, model_file, time_steps):
-    sequences = load_training_seq(time_steps, shuffle=False)
+    sequences = process_data(load_styles(), time_steps, shuffle=False)
     # Keep track of best metrics
     best_accuracy = 0
     no_improvements = 0
