@@ -22,19 +22,18 @@ def process_melody(melody):
         if x >= MAX_NOTE:
             res.append(NO_EVENT)
         elif x >= 0:
-            res.append(max(x - MIN_NOTE, MIN_CLASS))
+            res.append(x - MIN_NOTE + MIN_CLASS)
         else:
             # Apply shift to NOTE_OFF and NO_EVENT
             res.append(abs(x) - 1)
     return res
 
 
-def load_melody(fname):
+def load_melody(fname, transpose=None):
     try:
         seq_pb = midi_io.midi_to_sequence_proto(fname)
-        melody = melodies_lib.midi_file_to_melody(
-            seq_pb, steps_per_quarter=NOTES_PER_BEAT)
-        melody.squash(MIN_NOTE, MAX_NOTE, 0)
+        melody = melodies_lib.midi_file_to_melody(seq_pb, steps_per_quarter=NOTES_PER_BEAT)
+        melody.squash(MIN_NOTE, MAX_NOTE, transpose)
         return melody
     except Exception as e:
         # print(e)
@@ -52,15 +51,15 @@ def get_all_files(paths):
     return potential_files
 
 
-def load_then_process(f):
-    melody = load_melody(f)
+def load_process(f, doProcess, transpose):
+    melody = load_melody(f, transpose)
     if melody:
-        return process_melody(melody)
+        return f, (process_melody(melody) if doProcess else melody)
     else:
-        return None
+        return f, None
 
 
-def load_melodies(paths, process=True, limit=None, shuffle=True):
+def load_melodies(paths, transpose=None, process=True, limit=None, shuffle=True, named=False):
     assert len(paths) > 0
     files = get_all_files(paths)
 
@@ -72,17 +71,18 @@ def load_melodies(paths, process=True, limit=None, shuffle=True):
         files = files[:limit]
 
     print('Loading melodies from {} files'.format(len(files)))
-    fn = load_then_process if process else load_melody
-    res = Parallel(n_jobs=8, verbose=5, backend='threading')(
-        delayed(fn)(f) for f in files)
+    res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(load_process)(f, process, transpose) for f in files)
 
     out = []
     skipped = 0
-    for melody in res:
-        if melody == None or len(melody) <= 1:
+    for result in res:
+        if result[1] == None or len(result[1]) <= 1:
             skipped += 1
         else:
-            out.append(melody)
+            if named:
+                out.append(result)
+            else:
+                out.append(result[1])
 
     print('Loaded {} melodies (skipped {})'.format(len(out), skipped))
     return out

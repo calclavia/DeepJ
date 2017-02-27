@@ -50,7 +50,7 @@ def midi_encode_melody(melody,
 
         if action != NOTE_OFF:
             # A note is played. Turn it on!
-            pitch = MIN_NOTE + action - MIN_CLASS
+            pitch = action + MIN_NOTE - MIN_CLASS
 
             # Turn a note on
             track.append(
