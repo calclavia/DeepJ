@@ -166,7 +166,8 @@ def stateless_gen(melody_styles,
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
-            yield each in melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all)
+            for x in melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all):
+                yield x
 
 def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
     """

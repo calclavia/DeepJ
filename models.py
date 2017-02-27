@@ -126,14 +126,14 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(primary, context, stateful, rnn_layers=2, num_units=256, batch_norm=False):
+def gru_stack(primary, context, stateful, act='relu', rnn_layers=3, num_units=256, batch_norm=False):
     out = primary
 
     # Create a distributerd representation of context
     context = GRU(num_units, return_sequences=True, stateful=stateful)(context)
     if batch_norm:
         out = BatchNormalization()(out)
-    context = Activation('tanh')(context)
+    context = Activation(act)(context)
 
     # RNN layer stasck
     for i in range(rnn_layers):
@@ -155,7 +155,7 @@ def gru_stack(primary, context, stateful, rnn_layers=2, num_units=256, batch_nor
 
         if batch_norm:
             out = BatchNormalization()(out)
-        out = Activation('tanh')(out)
+        out = Activation(act)(out)
 
     # Output dense layer
     out = Dense(NUM_CLASSES)(out)
