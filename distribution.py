@@ -4,10 +4,7 @@ import sys
 import dataset
 import ntpath
 
-import midi
-from midi_util import midi_encode_melody
-
-from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BEAT, NOTE_OFF, NO_EVENT, MIN_NOTE
+from music import autocorrelate, NUM_CLASSES, MIN_CLASS, NOTES_PER_BEAT, NOTE_OFF, NO_EVENT, MIN_NOTE
 
 MIDI_NOTE_RANGE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] * 4 + ['C']
 NOTE_LEN_RANGE = ['0', ''] + MIDI_NOTE_RANGE
@@ -19,7 +16,7 @@ def plot_note_distribution(melody_list):
         # Subtract min class from each note to 0 index the whole list
         notes = [x - MIN_CLASS for x in melody if x != 0 and x != 1]
         # Plot
-        plt.hist(notes, bins=np.arange(len(MIDI_NOTE_RANGE) + 1) - 0.5, rwidth=0.8)
+        plt.hist(notes, bins=np.arange(len(MIDI_NOTE_RANGE) + 1))
         plt.ylabel('Note frequency')
         plt.xticks(range(len(MIDI_NOTE_RANGE)), MIDI_NOTE_RANGE)
         # plt.show()
@@ -53,17 +50,28 @@ def plot_note_length(melody_list):
 
         # Plot
         fig = plt.figure(figsize=(14, 5))
-        plt.hist(note_lens, bins=np.arange(52)-0.5, rwidth=0.8)
+        plt.hist(note_lens, bins=np.arange(len(NOTE_LEN_RANGE) + 1))
         plt.xlabel('0 represents a rest')
         plt.ylabel('Duration in eigth notes')
         plt.xticks(range(len(NOTE_LEN_RANGE)), NOTE_LEN_RANGE)
         # plt.show()
         plt.savefig('out/' + ntpath.basename(name) + ' (note length).png')
 
+def calculate_correlation(melody_list):
+    correlations = []
+    for name, melody in melody_list:
+        correlation =  np.sum([autocorrelate(melody, i) ** 2 for i in range(1, 4)])
+        correlations.append(correlation)
+        print('Correlation Coefficient (r^2 for 1, 2, 3): ', name, correlation)
+
+    print('Mean: ', np.mean(correlations))
+    print('Std: ', np.std(correlations))
+
 def distributions(paths):
     melody_list = dataset.load_melodies(paths, shuffle=False, named=True)
     plot_note_distribution(melody_list)
     plot_note_length(melody_list)
+    calculate_correlation(melody_list)
 
 distributions(sys.argv)
 
