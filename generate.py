@@ -33,10 +33,9 @@ def main():
     if args.style is None:
         # By default, generate all different styles
         styles = [np.array(i, dtype=float) for i in itertools.product([0, 1], repeat=NUM_STYLES)]
-        print(styles)
     else:
         assert len(args.style) == NUM_STYLES
-        styles = [args.style]
+        styles = [np.array(args.style)]
 
 
     if args.prime:
