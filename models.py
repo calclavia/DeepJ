@@ -126,14 +126,16 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(primary, context, stateful, act='relu', rnn_layers=3, num_units=256, batch_norm=False):
+def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_norm=False, dropout=False):
     out = primary
 
     # Create a distributerd representation of context
     context = GRU(num_units, return_sequences=True, stateful=stateful)(context)
     if batch_norm:
-        out = BatchNormalization()(out)
-    context = Activation(act)(context)
+        context = BatchNormalization()(context)
+    context = Activation('tanh')(context)
+    if dropout:
+        context = Dropout(0.25)(context)
 
     # RNN layer stasck
     for i in range(rnn_layers):
@@ -155,7 +157,9 @@ def gru_stack(primary, context, stateful, act='relu', rnn_layers=3, num_units=25
 
         if batch_norm:
             out = BatchNormalization()(out)
-        out = Activation(act)(out)
+        out = Activation('tanh')(out)
+        if dropout:
+            out = Dropout(0.25)(out)
 
     # Output dense layer
     out = Dense(NUM_CLASSES)(out)
@@ -186,7 +190,7 @@ def gru_stateful(time_steps):
 
 def gru_stateless(time_steps):
     inputs, primary, context = build_inputs(time_steps)
-    model = Model(inputs, gru_stack(primary, context, False, batch_norm=True))
+    model = Model(inputs, gru_stack(primary, context, False, batch_norm=True, dropout=True))
     model.compile(
         optimizer='adam',
         loss='categorical_crossentropy',
