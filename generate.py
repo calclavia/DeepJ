@@ -18,6 +18,8 @@ def main():
                         help='A list that defines the weights of style')
     parser.add_argument('--bars', default=8, type=int, dest='bars',
                         help='How many bars of music to generate.')
+    parser.add_argument('--prime', default=True, type=bool, dest='prime',
+                        help='Prime the generator with inspiration?')
 
     args = parser.parse_args()
 
@@ -34,8 +36,9 @@ def main():
     # Normalize style
     style /= np.linalg.norm(style)
 
-    # Inspiration melodies
-    inspirations = list(map(process_melody, load_melodies(styles, limit=samples * 10)))
+    if args.prime:
+        # Inspiration melodies
+        inspirations = list(map(process_melody, load_melodies(styles, limit=samples * 10)))
 
     with tf.device('/cpu:0'):
         model = load_supervised_model(time_steps, args.model)
@@ -43,15 +46,16 @@ def main():
     for sample_count in range(samples):
         # A priming melody
         inspiration = None
+        
+        if args.prime:
+            while inspiration is None or len(inspiration) < time_steps:
+                inspiration = np.random.choice(inspirations)
 
-        while inspiration is None or len(inspiration) < time_steps:
-            inspiration = np.random.choice(inspirations)
-
-        composition = generate(model, inspiration, time_steps, style, bars)
+        composition = generate(model, time_steps, style, bars, inspiration)
         mf = midi_encode_melody(composition)
         midi.write_midifile('out/melody_{}.mid'.format(sample_count), mf)
 
-def generate(model, inspiration, time_steps, style, bars):
+def generate(model, time_steps, style, bars, inspiration=None):
     """
     Generates a sequence
     """
@@ -61,14 +65,15 @@ def generate(model, inspiration, time_steps, style, bars):
     # Prime the time steps
     history = build_history_buffer(time_steps, NUM_CLASSES, NOTES_PER_BAR, style, prime_beats=False)
 
-    # Prime the RNN for one bar
-    for i in range(NOTES_PER_BAR):
-        model.predict([np.array([x]) for x in zip(*history)])
-        note_hot = one_hot(inspiration[i], NUM_CLASSES)
-        beat_input = compute_beat(i, NOTES_PER_BAR)
-        completion_input = np.array([i / (len(inspiration) - 1)])
-        # TODO: This completion may not be good, since it resets to 0 later.
-        history.append([note_hot, beat_input, completion_input, style])
+    if inspiration is not None:
+        # Prime the RNN for one bar
+        for i in range(NOTES_PER_BAR):
+            model.predict([np.array([x]) for x in zip(*history)])
+            note_hot = one_hot(inspiration[i], NUM_CLASSES)
+            beat_input = compute_beat(i, NOTES_PER_BAR)
+            completion_input = np.array([i / (len(inspiration) - 1)])
+            # TODO: This completion may not be good, since it resets to 0 later.
+            history.append([note_hot, beat_input, completion_input, style])
 
     # Compose
     composition = []

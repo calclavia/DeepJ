@@ -53,8 +53,8 @@ def train_stateful(model, model_file):
     best_accuracy = 0
     no_improvements = 0
 
-    patience = 10
-    lr_patience = 7
+    lr_patience = 3
+    patience = lr_patience * 2
 
     for epoch in itertools.count():
         print('Epoch {}:'.format(epoch))
