@@ -17,7 +17,7 @@ def main():
                         help='Path to the model file')
     parser.add_argument('--style', metavar='S', default=None, type=float, nargs='+',
                         help='A list that defines the weights of style')
-    parser.add_argument('--bars', default=16, type=int, dest='bars',
+    parser.add_argument('--bars', default=32, type=int, dest='bars',
                         help='How many bars of music to generate.')
     parser.add_argument('--prime', default=False, action='store_true',
                         help='Prime the generator with inspiration?')
