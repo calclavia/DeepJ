@@ -11,7 +11,7 @@ from keras.utils.np_utils import conv_output_length
 from keras.optimizers import RMSprop, Adam
 
 from util import one_hot
-from constants import NUM_STYLES
+from constants import NUM_STYLES, BATCH_SIZE
 from music import NUM_CLASSES, NOTES_PER_BAR, NUM_KEYS
 from keras.models import load_model
 
@@ -170,19 +170,20 @@ def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_nor
 
 def gru_stateful(time_steps):
     # Primary input
-    note_input = Input(batch_shape=(1, time_steps, NUM_CLASSES), name='note_input')
+    note_input = Input(batch_shape=(BATCH_SIZE, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
     # Context inputs
-    beat_input = Input(batch_shape=(1, time_steps, NOTES_PER_BAR), name='beat_input')
-    completion_input = Input(batch_shape=(1, time_steps, 1), name='completion_input')
-    style_input = Input(batch_shape=(1, time_steps, NUM_STYLES), name='style_input')
+    beat_input = Input(batch_shape=(BATCH_SIZE, time_steps, NOTES_PER_BAR), name='beat_input')
+    completion_input = Input(batch_shape=(BATCH_SIZE, time_steps, 1), name='completion_input')
+    style_input = Input(batch_shape=(BATCH_SIZE, time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
 
     inputs = [note_input, beat_input, completion_input, style_input]
 
-    model = Model(inputs, gru_stack(primary, context, True))
+    model = Model(inputs, gru_stack(primary, context, True, rnn_layers=3))
     model.compile(
-        optimizer='adam',
+        #optimizer=RMSprop(lr=1e-4),
+        optimizer=Adam(lr=1e-3),
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )

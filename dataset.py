@@ -128,6 +128,9 @@ def melody_data_gen(melody,
     Return:
         A list of samples. Each sample consist of inputs for each time step
         and a target level as a tuple.
+        samples:
+            inputs: (input, time_steps, ?)
+            target: (?)
     """
     # Recurrent history
     history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
@@ -151,10 +154,10 @@ def melody_data_gen(melody,
         if target_all:
             # Yield a list of targets for each time step
             target_history.append([next_note_hot])
-            yield zip(*history), zip(*target_history)
+            yield [list(x) for x in zip(*history)], [list(x) for x in zip(*target_history)]
         else:
             # Yield the target to predict
-            yield zip(*history), [next_note_hot]
+            yield [list(x) for x in zip(*history)], [next_note_hot]
 
 
 def stateless_gen(melody_styles,
@@ -169,7 +172,7 @@ def stateless_gen(melody_styles,
             for x in melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all):
                 yield x
 
-def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
+def stateful_gen(melody_styles, time_steps, batch_size, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
     """
     For every single melody style, yield the melody along
     with its contextual inputs.
@@ -183,24 +186,40 @@ def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSE
         for melody in style:
             m_data = list(melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all))
             # A list of sample inputs and targets
-            inputs, targets = zip(*m_data)
+            samples, targets = zip(*m_data)
 
-            # Chunk input and targets into batch size
-            inputs = [np.split(x, batch_size) for x in inputs]
-            targets = np.split(targets, batch_size)
 
-            yield inputs, targets
+            # (samples, inputs, timesteps, ?) -> (batches, batch_size, inputs, timesteps, ?)
+            # Batchify input
+            batches = []
+            current_batch = None
 
-def load_styles(transpose=None):
+            for i, sample in enumerate(samples):
+                if i % batch_size == 0:
+                    if current_batch is not None:
+                        batches.append(current_batch)
+                    current_batch = []
+
+                current_batch.append(sample)
+
+            # (batches, batch_size, inputs, timesteps, ?) -> (batches, inputs, batch_size, timesteps, ?)
+            batches = [[np.array(list(batch_input)) for batch_input in zip(*batch)] for batch in batches]
+            targets = np.squeeze(targets)
+            truncated = (len(targets) // batch_size) * batch_size
+            targets = np.swapaxes(np.split(targets[:truncated], batch_size), 0, 1)
+            yield batches, targets
+
+def load_styles(transpose=None, limit=None):
     # A list of styles, each containing melodies
-    return [load_melodies([style], transpose=transpose) for style in styles]
+    return [load_melodies([style], limit=limit, transpose=transpose) for style in styles]
 
-def process_data(melody_styles, time_steps, stateful=True, limit=None, shuffle=True):
+def process_stateful(melody_styles, time_steps, shuffle=True, batch_size=1):
     print('Processing dataset')
-    if stateful:
-        return list(stateful_gen(melody_styles, time_steps))
-    else:
-        input_set, target_set = zip(*list(stateless_gen(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR)))
-        input_set = [np.array(i) for i in zip(*input_set)]
-        target_set = [np.array(i) for i in zip(*target_set)]
-        return input_set, target_set
+    return list(stateful_gen(melody_styles, time_steps, batch_size=batch_size))
+
+def process_stateless(melody_styles, time_steps, shuffle=True):
+    print('Processing dataset')
+    input_set, target_set = zip(*list(stateless_gen(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR)))
+    input_set = [np.array(i) for i in zip(*input_set)]
+    target_set = [np.array(i) for i in zip(*target_set)]
+    return input_set, target_set
