@@ -135,7 +135,7 @@ def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_nor
         context = BatchNormalization()(context)
     context = Activation('tanh')(context)
     if dropout:
-        context = Dropout(0.25)(context)
+        context = Dropout(0.2)(context)
 
     # RNN layer stasck
     for i in range(rnn_layers):
@@ -159,7 +159,7 @@ def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_nor
             out = BatchNormalization()(out)
         out = Activation('tanh')(out)
         if dropout:
-            out = Dropout(0.25)(out)
+            out = Dropout(0.2)(out)
 
     # Output dense layer
     out = Dense(NUM_CLASSES)(out)
@@ -190,7 +190,7 @@ def gru_stateful(time_steps):
 
 def gru_stateless(time_steps):
     inputs, primary, context = build_inputs(time_steps)
-    model = Model(inputs, gru_stack(primary, context, False, batch_norm=True, dropout=True))
+    model = Model(inputs, gru_stack(primary, context, False))
     model.compile(
         optimizer='adam',
         loss='categorical_crossentropy',
