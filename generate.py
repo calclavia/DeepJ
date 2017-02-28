@@ -19,7 +19,7 @@ def main():
                         help='A list that defines the weights of style')
     parser.add_argument('--bars', default=16, type=int, dest='bars',
                         help='How many bars of music to generate.')
-    parser.add_argument('--prime', default=False, type=bool, dest='prime',
+    parser.add_argument('--prime', default=False, action='store_true',
                         help='Prime the generator with inspiration?')
     parser.add_argument('--samples', default=1, type=int, dest='samples',
                         help='Number of samples to output')
@@ -27,28 +27,27 @@ def main():
     args = parser.parse_args()
 
     time_steps = 8
-    samples = 1
+    samples = args.samples
     bars = args.bars
 
     if args.style is None:
         # By default, generate all different styles
-        styles = [np.array(i, dtype=float) for i in itertools.product([0, 1], repeat=NUM_STYLES)]
+        target_styles = [np.array(i, dtype=float) for i in itertools.product([0, 1], repeat=NUM_STYLES)]
     else:
         assert len(args.style) == NUM_STYLES
-        styles = [np.array(args.style)]
+        target_styles = [np.array(args.style)]
 
 
     if args.prime:
         print('Loading priming melodies')
         # Inspiration melodies
-        inspirations = list(
-            map(process_melody, load_melodies(styles, limit=samples * 10)))
+        inspirations = list(map(process_melody, load_melodies(styles, limit=samples * 10, transpose=True)))
 
     with tf.device('/cpu:0'):
         model = load_supervised_model(time_steps, args.model)
 
     for i in range(samples):
-        for style in styles:
+        for style in target_styles:
             # Skip 0 sum style
             if np.sum(style) == 0:
                 continue
@@ -73,8 +72,7 @@ def generate(model, time_steps, style, bars, inspiration=None):
     # TODO: Mask the model output for Wavenet
     # out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
     # Prime the time steps
-    history = build_history_buffer(
-        time_steps, NUM_CLASSES, NOTES_PER_BAR, style, prime_beats=False)
+    history = build_history_buffer(time_steps, NUM_CLASSES, NOTES_PER_BAR, style, prime_beats=False)
 
     if inspiration is not None:
         # Prime the RNN for one bar

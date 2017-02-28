@@ -91,9 +91,9 @@ def load_melodies(paths, transpose=None, process=True, limit=None, shuffle=True,
 def compute_beat(beat, notes_in_bar):
     # TODO: Compare methods
     # Angle method
-    angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
-    return np.array([math.cos(angle), math.sin(angle)])
-    # return one_hot(beat % notes_in_bar, notes_in_bar)
+    # angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
+    # return np.array([math.cos(angle), math.sin(angle)])
+    return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def compute_completion(beat, len_melody):
     return np.array([beat / (len_melody - 1)])
@@ -191,9 +191,9 @@ def stateful_gen(melody_styles, time_steps, batch_size=1, num_classes=NUM_CLASSE
 
             yield inputs, targets
 
-def load_styles():
+def load_styles(transpose=None):
     # A list of styles, each containing melodies
-    return [load_melodies([style]) for style in styles]
+    return [load_melodies([style], transpose=transpose) for style in styles]
 
 def process_data(melody_styles, time_steps, stateful=True, limit=None, shuffle=True):
     print('Processing dataset')

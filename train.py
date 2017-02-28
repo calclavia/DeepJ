@@ -37,12 +37,12 @@ def main():
         train_stateless(model, args.file, time_steps)
 
 def train_stateless(model, model_file, time_steps):
-    input_set, target_set = process_data(load_styles(), time_steps, stateful=False)
+    input_set, target_set = process_data(load_styles(transpose=True), time_steps, stateful=False)
 
     cbs = [
         ModelCheckpoint(filepath=model_file, monitor='acc', save_best_only=True),
         #TensorBoard(log_dir='./out/supervised/summary', histogram_freq=1),
-        ReduceLROnPlateau(monitor='acc', patience=5, verbose=1),
+        ReduceLROnPlateau(monitor='acc', patience=3, verbose=1),
         EarlyStopping(monitor='acc', patience=10)
     ]
 
@@ -54,7 +54,7 @@ def train_stateless(model, model_file, time_steps):
     )
 
 def train_stateful(model, model_file, time_steps):
-    sequences = process_data(load_styles(), time_steps, shuffle=False)
+    sequences = process_data(load_styles(transpose=True), time_steps, shuffle=False)
     # Keep track of best metrics
     best_accuracy = 0
     no_improvements = 0
