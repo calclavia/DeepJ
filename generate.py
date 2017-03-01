@@ -23,10 +23,13 @@ def main():
                         help='Prime the generator with inspiration?')
     parser.add_argument('--samples', default=1, type=int, dest='samples',
                         help='Number of samples to output')
+    parser.add_argument('--timesteps', metavar='t', type=int,
+                        default=8,
+                        help='Number of timesteps')
 
     args = parser.parse_args()
 
-    time_steps = 8
+    time_steps = args.timesteps
     samples = args.samples
     bars = args.bars
 
@@ -74,10 +77,14 @@ def generate(model, time_steps, style, bars, inspiration=None):
     # Prime the time steps
     history = build_history_buffer(time_steps, NUM_CLASSES, NOTES_PER_BAR, style, prime_beats=False)
 
+    def make_inputs():
+        return [np.repeat(np.expand_dims(x, 0), BATCH_SIZE, axis=0) for x in zip(*history)]
+
     if inspiration is not None:
+        print('Priming melody')
         # Prime the RNN for one bar
         for i in range(NOTES_PER_BAR):
-            model.predict([np.array([x]) for x in zip(*history)])
+            model.predict(make_inputs())
             note_hot = one_hot(inspiration[i], NUM_CLASSES)
             beat_input = compute_beat(i, NOTES_PER_BAR)
             completion_input = np.array([i / (len(inspiration) - 1)])
@@ -90,8 +97,9 @@ def generate(model, time_steps, style, bars, inspiration=None):
 
     N = NOTES_PER_BAR * bars
     for i in range(N):
-        results = model.predict([np.array([x]) for x in zip(*history)])
-        prob_dist = results[0]  # [-1] # TODO: Used for old model architecture
+        # Batchify the input
+        results = model.predict(make_inputs())
+        prob_dist = results[0]
         note = np.random.choice(len(prob_dist), p=prob_dist)
 
         note_hot = one_hot(note, NUM_CLASSES)

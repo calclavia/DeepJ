@@ -61,7 +61,7 @@ def train_stateful(model, model_file, time_steps):
     no_improvements = 0
 
     lr_patience = 3
-    patience = lr_patience * 2
+    patience = 10
 
     for epoch in itertools.count():
         print('Epoch {}:'.format(epoch))
@@ -73,7 +73,6 @@ def train_stateful(model, model_file, time_steps):
         t = tqdm(order)
         for s in t:
             inputs, targets = sequences[s]
-            """
             # Long sequence training
             for x, y in tqdm(zip(inputs, targets)):
                 tr_loss, tr_acc = model.train_on_batch(x, y)
@@ -83,6 +82,7 @@ def train_stateful(model, model_file, time_steps):
                 count += 1
                 t.set_postfix(loss=loss/count, acc=acc/count)
             model.reset_states()
+            # TODO: Seems to have made no significant difference
             """
             # Bar based training
             for i, (x, y) in tqdm(enumerate(zip(inputs, targets))):
@@ -95,6 +95,7 @@ def train_stateful(model, model_file, time_steps):
                 loss += tr_loss
                 count += 1
                 t.set_postfix(loss=loss/count, acc=acc/count)
+            """
 
         # Save model
         if acc > best_accuracy:
@@ -106,7 +107,7 @@ def train_stateful(model, model_file, time_steps):
 
         # Lower learning rate
         if no_improvements > lr_patience:
-            new_lr = K.get_value(model.optimizer.lr) * 0.2
+            new_lr = K.get_value(model.optimizer.lr) * 0.5
             K.set_value(model.optimizer.lr, new_lr)
             print('Lowering learning rate to {}'.format(new_lr))
 

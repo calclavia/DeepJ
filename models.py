@@ -173,17 +173,16 @@ def gru_stateful(time_steps):
     note_input = Input(batch_shape=(BATCH_SIZE, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
     # Context inputs
-    beat_input = Input(batch_shape=(BATCH_SIZE, time_steps, NOTES_PER_BAR), name='beat_input')
+    beat_input = Input(batch_shape=(BATCH_SIZE, time_steps, 2), name='beat_input')
     completion_input = Input(batch_shape=(BATCH_SIZE, time_steps, 1), name='completion_input')
     style_input = Input(batch_shape=(BATCH_SIZE, time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
 
     inputs = [note_input, beat_input, completion_input, style_input]
 
-    model = Model(inputs, gru_stack(primary, context, True, rnn_layers=3))
+    model = Model(inputs, gru_stack(primary, context, True))
     model.compile(
-        #optimizer=RMSprop(lr=1e-4),
-        optimizer=Adam(lr=1e-3),
+        optimizer='adam',
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -204,7 +203,7 @@ def build_inputs(time_steps):
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
     # Context inputs
-    beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
+    beat_input = Input(shape=(time_steps, 2), name='beat_input')
     completion_input = Input(shape=(time_steps, 1), name='completion_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
