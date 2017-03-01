@@ -55,7 +55,7 @@ def train_stateless(model, model_file, time_steps):
     )
 
 def train_stateful(model, model_file, time_steps):
-    sequences = process_stateful(load_styles(transpose=True), time_steps, shuffle=False, batch_size=BATCH_SIZE)
+    sequences = process_stateful(load_styles(transpose=False), time_steps, shuffle=False, batch_size=BATCH_SIZE)
     # Keep track of best metrics
     best_accuracy = 0
     no_improvements = 0
@@ -73,18 +73,10 @@ def train_stateful(model, model_file, time_steps):
         t = tqdm(order)
         for s in t:
             inputs, targets = sequences[s]
-            # Long sequence training
-            for x, y in tqdm(zip(inputs, targets)):
-                tr_loss, tr_acc = model.train_on_batch(x, y)
 
-                acc += tr_acc
-                loss += tr_loss
-                count += 1
-                t.set_postfix(loss=loss/count, acc=acc/count)
-            model.reset_states()
             # TODO: Seems to have made no significant difference
-            """
             # Bar based training
+            """
             for i, (x, y) in tqdm(enumerate(zip(inputs, targets))):
                 if i % NOTES_PER_BAR == 0:
                     model.reset_states()
@@ -95,7 +87,17 @@ def train_stateful(model, model_file, time_steps):
                 loss += tr_loss
                 count += 1
                 t.set_postfix(loss=loss/count, acc=acc/count)
+            model.reset_states()
             """
+            # Long sequence training
+            for x, y in tqdm(zip(inputs, targets)):
+                tr_loss, tr_acc = model.train_on_batch(x, y)
+
+                acc += tr_acc
+                loss += tr_loss
+                count += 1
+                t.set_postfix(loss=loss/count, acc=acc/count)
+            model.reset_states()
 
         # Save model
         if acc > best_accuracy:
