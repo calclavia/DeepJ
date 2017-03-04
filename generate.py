@@ -6,6 +6,7 @@ from midi_util import *
 from music import NUM_CLASSES, NOTES_PER_BAR
 from dataset import load_melodies, process_melody, compute_beat, build_history_buffer
 from constants import *
+from music import MIN_NOTE
 import random
 import math
 import argparse
@@ -66,6 +67,10 @@ def main():
             composition = generate(model, time_steps, style / np.sum(style), bars, inspiration)
             #mf = midi_encode_melody(composition)
             #midi.write_midifile('out/melody {} {}.mid'.format(style.astype(int), i), mf)
+
+            # Shift notes back up
+            composition = np.concatenate((np.zeros((len(composition), MIN_NOTE)), composition), axis=1)
+
             mf = midi_encode(composition)
             midi.write_midifile('out/music {} {}.mid'.format(style.astype(int), i), mf)
 
@@ -106,7 +111,7 @@ def generate(model, time_steps, style, bars, inspiration=None):
 
         note = np.zeros(len(prob_dist))
         for i in range(len(prob_dist)):
-            note[i] = 1 if random.random() > prob_dist[i] else 0
+            note[i] = 1 if random.random() < prob_dist[i] else 0
         # note = np.random.choice(len(prob_dist), p=prob_dist)
         # note = one_hot(note, NUM_CLASSES)
 
