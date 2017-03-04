@@ -126,10 +126,8 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_norm=False, dropout=False):
+def gru_stack(primary, context, stateful, rnn_layers=2, num_units=256, batch_norm=False, dropout=False):
     out = primary
-    # TODO: Only connect the style contact to every layer for stronger effect.
-    # TODO: Use concat for better performance.
 
     # Create a distributerd representation of context
     context = GRU(64, return_sequences=True, stateful=stateful)(context)
@@ -167,7 +165,7 @@ def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_nor
     out = Dense(NUM_CLASSES)(out)
     if batch_norm:
         out = BatchNormalization()(out)
-    out = Activation('softmax')(out)
+    out = Activation('sigmoid')(out)
     return out
 
 def gru_stateful(time_steps):

@@ -6,6 +6,7 @@ from midi_util import *
 from music import NUM_CLASSES, NOTES_PER_BAR
 from dataset import load_melodies, process_melody, compute_beat, build_history_buffer
 from constants import *
+import random
 import math
 import argparse
 import itertools
@@ -63,8 +64,10 @@ def main():
                     inspiration = np.random.choice(inspirations)
 
             composition = generate(model, time_steps, style / np.sum(style), bars, inspiration)
-            mf = midi_encode_melody(composition)
-            midi.write_midifile('out/melody {} {}.mid'.format(style.astype(int), i), mf)
+            #mf = midi_encode_melody(composition)
+            #midi.write_midifile('out/melody {} {}.mid'.format(style.astype(int), i), mf)
+            mf = midi_encode(composition)
+            midi.write_midifile('out/music {} {}.mid'.format(style.astype(int), i), mf)
 
 
 def generate(model, time_steps, style, bars, inspiration=None):
@@ -100,17 +103,20 @@ def generate(model, time_steps, style, bars, inspiration=None):
         # Batchify the input
         results = model.predict(make_inputs())
         prob_dist = results[0]
-        note = np.random.choice(len(prob_dist), p=prob_dist)
 
-        note_hot = one_hot(note, NUM_CLASSES)
+        note = np.zeros(len(prob_dist))
+        for i in range(len(prob_dist)):
+            note[i] = 1 if random.random() > prob_dist[i] else 0
+        # note = np.random.choice(len(prob_dist), p=prob_dist)
+        # note = one_hot(note, NUM_CLASSES)
+
         beat_input = compute_beat(i, NOTES_PER_BAR)
         completion_input = np.array([i / (N - 1)])
-        history.append([note_hot, beat_input, completion_input, style])
+        history.append([note, beat_input, completion_input, style])
 
         composition.append(note)
 
     model.reset_states()
-    print(composition)
     return composition
 
 if __name__ == '__main__':

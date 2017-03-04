@@ -137,7 +137,7 @@ def midi_decode(pattern,
         step = pattern.resolution // NOTES_PER_BEAT
 
     # Extract all tracks at highest resolution
-    track_rolls = []
+    final_track = None
     max_len = 0
 
     for track in pattern:
@@ -160,25 +160,38 @@ def midi_decode(pattern,
                 pitch, velocity = event.data
                 composition[-1][pitch] = 0
 
-        track_rolls.append(np.array(composition))
+        composition = np.array(composition)
         max_len = max(max_len, len(composition))
 
-    # Merge all tracks
-    final_track = None
-
-    for track in track_rolls:
-        aug = np.concatenate((track, np.zeros((max_len - track.shape[0], classes))))
         if final_track is None:
-            final_track = aug
+            final_track = composition
         else:
-            final_track += aug
+            # Rescale arrays based on max size.
+            if max_len - final_track.shape[0] > 0:
+                final_track = np.concatenate((final_track, np.zeros((max_len - final_track.shape[0], classes))))
+            if max_len - composition.shape[0] > 0:
+                composition = np.concatenate((composition, np.zeros((max_len - composition.shape[0], classes))))
+            final_track += composition
 
     # Downscale resolution
     return final_track[::step]
 
 def load_midi(fname):
     p = midi.read_midifile(fname)
-    return midi_decode(p)
+    cache_path = os.path.join('data', 'cache', fname + '.npy')
+    try:
+        music = np.load(cache_path)
+        print('Loading {} from cache'.format(fname))
+        return music
+    except Exception as e:
+        # Perform caching
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        print('Caching {}'.format(fname))
+
+        music = midi_decode(p)
+        np.save(cache_path, music)
+
+        return music
 
 import unittest
 
