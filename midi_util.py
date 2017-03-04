@@ -265,8 +265,10 @@ class TestMIDI(unittest.TestCase):
 
 if __name__ == '__main__':
     # Test
+    """
     p = midi.read_midifile("out/test_input.mid")
     comp = midi_decode(p)
     p = midi_encode(comp)
     midi.write_midifile("out/test_output.mid", p)
-    # unittest.main()
+    """
+    unittest.main()

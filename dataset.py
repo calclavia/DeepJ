@@ -122,14 +122,14 @@ def opt_one_hot(x, num_classes):
     """
     return one_hot(x, num_classes) if isinstance(x, int) else x
 
-def data_gen(melody,
+def data_gen(music,
             style_hot,
             time_steps,
             num_classes,
             notes_in_bar,
             target_all):
     """
-    Generates training and label data for a given melody sequence.
+    Generates training and label data for a given music sequence.
 
     Return:
         A list of samples. Each sample consist of inputs for each time step
@@ -144,13 +144,13 @@ def data_gen(melody,
     if target_all:
         target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
-    for beat, note in enumerate(melody[:-1]):
+    for beat, note in enumerate(music[:-1]):
         note_in = opt_one_hot(note, num_classes)
         beat_input = compute_beat(beat, notes_in_bar)
-        completion_input = compute_completion(beat, len(melody))
+        completion_input = compute_completion(beat, len(music))
 
         # Wrap around
-        next_note_in = opt_one_hot(melody[beat + 1], num_classes)
+        next_note_in = opt_one_hot(music[beat + 1], num_classes)
 
         history.append(
             [note_in, beat_input, completion_input, style_hot]
@@ -166,28 +166,36 @@ def data_gen(melody,
             yield [list(x) for x in zip(*history)], [next_note_in]
 
 
-def stateless_gen(melody_styles,
+def stateless_gen(music_styles,
                     time_steps,
                     num_classes,
                     notes_in_bar,
                     target_all=False):
-    for s, style in enumerate(melody_styles):
-        style_hot = one_hot(s, len(melody_styles))
+    """
+    Generates data for a stateless RNN.
+    Return:
+        A list of data samples for all styles
+    """
+    for s, style in enumerate(music_styles):
+        style_hot = one_hot(s, len(music_styles))
 
         for melody in style:
             for x in data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all):
                 yield x
 
-def stateful_gen(melody_styles, time_steps, batch_size, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
+def stateful_gen(music_styles, time_steps, batch_size, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
     """
     For every single melody style, yield the melody along
     with its contextual inputs.
+
+    Return:
+        A list of music sequences
     """
     # Process the data into a list of sequences.
     # Each sequence contains input tracks
     # Each training sequence is a tuple of various inputs, including contexts
-    for s, style in enumerate(melody_styles):
-        style_hot = one_hot(s, len(melody_styles))
+    for s, style in enumerate(music_styles):
+        style_hot = one_hot(s, len(music_styles))
 
         for melody in style:
             m_data = list(data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all))
@@ -237,13 +245,13 @@ def load_music_styles():
 
     return music_styles
 
-def process_stateful(melody_styles, time_steps, shuffle=True, batch_size=1):
+def process_stateful(music_styles, time_steps, shuffle=True, batch_size=1):
     print('Processing dataset')
-    return list(stateful_gen(melody_styles, time_steps, batch_size=batch_size))
+    return list(stateful_gen(music_styles, time_steps, batch_size=batch_size))
 
-def process_stateless(melody_styles, time_steps, shuffle=True):
+def process_stateless(music_styles, time_steps, shuffle=True):
     print('Processing dataset')
-    input_set, target_set = zip(*list(stateless_gen(melody_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR)))
+    input_set, target_set = zip(*list(stateless_gen(music_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR)))
     input_set = [np.array(i) for i in zip(*input_set)]
     target_set = [np.array(i) for i in zip(*target_set)]
     return input_set, target_set
