@@ -83,16 +83,12 @@ def midi_encode(composition,
     # Append the track to the pattern
     pattern.append(track)
 
-    velocity = 100
-
     # The current pattern being played
     current = np.zeros_like(composition[0])
     # Absolute tick of last event
     last_event_tick = 0
     # Amount of NOOP ticks
     noop_ticks = 0
-
-    # track.append(midi.SetTempoEvent(bpm=100))
 
     for tick, data in enumerate(composition):
         data = np.array(data)
@@ -180,19 +176,11 @@ def midi_decode(pattern,
     # Downscale resolution
     return final_track[::step]
 
-def load_midi(path='data'):
-    out = []
-
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            fname = os.path.join(root, f)
-            if os.path.isfile(fname):
-                p = midi.read_midifile(fname)
-                out.append(midi_decode(p, track_index=1))
-    return out
+def load_midi(fname):
+    p = midi.read_midifile(fname)
+    return midi_decode(p)
 
 import unittest
-
 
 class TestMIDI(unittest.TestCase):
 

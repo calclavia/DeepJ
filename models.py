@@ -128,21 +128,23 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
 
 def gru_stack(primary, context, stateful, rnn_layers=4, num_units=256, batch_norm=False, dropout=False):
     out = primary
+    # TODO: Only connect the style contact to every layer for stronger effect.
+    # TODO: Use concat for better performance.
 
     # Create a distributerd representation of context
-    context = GRU(num_units, return_sequences=True, stateful=stateful)(context)
+    context = GRU(64, return_sequences=True, stateful=stateful)(context)
     if batch_norm:
         context = BatchNormalization()(context)
     context = Activation('tanh')(context)
+
     if dropout:
         context = Dropout(0.2)(context)
 
     # RNN layer stasck
     for i in range(rnn_layers):
         y = out
-        if i > 0:
-            # Contextual connections
-            out = merge([out, context], mode='sum')
+        # Contextual connections
+        out = merge([out, context], mode='concat')
 
         out = GRU(
             num_units,
@@ -183,7 +185,8 @@ def gru_stateful(time_steps):
     model = Model(inputs, gru_stack(primary, context, True))
     model.compile(
         optimizer='adam',
-        loss='categorical_crossentropy',
+        #loss='categorical_crossentropy',
+        loss='binary_crossentropy',
         metrics=['accuracy']
     )
     return model
@@ -193,20 +196,21 @@ def gru_stateless(time_steps):
     model = Model(inputs, gru_stack(primary, context, False))
     model.compile(
         optimizer='adam',
-        loss='categorical_crossentropy',
+        #loss='categorical_crossentropy',
+        loss='binary_crossentropy',
         metrics=['accuracy']
     )
     return model
 
 def build_inputs(time_steps):
-    # Primary input
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
-    primary = note_input
-    # Context inputs
     beat_input = Input(shape=(time_steps, 2), name='beat_input')
     completion_input = Input(shape=(time_steps, 1), name='completion_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
-    context = merge([completion_input, beat_input, style_input], mode='concat')
+
+    # Differentiate context and primary inputs
+    primary = merge([note_input, completion_input, beat_input], mode='concat')
+    context = style_input
     return [note_input, beat_input, completion_input, style_input], primary, context
 
 def note_model(time_steps):

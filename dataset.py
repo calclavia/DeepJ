@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 import math
 import random
 from constants import styles
-
+from midi_util import *
 
 def process_melody(melody):
     """
@@ -116,12 +116,18 @@ def build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot, prime
             current_beat = NOTES_PER_BAR - 1
     return history
 
-def melody_data_gen(melody,
-                    style_hot,
-                    time_steps,
-                    num_classes,
-                    notes_in_bar,
-                    target_all):
+def opt_one_hot(x, num_classes):
+    """
+    Creates a one hot representation if needed.
+    """
+    return one_hot(x, num_classes) if isinstance(x, int) else x
+
+def data_gen(melody,
+            style_hot,
+            time_steps,
+            num_classes,
+            notes_in_bar,
+            target_all):
     """
     Generates training and label data for a given melody sequence.
 
@@ -139,37 +145,37 @@ def melody_data_gen(melody,
         target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
     for beat, note in enumerate(melody[:-1]):
-        note_hot = one_hot(note, num_classes)
+        note_in = opt_one_hot(note, num_classes)
         beat_input = compute_beat(beat, notes_in_bar)
         completion_input = compute_completion(beat, len(melody))
 
         # Wrap around
-        next_note_hot = one_hot(melody[beat + 1 ], num_classes)
+        next_note_in = opt_one_hot(melody[beat + 1], num_classes)
 
         history.append(
-            [note_hot, beat_input, completion_input, style_hot]
+            [note_in, beat_input, completion_input, style_hot]
         )
 
         # Yield the current input with target
         if target_all:
             # Yield a list of targets for each time step
-            target_history.append([next_note_hot])
+            target_history.append([next_note_in])
             yield [list(x) for x in zip(*history)], [list(x) for x in zip(*target_history)]
         else:
             # Yield the target to predict
-            yield [list(x) for x in zip(*history)], [next_note_hot]
+            yield [list(x) for x in zip(*history)], [next_note_in]
 
 
 def stateless_gen(melody_styles,
-                        time_steps,
-                        num_classes,
-                        notes_in_bar,
-                        target_all=False):
+                    time_steps,
+                    num_classes,
+                    notes_in_bar,
+                    target_all=False):
     for s, style in enumerate(melody_styles):
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
-            for x in melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all):
+            for x in data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all):
                 yield x
 
 def stateful_gen(melody_styles, time_steps, batch_size, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
@@ -184,7 +190,7 @@ def stateful_gen(melody_styles, time_steps, batch_size, num_classes=NUM_CLASSES,
         style_hot = one_hot(s, len(melody_styles))
 
         for melody in style:
-            m_data = list(melody_data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all))
+            m_data = list(data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all))
             # A list of sample inputs and targets
             samples, targets = zip(*m_data)
 
@@ -211,6 +217,25 @@ def stateful_gen(melody_styles, time_steps, batch_size, num_classes=NUM_CLASSES,
 def load_styles(transpose=None, limit=None):
     # A list of styles, each containing melodies
     return [load_melodies([style], limit=limit, transpose=transpose) for style in styles]
+
+def load_music_styles():
+    """
+    Loads style for a full music score (not just melody)
+    """
+    music_styles = []
+    for s_file in styles:
+        print('Searching {}'.format(s_file))
+        files = get_all_files([s_file])
+        print('Loading music from {} files'.format(len(files)))
+        res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(load_midi)(f) for f in files)
+
+        # Trim the representation to be between MIN and MAX note
+        # TODO: There's 2 extra to fill in compatibility with melody rnn
+        # TODO: Volume input
+        res = [np.ceil(m[:, MIN_NOTE:MAX_NOTE+2]) for m in res]
+        music_styles.append(res)
+
+    return music_styles
 
 def process_stateful(melody_styles, time_steps, shuffle=True, batch_size=1):
     print('Processing dataset')

@@ -11,7 +11,7 @@ from music import NUM_CLASSES, NOTES_PER_BAR, MAX_NOTE, NO_EVENT
 from keras.models import load_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from keras import backend as K
-from dataset import load_styles, process_stateful, process_stateless
+from dataset import *
 from tqdm import tqdm
 from models import *
 from constants import BATCH_SIZE
@@ -38,7 +38,8 @@ def main():
         train_stateless(model, args.file, time_steps)
 
 def train_stateless(model, model_file, time_steps):
-    input_set, target_set = process_stateless(load_styles(transpose=True), time_steps)
+    input_set, target_set = process_stateless(load_music_styles(), time_steps)
+    # input_set, target_set = process_stateless(load_styles(transpose=True), time_steps)
 
     cbs = [
         ModelCheckpoint(filepath=model_file, monitor='acc', save_best_only=True),
