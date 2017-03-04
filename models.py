@@ -1,7 +1,7 @@
 # Defines the models used in the experiments
 
 import numpy as np
-from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten, Lambda
+from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten, Lambda, Permute, Reshape
 from keras.models import Model
 from keras.layers.convolutional import AtrousConvolution1D, Convolution1D
 from keras.layers.recurrent import GRU
@@ -126,17 +126,29 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(primary, context, stateful, rnn_layers=2, num_units=256, batch_norm=False, dropout=False):
+def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=200, batch_norm=False, dropout=0, act='relu'):
     out = primary
 
     # Create a distributerd representation of context
-    context = GRU(64, return_sequences=True, stateful=stateful)(context)
+    context = GRU(num_units // 4, return_sequences=True, stateful=stateful)(context)
     if batch_norm:
         context = BatchNormalization()(context)
-    context = Activation('tanh')(context)
+    context = Activation(act)(context)
 
-    if dropout:
-        context = Dropout(0.2)(context)
+    if dropout > 0:
+        context = Dropout(dropout)(context)
+
+    # Convolve over input rather than time
+    out = Permute((2, 1))(out)
+
+    # Convolution layers
+    for i in range(cnn_layers):
+        out = Convolution1D(32, 3)(out)
+        out = Activation(act)(out)
+        if dropout > 0:
+            out = Dropout(dropout)(out)
+
+    out = Permute((2, 1))(out)
 
     # RNN layer stasck
     for i in range(rnn_layers):
@@ -157,9 +169,9 @@ def gru_stack(primary, context, stateful, rnn_layers=2, num_units=256, batch_nor
 
         if batch_norm:
             out = BatchNormalization()(out)
-        out = Activation('tanh')(out)
-        if dropout:
-            out = Dropout(0.2)(out)
+        out = Activation(act)(out)
+        if dropout > 0:
+            out = Dropout(dropout)(out)
 
     # Output dense layer
     out = Dense(NUM_CLASSES)(out)
@@ -191,7 +203,7 @@ def gru_stateful(time_steps):
 
 def gru_stateless(time_steps):
     inputs, primary, context = build_inputs(time_steps)
-    model = Model(inputs, gru_stack(primary, context, False))
+    model = Model(inputs, gru_stack(primary, context, False, dropout=0.5))
     model.compile(
         optimizer='adam',
         #loss='categorical_crossentropy',
@@ -207,8 +219,8 @@ def build_inputs(time_steps):
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
 
     # Differentiate context and primary inputs
-    primary = merge([note_input, completion_input, beat_input], mode='concat')
-    context = style_input
+    primary = note_input
+    context = merge([style_input, completion_input, beat_input], mode='concat')
     return [note_input, beat_input, completion_input, style_input], primary, context
 
 def note_model(time_steps):

@@ -75,13 +75,11 @@ def main():
             midi.write_midifile('out/music {} {}.mid'.format(style.astype(int), i), mf)
 
 
-def generate(model, time_steps, style, bars, inspiration=None):
+def generate(model, time_steps, style, bars, inspiration=None, temperature=0.8):
     """
     Generates a sequence
     """
     print('Generating music with style {} for {} bars:'.format(style, bars))
-    # TODO: Mask the model output for Wavenet
-    # out = Lambda(lambda x: x[:, -1, :], output_shape=(out._keras_shape[-1],))(out)
     # Prime the time steps
     history = build_history_buffer(time_steps, NUM_CLASSES, NOTES_PER_BAR, style, prime_beats=False)
 
@@ -108,12 +106,16 @@ def generate(model, time_steps, style, bars, inspiration=None):
         # Batchify the input
         results = model.predict(make_inputs())
         prob_dist = results[0]
+        num_outputs = len(prob_dist)
 
-        note = np.zeros(len(prob_dist))
-        for i in range(len(prob_dist)):
+        # Inverse sigmoid
+        x = 1 - np.log(1 / np.array(prob_dist))
+        # Apply temperature to sigmoid function
+        prob_dist = 1 / (1 + np.exp(-x / temperature))
+
+        note = np.zeros(num_outputs)
+        for i in range(num_outputs):
             note[i] = 1 if random.random() < prob_dist[i] else 0
-        # note = np.random.choice(len(prob_dist), p=prob_dist)
-        # note = one_hot(note, NUM_CLASSES)
 
         beat_input = compute_beat(i, NOTES_PER_BAR)
         completion_input = np.array([i / (N - 1)])
