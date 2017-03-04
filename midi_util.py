@@ -1,4 +1,3 @@
-# TODO: We don't need this anymore...
 import midi
 import numpy as np
 import os
@@ -7,7 +6,7 @@ from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BEAT, NOTE_OFF, NO_EVENT, MI
 # MIDI Resolution
 DEFAULT_RES = 96
 MIDI_MAX_NOTES = 128
-
+MAX_VELOCITY = 127
 
 def midi_encode_melody(melody,
                        resolution=DEFAULT_RES,
@@ -26,7 +25,7 @@ def midi_encode_melody(melody,
 
     track.append(midi.SetTempoEvent(bpm=130))
 
-    velocity = 127
+    velocity = 100
     last_note = None
     last_event = 0
     noop_ticks = 0
@@ -71,10 +70,10 @@ def midi_encode_melody(melody,
 
 
 def midi_encode(composition,
-                resolution=DEFAULT_RES,
-                step=DEFAULT_RES // NOTES_PER_BEAT):
+                resolution=NOTES_PER_BEAT,
+                step=1):
     """
-    Takes a composition array and encodes it into MIDI pattern
+    Takes a piano roll and encodes it into MIDI pattern
     """
     # Instantiate a MIDI Pattern (contains a list of tracks)
     pattern = midi.Pattern()
@@ -84,7 +83,7 @@ def midi_encode(composition,
     # Append the track to the pattern
     pattern.append(track)
 
-    velocity = 127
+    velocity = 100
 
     # The current pattern being played
     current = np.zeros_like(composition[0])
@@ -93,28 +92,26 @@ def midi_encode(composition,
     # Amount of NOOP ticks
     noop_ticks = 0
 
-    # track.append(midi.SetTempoEvent())
+    # track.append(midi.SetTempoEvent(bpm=100))
+
     for tick, data in enumerate(composition):
         data = np.array(data)
 
         if not np.array_equal(current, data):
             noop_ticks = 0
 
-            # A bit difference vector.
-            diff = data - current
-
-            # TODO: Handle articulate
-            for index, bit in np.ndenumerate(diff):
-                if bit > 0:
+            # TODO: Handle articulation
+            for index, next_volume in np.ndenumerate(data):
+                if next_volume > 0 and current[index] == 0:
                     # Was off, but now turned on
                     evt = midi.NoteOnEvent(
                         tick=(tick - last_event_tick) * step,
-                        velocity=velocity,
+                        velocity=int(next_volume * MAX_VELOCITY),
                         pitch=index[0]
                     )
                     track.append(evt)
                     last_event_tick = tick
-                elif bit < 0:
+                elif current[index] > 0 and next_volume == 0:
                     # Was on, but now turned off
                     evt = midi.NoteOffEvent(
                         tick=(tick - last_event_tick) * step,
@@ -130,37 +127,58 @@ def midi_encode(composition,
     # Add the end of track event, append it to the track
     eot = midi.EndOfTrackEvent(tick=noop_ticks)
     track.append(eot)
+
     return pattern
 
 
 def midi_decode(pattern,
                 classes=MIDI_MAX_NOTES,
-                track_index=0,
-                step=DEFAULT_RES // NOTES_PER_BEAT):
+                step=None):
     """
-    Takes a MIDI pattern and decodes it into a composition array.
+    Takes a MIDI pattern and decodes it into a piano roll.
     """
-    track = pattern[track_index]
-    composition = [np.zeros((classes,))]
+    if step is None:
+        step = pattern.resolution // NOTES_PER_BEAT
 
-    for event in track:
-        # Duplicate the last note pattern to wait for next event
-        for _ in range(event.tick // step):
-            composition.append(np.copy(composition[-1]))
+    # Extract all tracks at highest resolution
+    track_rolls = []
+    max_len = 0
 
-        if isinstance(event, midi.EndOfTrackEvent):
-            break
+    for track in pattern:
+        composition = [np.zeros((classes,))]
 
-        # Modify the last note pattern
-        if isinstance(event, midi.NoteOnEvent):
-            pitch, velocity = event.data
-            composition[-1][pitch] = 1
+        for event in track:
+            # Duplicate the last note pattern to wait for next event
+            for _ in range(event.tick):
+                composition.append(np.copy(composition[-1]))
 
-        if isinstance(event, midi.NoteOffEvent):
-            pitch, velocity = event.data
-            composition[-1][pitch] = 0
-    return composition
+            if isinstance(event, midi.EndOfTrackEvent):
+                break
 
+            # Modify the last note pattern
+            if isinstance(event, midi.NoteOnEvent):
+                pitch, velocity = event.data
+                composition[-1][pitch] = velocity / MAX_VELOCITY
+
+            if isinstance(event, midi.NoteOffEvent):
+                pitch, velocity = event.data
+                composition[-1][pitch] = 0
+
+        track_rolls.append(np.array(composition))
+        max_len = max(max_len, len(composition))
+
+    # Merge all tracks
+    final_track = None
+
+    for track in track_rolls:
+        aug = np.concatenate((track, np.zeros((max_len - track.shape[0], classes))))
+        if final_track is None:
+            final_track = aug
+        else:
+            final_track += aug
+
+    # Downscale resolution
+    return final_track[::step]
 
 def load_midi(path='data'):
     out = []
@@ -189,7 +207,7 @@ class TestMIDI(unittest.TestCase):
         ]
 
         pattern = midi_encode(composition, step=1)
-        self.assertEqual(pattern.resolution, 2)
+        self.assertEqual(pattern.resolution, 96)
         self.assertEqual(len(pattern), 1)
         track = pattern[0]
         self.assertEqual(len(track), 4 + 1)
@@ -222,7 +240,7 @@ class TestMIDI(unittest.TestCase):
         track.append(midi.NoteOffEvent(tick=48, velocity=127, pitch=1))
         track.append(midi.EndOfTrackEvent(tick=1))
 
-        composition = midi_decode(pattern, 4)
+        composition = midi_decode(pattern, 4, step=DEFAULT_RES // 2)
 
         np.testing.assert_array_equal(composition, [
             [1, 0, 0, 0],
@@ -245,11 +263,9 @@ class TestMIDI(unittest.TestCase):
         np.testing.assert_array_equal(composition, new_comp)
 
 if __name__ == '__main__':
-    """
     # Test
-    p = midi.read_midifile("out/Melody 001.mid")
-    comp = midi_decode(p, track_index=1, step=1)
-    p = midi_encode(comp, step=1, resolution=96)
-    midi.write_midifile("out/Melody 002.mid", p)
-    """
-    unittest.main()
+    p = midi.read_midifile("out/test_input.mid")
+    comp = midi_decode(p)
+    p = midi_encode(comp)
+    midi.write_midifile("out/test_output.mid", p)
+    # unittest.main()
