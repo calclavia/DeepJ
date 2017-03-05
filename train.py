@@ -51,6 +51,7 @@ def train_stateless(model, model_file, time_steps):
     model.fit(
         input_set,
         target_set,
+        batch_size=128,
         nb_epoch=1000,
         callbacks=cbs
     )
@@ -76,7 +77,7 @@ def train_stateful(model, model_file, time_steps):
         t = tqdm(order)
         for s in t:
             inputs, targets = sequences[s]
-
+            """
             # TODO: Seems to have made no significant difference
             # Bar based training
             for i, (x, y) in tqdm(enumerate(zip(inputs, targets))):
@@ -90,6 +91,7 @@ def train_stateful(model, model_file, time_steps):
                 count += 1
                 t.set_postfix(loss=loss/count, acc=acc/count)
             model.reset_states()
+            """
 
             # Long sequence training
             for x, y in tqdm(zip(inputs, targets)):

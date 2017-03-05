@@ -144,27 +144,26 @@ def data_gen(music,
     if target_all:
         target_history = build_history_buffer(time_steps, num_classes, notes_in_bar, style_hot)
 
-    for beat, note in enumerate(music[:-1]):
-        note_in = opt_one_hot(note, num_classes)
+    music = list(music)
+
+    for beat, note in enumerate(music):
         beat_input = compute_beat(beat, notes_in_bar)
         completion_input = compute_completion(beat, len(music))
-
-        # Wrap around
-        next_note_in = opt_one_hot(music[beat + 1], num_classes)
-
-        history.append(
-            [note_in, beat_input, completion_input, style_hot]
-        )
+        
+        predict_note = opt_one_hot(note, num_classes)
 
         # Yield the current input with target
         if target_all:
             # Yield a list of targets for each time step
-            target_history.append([next_note_in])
+            target_history.append([predict_note])
             yield [list(x) for x in zip(*history)], [list(x) for x in zip(*target_history)]
         else:
             # Yield the target to predict
-            yield [list(x) for x in zip(*history)], [next_note_in]
+            yield [list(x) for x in zip(*history)], [predict_note]
 
+        history.append(
+            [predict_note, beat_input, completion_input, style_hot]
+        )
 
 def stateless_gen(music_styles,
                     time_steps,
@@ -249,7 +248,7 @@ def process_stateful(music_styles, time_steps, shuffle=True, batch_size=1):
     print('Processing dataset')
     return list(stateful_gen(music_styles, time_steps, batch_size=batch_size))
 
-def process_stateless(music_styles, time_steps, shuffle=True):
+def process_stateless(music_styles, time_steps):
     print('Processing dataset')
     input_set, target_set = zip(*list(stateless_gen(music_styles, time_steps, NUM_CLASSES, NOTES_PER_BAR)))
     input_set = [np.array(i) for i in zip(*input_set)]

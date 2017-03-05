@@ -128,7 +128,7 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=256, batch_norm=False, dropout=0, act='relu'):
+def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=200, batch_norm=False, dropout=0, act='tanh'):
     out = primary
 
     # Create a distributerd representation of context
@@ -141,7 +141,7 @@ def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=
     if dropout > 0:
         context = Dropout(dropout)(context)
     """
-
+    """
     # Convolve over input rather than time
     # Convolution layers
     out = TimeDistributed(Reshape((NUM_CLASSES, 1)))(out)
@@ -150,12 +150,12 @@ def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=
         out = TimeDistributed(Convolution1D(64 * (i + 1), 3))(out)
         out = TimeDistributed(MaxPooling1D())(out)
         out = Activation(act)(out)
-        
+
         if dropout > 0:
             out = Dropout(dropout)(out)
 
     out = TimeDistributed(Flatten())(out)
-
+    """
     out = merge([out, context], mode='concat')
 
     # RNN layer stasck
@@ -213,7 +213,7 @@ def gru_stateful(time_steps):
 
 def gru_stateless(time_steps):
     inputs, primary, context = build_inputs(time_steps)
-    model = Model(inputs, gru_stack(primary, context, False, dropout=0.5))
+    model = Model(inputs, gru_stack(primary, context, False))
     model.compile(
         optimizer='adam',
         #loss='categorical_crossentropy',

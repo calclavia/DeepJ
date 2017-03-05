@@ -208,7 +208,7 @@ class TestMIDI(unittest.TestCase):
         ]
 
         pattern = midi_encode(composition, step=1)
-        self.assertEqual(pattern.resolution, 96)
+        self.assertEqual(pattern.resolution, NOTES_PER_BEAT)
         self.assertEqual(len(pattern), 1)
         track = pattern[0]
         self.assertEqual(len(track), 4 + 1)
