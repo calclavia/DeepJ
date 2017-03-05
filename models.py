@@ -4,7 +4,9 @@ import numpy as np
 from keras.layers import Dense, Input, merge, Activation, Dropout, Flatten, Lambda, Permute, Reshape
 from keras.models import Model
 from keras.layers.convolutional import AtrousConvolution1D, Convolution1D
+from keras.layers.pooling import MaxPooling1D
 from keras.layers.recurrent import GRU
+from keras.layers.wrappers import TimeDistributed
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 from keras.utils.np_utils import conv_output_length
@@ -126,10 +128,11 @@ def wavenet(time_steps, nb_stacks=1, dilation_depth=5, nb_filters=64, nb_output_
     )
     return model
 
-def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=200, batch_norm=False, dropout=0, act='relu'):
+def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=256, batch_norm=False, dropout=0, act='relu'):
     out = primary
 
     # Create a distributerd representation of context
+    """
     context = GRU(num_units // 4, return_sequences=True, stateful=stateful)(context)
     if batch_norm:
         context = BatchNormalization()(context)
@@ -137,24 +140,29 @@ def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=
 
     if dropout > 0:
         context = Dropout(dropout)(context)
+    """
 
     # Convolve over input rather than time
-    out = Permute((2, 1))(out)
-
     # Convolution layers
+    out = TimeDistributed(Reshape((NUM_CLASSES, 1)))(out)
+
     for i in range(cnn_layers):
-        out = Convolution1D(32, 3)(out)
+        out = TimeDistributed(Convolution1D(64 * (i + 1), 3))(out)
+        out = TimeDistributed(MaxPooling1D())(out)
         out = Activation(act)(out)
+        
         if dropout > 0:
             out = Dropout(dropout)(out)
 
-    out = Permute((2, 1))(out)
+    out = TimeDistributed(Flatten())(out)
+
+    out = merge([out, context], mode='concat')
 
     # RNN layer stasck
     for i in range(rnn_layers):
         y = out
         # Contextual connections
-        out = merge([out, context], mode='concat')
+        # out = merge([out, context], mode='concat')
 
         out = GRU(
             num_units,
@@ -164,8 +172,10 @@ def gru_stack(primary, context, stateful, cnn_layers=4, rnn_layers=2, num_units=
         )(out)
 
         # Residual connection
+        """
         if i > 0 and i < rnn_layers - 1:
            out = merge([out, y], mode='sum')
+        """
 
         if batch_norm:
             out = BatchNormalization()(out)
@@ -185,7 +195,7 @@ def gru_stateful(time_steps):
     note_input = Input(batch_shape=(BATCH_SIZE, time_steps, NUM_CLASSES), name='note_input')
     primary = note_input
     # Context inputs
-    beat_input = Input(batch_shape=(BATCH_SIZE, time_steps, 2), name='beat_input')
+    beat_input = Input(batch_shape=(BATCH_SIZE, time_steps, NOTES_PER_BAR), name='beat_input')
     completion_input = Input(batch_shape=(BATCH_SIZE, time_steps, 1), name='completion_input')
     style_input = Input(batch_shape=(BATCH_SIZE, time_steps, NUM_STYLES), name='style_input')
     context = merge([completion_input, beat_input, style_input], mode='concat')
@@ -214,7 +224,7 @@ def gru_stateless(time_steps):
 
 def build_inputs(time_steps):
     note_input = Input(shape=(time_steps, NUM_CLASSES), name='note_input')
-    beat_input = Input(shape=(time_steps, 2), name='beat_input')
+    beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
     completion_input = Input(shape=(time_steps, 1), name='completion_input')
     style_input = Input(shape=(time_steps, NUM_STYLES), name='style_input')
 

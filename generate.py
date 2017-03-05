@@ -28,6 +28,8 @@ def main():
     parser.add_argument('--timesteps', metavar='t', type=int,
                         default=8,
                         help='Number of timesteps')
+    parser.add_argument('--temperature', type=float, default=1,
+                        help='Temperature used to scale randomness')
 
     args = parser.parse_args()
 
@@ -64,7 +66,7 @@ def main():
                 while inspiration is None or len(inspiration) < time_steps:
                     inspiration = np.random.choice(inspirations)
 
-            composition = generate(model, time_steps, style / np.sum(style), bars, inspiration)
+            composition = generate(model, time_steps, style / np.sum(style), bars, inspiration, args.temperature)
             #mf = midi_encode_melody(composition)
             #midi.write_midifile('out/melody {} {}.mid'.format(style.astype(int), i), mf)
 
@@ -75,7 +77,7 @@ def main():
             midi.write_midifile('out/music {} {}.mid'.format(style.astype(int), i), mf)
 
 
-def generate(model, time_steps, style, bars, inspiration=None, temperature=0.8):
+def generate(model, time_steps, style, bars, inspiration, temperature):
     """
     Generates a sequence
     """
@@ -109,7 +111,7 @@ def generate(model, time_steps, style, bars, inspiration=None, temperature=0.8):
         num_outputs = len(prob_dist)
 
         # Inverse sigmoid
-        x = 1 - np.log(1 / np.array(prob_dist))
+        x = -np.log(1 / np.array(prob_dist) - 1)
         # Apply temperature to sigmoid function
         prob_dist = 1 / (1 + np.exp(-x / temperature))
 
