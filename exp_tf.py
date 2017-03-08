@@ -15,7 +15,7 @@ model_file = 'out/saves/model'
 class Model:
     def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS):
         state_size = 300
-        num_layers = 1
+        num_layers = 2
         global_dropout = 0.5
         """
         Input
@@ -127,6 +127,10 @@ class Model:
 
 def create_dataset(data, look_back):
     dataX, dataY = [], []
+
+    # First note prediction
+    data = [np.zeros_like(data[0])] + list(data)
+
     for i in range(len(data) - look_back - 1):
         dataX.append(data[i:(i + look_back)])
         dataY.append(data[i + 1:(i + look_back + 1)])
