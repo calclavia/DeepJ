@@ -3,7 +3,6 @@ import midi
 from rl import A3CAgent
 from midi_util import *
 from keras.models import load_model
-from models import *
 
 def make_agent():
     from models import note_model, note_preprocess
@@ -23,7 +22,7 @@ def one_hot(i, nb_classes):
     arr[i] = 1
     return arr
 
-def load_supervised_model(time_steps, model_file, model_fn=gru_stateful):
+def load_supervised_model(time_steps, model_file, model_fn=None):
     # Make dir for model saving
     os.makedirs(os.path.dirname(model_file), exist_ok=True)
 

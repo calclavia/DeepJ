@@ -53,83 +53,72 @@ def repeat_const():
     return f
 
 def build_model(num_time_axis=2, act='relu'):
+    from models import CausalAtrousConvolution1D, residual_block
     # Multi-hot vector of each note
     note = Input(shape=(time_steps, NUM_NOTES), name='note')
 
+    # One hot vector representing the current beat
     beat_input = Input(shape=(time_steps, NOTES_PER_BAR), name='beat_input')
-    beat_context = Reshape((1, time_steps, NOTES_PER_BAR))(beat_input)
-    beat_context = merge([beat_context for _ in range(NUM_NOTES)], mode='concat', concat_axis=1)
 
     # Positional context. How high is the current note?
     pos = Input(shape=(NUM_NOTES,), name='pos')
-    pos_context = repeat_const()(pos)
 
     # A number from 0 to 12 indicating the class of the pitch
     pitch_class = Input(shape=(NUM_NOTES,), name='pitch_class')
+
+    # Process context
+    beat_context = Reshape((1, time_steps, NOTES_PER_BAR))(beat_input)
+    beat_context = merge([beat_context for _ in range(NUM_NOTES)], mode='concat', concat_axis=1)
+    pos_context = repeat_const()(pos)
     pitch_class_context = repeat_const()(pitch_class)
 
     out = note
 
     # Convolution layer for vicinity context
     out = TimeDistributed(Reshape((NUM_NOTES, 1)))(out)
+    nb_filters = 32
 
     # Previous vicinity
     # TODO: Stacked conv may allow better feature extraction
-    out = TimeDistributed(Convolution1D(1, 2 * OCTAVE + 1, border_mode='same'))(out)
+    out = TimeDistributed(Convolution1D(nb_filters, 2 * OCTAVE + 1, border_mode='same'))(out)
     out = Activation(act)(out)
-    out = Dropout(0.2)(out)
+    # out = Dropout(0.2)(out)
 
     out = TimeDistributed(Flatten())(out)
 
     # Time axis connections only (each note is "independent" of others)
     # Permute the input so the notes are in the temporal dimension, and
     # perform a hack on temporal slice
-    out = Reshape((NUM_NOTES, time_steps, 1))(out)
+    out = Reshape((NUM_NOTES, time_steps, nb_filters))(out)
     # Add context
     out = merge([out, pos_context, pitch_class_context, beat_context], mode='concat')
 
-    out = TimeDistributed(GRU(200, return_sequences=True))(out)
+    out = TimeDistributed(GRU(100, return_sequences=True))(out)
     out = Activation(act)(out)
-    out = Dropout(0.5)(out)
+    # out = Dropout(0.5)(out)
 
-    out = TimeDistributed(GRU(200))(out)
+    out = TimeDistributed(GRU(100))(out)
     out = Activation(act)(out)
-    out = Dropout(0.5)(out)
-
-    """
-    for i in range(4):
-        out = Convolution1D(64 * (2 ** i), 3)(out)
-        out = Activation(act)(out)
-        out = MaxPooling1D()(out)
-        out = Dropout(0.5)(out)
-    
-    out = Dense(256)(out)
-    out = Activation(act)(out)
-    out = Dropout(0.5)(out)
-    """
+    # out = Dropout(0.5)(out)
 
     # Note axis connections
     # TODO: Recurrent connections resets might not make sense here.
     out = GRU(100, return_sequences=True)(out)
     out = Activation(act)(out)
-    out = Dropout(0.5)(out)
-
-    out = GRU(50, return_sequences=True)(out)
-    out = Activation(act)(out)
-    out = Dropout(0.5)(out)
-    out = Flatten()(out)
+    # out = Dropout(0.5)(out)
 
     # Multi-label
-    out = Dense(NUM_NOTES)(out)
+    out = GRU(NUM_NOTES)(out)
     out = Activation('sigmoid')(out)
+    # out = Dropout(0.5)(out)
 
     model = Model([note, beat_input, pos, pitch_class], out)
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['fbeta_score'])
     return model
 
 if __name__ == '__main__':
-    # compositions = [load_midi(f) for f in get_all_files(['data/classical/bach'])]
-    compositions = [load_midi(f) for f in get_all_files(['data/classical/bach', 'data/classical/mozart', 'data/classical/beethoven'])]
+    compositions = [load_midi(f) for f in get_all_files(['data/classical/bach'])]
+    # compositions = [load_midi(f) for f in get_all_files(['data/classical/bach', 'data/classical/mozart', 'data/classical/beethoven'])]
     compositions = [m[:, MIN_NOTE:MAX_NOTE] for m in compositions]
 
     note_inputs = []
