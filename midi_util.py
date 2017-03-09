@@ -168,7 +168,7 @@ def midi_decode(pattern,
             # Modify the last note pattern
             if isinstance(event, midi.NoteOnEvent):
                 pitch, velocity = event.data
-                composition[-1][pitch] = velocity / MAX_VELOCITY
+                composition[-1][pitch] = min(velocity / MAX_VELOCITY, 1)
 
             if isinstance(event, midi.NoteOffEvent):
                 pitch, velocity = event.data

@@ -10,8 +10,8 @@ from midi_util import *
 from keras.layers.recurrent import GRU
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
-BATCH_SIZE = 16
-TIME_STEPS = 16
+BATCH_SIZE = 32
+TIME_STEPS = 32
 model_file = 'out/saves/model'
 
 class Model:
@@ -39,7 +39,9 @@ class Model:
         """
         Note invariant
         """
-        state_size = 200
+        state_size = 256
+
+        """
         # Output of the same RNN for each note
         rnn_note_outs = []
 
@@ -67,10 +69,26 @@ class Model:
         assert out.get_shape()[0] == batch_size
         assert out.get_shape()[1] == time_steps
         assert out.get_shape()[2] == NUM_NOTES
+        """
 
+        ### Simple approach ###
+        # TODO: Current performs better
+        ### RNN Layer ###
+        cell = tf.contrib.rnn.GRUCell(state_size)
+        # Initial state of the memory.
+        init_state = cell.zero_state(batch_size, tf.float32)
+        rnn_out, final_state = tf.nn.dynamic_rnn(cell, note_in, initial_state=init_state)
+        rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
+
+        ### Sigmoid Layer ###
+        logits = tf.layers.dense(inputs=rnn_out, units=NUM_NOTES)
+
+        """
+        Consolidate logits into predictions
+        """
         # Next note predictions
         self.prob = tf.nn.sigmoid(logits)
-        # self.prob = tf.nn.softmax(logits)
+        # Classification prediction for f1 score
         self.pred = tf.round(self.prob)
 
         """
@@ -94,46 +112,51 @@ class Model:
         # Saver
         self.saver = tf.train.Saver()
 
-    def train(self, sess, data_it, num_epochs=100, verbose=True):
+    def train(self, sess, train_seqs, num_epochs=100, verbose=True):
         total_steps = 0
 
         for epoch in range(num_epochs):
             # Metrics
             training_loss = 0
             f1_score = 0
-
-            # TODO: Should reset after one sequence.
-            t_state = None
+            step = 0
 
             # Bar
-            t = tqdm(data_it)
+            t = tqdm(train_seqs)
             t.set_description('{}/{}'.format(epoch + 1, num_epochs))
 
-            for step, (X, Y) in enumerate(t):
-                feed_dict = { self.note_in: X, self.note_target: Y }
+            for seq in t:
+                # Reset state
+                t_state = None
 
-                if t_state is not None:
-                    feed_dict[self.init_state] = t_state
+                for X, Y in tqdm(seq):
+                    feed_dict = { self.note_in: X, self.note_target: Y }
 
-                pred, t_loss, t_state, _ = sess.run([
-                        self.pred,
-                        self.loss,
-                        self.final_state,
-                        self.train_step
-                    ],
-                    feed_dict
-                )
+                    if t_state is not None:
+                        feed_dict[self.init_state] = t_state
 
-                training_loss += t_loss
-                total_steps += 1
-                # Compute F-1 score of all timesteps and batches
-                f1_score += np.mean([metrics.f1_score(y, p, average='weighted') for y, p in zip(Y, pred)])
-                t.set_postfix(loss=training_loss/(step + 1), f1=f1_score/(step + 1))
+                    pred, t_loss, t_state, _ = sess.run([
+                            self.pred,
+                            self.loss,
+                            self.final_state,
+                            self.train_step
+                        ],
+                        feed_dict
+                    )
 
-                if total_steps % 1000 == 0:
-                    self.saver.save(sess, model_file)
+                    training_loss += t_loss
+                    step += 1
+                    # Compute F-1 score of all timesteps and batches
+                    # For every single sample in the batch
+                    f1_score += np.mean([metrics.f1_score(y, p, average='weighted') for y, p in zip(Y, pred)])
+                    t.set_postfix(loss=training_loss / step, f1=f1_score / step)
 
-    def generate(self, sess, length=NOTES_PER_BAR * 2):
+                    if total_steps % 1000 == 0:
+                        # print('Saving at epoch {}'.format(epoch))
+                        self.saver.save(sess, model_file)
+                    total_steps += 1
+
+    def generate(self, sess, inspiration, length=NOTES_PER_BAR * 16):
         # Resulting generation
         results = []
         # Current RNN state
@@ -141,7 +164,7 @@ class Model:
         # Current note
         current_note = np.zeros(NUM_NOTES)
 
-        for i in range(length):
+        for i in range(length + len(inspiration)):
             if state is not None:
                 # Not the first prediction
                 feed_dict = { self.note_in: [[current_note]], self.init_state: state }
@@ -149,17 +172,20 @@ class Model:
                 # First prediction
                 feed_dict = { self.note_in: [[current_note]] }
 
-            preds, state = sess.run([self.prob, self.final_state], feed_dict)
-            preds = preds[0]
-            # Randomly choose classes for each class
-            current_note = np.zeros(NUM_NOTES)
+            prob, state = sess.run([self.prob, self.final_state], feed_dict)
 
-            for n in range(NUM_NOTES):
-                current_note[n] = 1 if np.random.random() <= preds[n] else 0
-            # note_index = np.random.choice(len(preds), p=preds)
-            # current_note[note_index] = 1
+            if i < len(inspiration):
+                # Priming notes
+                current_note = inspiration[i]
+            else:
+                prob = prob[0][0]
+                # Randomly choose classes for each class
+                current_note = np.zeros(NUM_NOTES)
 
-            results.append(current_note)
+                for n in range(NUM_NOTES):
+                    current_note[n] = 1 if np.random.random() <= prob[n] else 0
+
+                results.append(current_note)
         return results
 
 def create_dataset(data, look_back):
@@ -174,7 +200,8 @@ def create_dataset(data, look_back):
     return dataX, dataY
 
 def chunk(a, size):
-    return np.swapaxes(np.split(np.array(a), size), 0, 1)
+    trim_size = (len(a) // size) * size
+    return np.swapaxes(np.split(np.array(a[:trim_size]), size), 0, 1)
 
 def reset_graph():
     if 'sess' in globals() and sess:
@@ -187,34 +214,27 @@ args = parser.parse_args()
 
 print('Preparing training data')
 
-# Create training data
-# Scale. 8 * 4 notes
-# sequences = [load_midi(f) for f in get_all_files(['data/classical/bach'])]
-# sequences = [m[:, MIN_NOTE:MAX_NOTE] for m in sequences]
+# Load training data
+dataset = ['data/classical/bach']#'data/classical/mozart'
+sequences = [load_midi(f) for f in get_all_files(dataset)]
+sequences = [np.minimum(np.ceil(m[:, MIN_NOTE:MAX_NOTE]), 1) for m in sequences]
 
-sequence = [48, 50, 52, 53, 55, 57, 59, 60]
-# sequence = [one_hot(x - MIN_NOTE, NUM_NOTES) for x in sequence]
-sequence = [one_hot(x - MIN_NOTE, NUM_NOTES) + one_hot(x - MIN_NOTE - 12, NUM_NOTES) for x in sequence]
-sequence = [[x] * 4 for x in sequence]
-sequence = [y for x in sequence for y in x]
+train_seqs = []
 
-# sequence = sequences[0]
+for seq in sequences:
+    train_data, label_data = create_dataset(seq, TIME_STEPS)
 
-w_seq = np.concatenate((np.zeros((len(sequence), MIN_NOTE)), sequence), axis=1)
-midi.write_midifile('out/baseline.mid', midi_encode(w_seq))
-
-train_data, label_data = create_dataset(sequence, TIME_STEPS)
-
-# Chunk into batches
-train_data = chunk(train_data, BATCH_SIZE)
-label_data = chunk(label_data, BATCH_SIZE)
+    # Chunk into batches
+    train_data = chunk(train_data, BATCH_SIZE)
+    label_data = chunk(label_data, BATCH_SIZE)
+    train_seqs.append(list(zip(train_data, label_data)))
 
 if args.train:
     with tf.Session() as sess:
         print('Training...')
         train_model = Model()
         sess.run(tf.global_variables_initializer())
-        train_model.train(sess, list(zip(train_data, label_data)), 100)
+        train_model.train(sess, train_seqs, 100)
 
 reset_graph()
 
@@ -223,8 +243,8 @@ with tf.Session() as sess:
     gen_model = Model(1, 1, training=False)
     gen_model.saver.restore(sess, model_file)
 
-    for s in range(4):
+    for s in range(5):
         print('s={}'.format(s))
-        composition = gen_model.generate(sess)
+        composition = gen_model.generate(sess, np.random.choice(sequences)[:NOTES_PER_BAR])
         composition = np.concatenate((np.zeros((len(composition), MIN_NOTE)), composition), axis=1)
         midi.write_midifile('out/result_{}.mid'.format(s), midi_encode(composition))
