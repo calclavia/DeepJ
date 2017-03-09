@@ -1,3 +1,4 @@
+import numpy as np
 from music import *
 import midi
 from rl import A3CAgent
@@ -21,6 +22,10 @@ def one_hot(i, nb_classes):
     arr = np.zeros((nb_classes,))
     arr[i] = 1
     return arr
+
+def chunk(a, size):
+    trim_size = (len(a) // size) * size
+    return np.swapaxes(np.split(np.array(a[:trim_size]), size), 0, 1)
 
 def load_supervised_model(time_steps, model_file, model_fn=None):
     # Make dir for model saving

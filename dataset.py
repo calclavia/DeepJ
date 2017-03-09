@@ -12,6 +12,7 @@ import math
 import random
 from constants import styles
 from midi_util import *
+from util import chunk
 
 def process_melody(melody):
     """
@@ -91,9 +92,9 @@ def load_melodies(paths, transpose=None, process=True, limit=None, shuffle=True,
 def compute_beat(beat, notes_in_bar):
     # TODO: Compare methods
     # Angle method
-    # angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
-    # return np.array([math.cos(angle), math.sin(angle)])
-    return one_hot(beat % notes_in_bar, notes_in_bar)
+    angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
+    return np.array([math.cos(angle), math.sin(angle)])
+    # return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def compute_completion(beat, len_melody):
     return np.array([beat / (len_melody - 1)])
@@ -149,7 +150,7 @@ def data_gen(music,
     for beat, note in enumerate(music):
         beat_input = compute_beat(beat, notes_in_bar)
         completion_input = compute_completion(beat, len(music))
-        
+
         predict_note = opt_one_hot(note, num_classes)
 
         # Yield the current input with target
@@ -182,7 +183,7 @@ def stateless_gen(music_styles,
             for x in data_gen(melody, style_hot, time_steps, num_classes, notes_in_bar, target_all):
                 yield x
 
-def stateful_gen(music_styles, time_steps, batch_size, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=False):
+def stateful_gen(music_styles, time_steps, batch_size, num_classes=NUM_CLASSES, notes_in_bar=NOTES_PER_BAR, target_all=True):
     """
     For every single melody style, yield the melody along
     with its contextual inputs.
@@ -217,8 +218,8 @@ def stateful_gen(music_styles, time_steps, batch_size, num_classes=NUM_CLASSES, 
             # (batches, batch_size, inputs, timesteps, ?) -> (batches, inputs, batch_size, timesteps, ?)
             batches = [[np.array(list(batch_input)) for batch_input in zip(*batch)] for batch in batches]
             targets = np.squeeze(targets)
-            truncated = (len(targets) // batch_size) * batch_size
-            targets = np.swapaxes(np.split(targets[:truncated], batch_size), 0, 1)
+            # TODO: Instead of truncating, extend with blank notes.
+            targets = chunk(targets, batch_size)
             yield batches, targets
 
 def load_styles(transpose=None, limit=None):
@@ -237,9 +238,8 @@ def load_music_styles():
         res = Parallel(n_jobs=8, verbose=5, backend='threading')(delayed(load_midi)(f) for f in files)
 
         # Trim the representation to be between MIN and MAX note
-        # TODO: There's 2 extra to fill in compatibility with melody rnn
         # TODO: Volume input
-        res = [np.ceil(m[:, MIN_NOTE:MAX_NOTE+2]) for m in res]
+        res = [np.minimum(np.ceil(m[:, MIN_NOTE:MAX_NOTE+2]), 1) for m in res]
         music_styles.append(res)
 
     return music_styles

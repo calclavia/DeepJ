@@ -4,39 +4,23 @@ import argparse
 from sklearn import metrics
 from tqdm import tqdm
 
-from dataset import get_all_files
+from dataset import process_stateful, load_music_styles
 from music import *
 from midi_util import *
+from constants import NUM_STYLES
 from keras.layers.recurrent import GRU
 
-NUM_NOTES = MAX_NOTE - MIN_NOTE
-BATCH_SIZE = 32
+NUM_NOTES = MAX_NOTE - MIN_NOTE + 2
+BATCH_SIZE = 64
 TIME_STEPS = 32
 model_file = 'out/saves/model'
 
 class Model:
     def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5):
-        units = 256
-
         self.init_states = []
         self.final_states = []
 
-        def conv(out):
-            """
-            A convolution layer
-            """
-            with tf.variable_scope('conv'):
-                out = tf.layers.conv1d(
-                    inputs=out,
-                    filters=NUM_NOTES,
-                    kernel_size=3,
-                    padding='valid',
-                    activation=tf.nn.relu
-                )
-                out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
-            return out
-
-        def rnn(out):
+        def rnn(units, out):
             cell = tf.contrib.rnn.GRUCell(units)
             # Initial state of the memory.
             init_state = cell.zero_state(batch_size, tf.float32)
@@ -49,60 +33,46 @@ class Model:
         """
         Input
         """
-        # Input note of the current time step
-        note_in = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES])
+        # Input note (multi-hot vector)
+        note_in = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES], name='note_in')
+        # Input beat (clock representation)
+        beat_in = tf.placeholder(tf.float32, [batch_size, time_steps, 2], name='beat_in')
+        # Input progress (scalar representation)
+        progress_in = tf.placeholder(tf.float32, [batch_size, time_steps, 1], name='progress_in')
+        # Style bias (one-hot representation)
+        style_in = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_STYLES], name='style_in')
+
         # Target note to predict
-        note_target = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES])
-
-        # Main output pathway
-        out = note_in
-
-        # Note processing block
-        # Reshape to convolve over notes
-        out = tf.transpose(out, [0, 2, 1])
-        out = conv(out)
-        out = tf.transpose(out, [0, 2, 1])
-        print(out)
-        out = rnn(out)
-
-        # out = conv(out)
+        note_target = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES], name='target_in')
 
         """
-        # Output of the same RNN for each note
+        Note invariant block
+        """
+        # Output of RNN for each note
         rnn_note_outs = []
 
-        # Every single note connects to the same note invariant RNN
-        cell = tf.contrib.rnn.GRUCell(units)
-        # TODO: There are 48 RNN states that we've to keep track of?
-        # Initial state of the memory.
-        init_state = cell.zero_state(batch_size, tf.float32)
-
         for i in range(NUM_NOTES):
-            with tf.variable_scope('rnn', reuse=i > 0):
-                # There are a bunch of RNN states now...
-                rnn_out, final_state = tf.nn.dynamic_rnn(cell, out[:, :, i:i+1], initial_state=init_state)
-                rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
+            with tf.variable_scope('rnn1', reuse=i > 0):
+                inv_input = tf.concat([note_in[:, :, i:i+1], beat_in, progress_in, style_in], 2)
+                rnn_note_outs.append(rnn(128, inv_input))
 
-            ### Sigmoid layer that predicts the one note only ###
-            with tf.variable_scope('predict', reuse=i > 0):
-                logits = tf.layers.dense(inputs=rnn_out, units=1)
-                assert logits.get_shape()[0] == batch_size
-                assert logits.get_shape()[1] == time_steps
-                assert logits.get_shape()[2] == 1
-            rnn_note_outs.append(logits)
+        # Output of RNN for every octave
+        rnn_octave_outs = []
 
-        out = logits = tf.concat(rnn_note_outs, 2)
+        for i in range(NUM_OCTAVES):
+            with tf.variable_scope('rnn2', reuse=i > 0):
+                inv_input = tf.concat(rnn_note_outs[i:i+OCTAVE], 2)
+                rnn_octave_outs.append(rnn(512, inv_input))
+
+        out = tf.concat(rnn_octave_outs, 2)
         assert out.get_shape()[0] == batch_size
         assert out.get_shape()[1] == time_steps
-        assert out.get_shape()[2] == NUM_NOTES
-        """
 
-        ### Sigmoid Layer ###
+        """
+        Sigmoid Layer
+        """
         logits = tf.layers.dense(inputs=out, units=NUM_NOTES)
 
-        """
-        Consolidate logits into predictions
-        """
         # Next note predictions
         self.prob = tf.nn.sigmoid(logits)
         # Classification prediction for f1 score
@@ -118,6 +88,9 @@ class Model:
         Set instance vars
         """
         self.note_in = note_in
+        self.beat_in = beat_in
+        self.progress_in = progress_in
+        self.style_in = style_in
         self.note_target = note_target
 
         self.loss = total_loss
@@ -128,6 +101,9 @@ class Model:
 
     def train(self, sess, train_seqs, num_epochs=100, verbose=True):
         total_steps = 0
+        patience = 3
+        no_improvement = 0
+        best_fscore = 0
 
         for epoch in range(num_epochs):
             # Metrics
@@ -142,10 +118,17 @@ class Model:
             for seq in t:
                 # Reset state
                 states = [None for _ in self.init_states]
+                inputs, targets = seq
 
-                for X, Y in tqdm(seq):
+                for X, Y in tqdm(list(zip(inputs, targets))):
                     # Build feed-dict
-                    feed_dict = { self.note_in: X, self.note_target: Y }
+                    feed_dict = {
+                        self.note_in: X[0],
+                        self.beat_in: X[1],
+                        self.progress_in: X[2],
+                        self.style_in: X[3],
+                        self.note_target: Y
+                    }
 
                     for tf_s, s in zip(self.init_states, states):
                         if s is not None:
@@ -170,6 +153,16 @@ class Model:
                         # print('Saving at epoch {}'.format(epoch))
                         self.saver.save(sess, model_file)
                     total_steps += 1
+
+            # Early stopping
+            if f1_score > best_fscore:
+                best_fscore = f1_score
+                no_improvement = 0
+            else:
+                no_improvement += 1
+
+                if no_improvement > patience:
+                    break
 
         # Save the last epoch
         self.saver.save(sess, model_file)
@@ -206,63 +199,43 @@ class Model:
                 results.append(current_note)
         return results
 
-def create_dataset(data, look_back):
-    dataX, dataY = [], []
-
-    # First note prediction
-    data = [np.zeros_like(data[0])] + list(data)
-
-    for i in range(len(data) - look_back - 1):
-        dataX.append(data[i:(i + look_back)])
-        dataY.append(data[i + 1:(i + look_back + 1)])
-    return dataX, dataY
-
-def chunk(a, size):
-    trim_size = (len(a) // size) * size
-    return np.swapaxes(np.split(np.array(a[:trim_size]), size), 0, 1)
-
 def reset_graph():
     if 'sess' in globals() and sess:
         sess.close()
     tf.reset_default_graph()
 
-parser = argparse.ArgumentParser(description='Generates music.')
-parser.add_argument('--train', default=False, action='store_true', help='Train model?')
-args = parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser(description='Generates music.')
+    parser.add_argument('--train', default=False, action='store_true', help='Train model?')
+    args = parser.parse_args()
 
-print('Preparing training data')
+    print('Preparing training data')
 
-# Load training data
-dataset = ['data/classical/bach']#'data/classical/mozart'
-sequences = [load_midi(f) for f in get_all_files(dataset)]
-sequences = [np.minimum(np.ceil(m[:, MIN_NOTE:MAX_NOTE]), 1) for m in sequences]
+    # Load training data
+    # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
+    # TODO: Random transpoe?
+    # TODO: Random slices of subsequence?
+    sequences = process_stateful(load_music_styles(), TIME_STEPS, batch_size=BATCH_SIZE)
 
-train_seqs = []
+    if args.train:
+        with tf.Session() as sess:
+            print('Training...')
+            train_model = Model()
+            sess.run(tf.global_variables_initializer())
+            train_model.train(sess, sequences, 100)
 
-for seq in sequences:
-    train_data, label_data = create_dataset(seq, TIME_STEPS)
+    reset_graph()
 
-    # Chunk into batches
-    train_data = chunk(train_data, BATCH_SIZE)
-    label_data = chunk(label_data, BATCH_SIZE)
-    train_seqs.append(list(zip(train_data, label_data)))
-
-if args.train:
     with tf.Session() as sess:
-        print('Training...')
-        train_model = Model()
-        sess.run(tf.global_variables_initializer())
-        train_model.train(sess, train_seqs, 100)
+        print('Generating...')
+        gen_model = Model(1, 1, training=False)
+        gen_model.saver.restore(sess, model_file)
 
-reset_graph()
+        for s in range(5):
+            print('s={}'.format(s))
+            composition = gen_model.generate(sess, np.random.choice(sequences)[:NOTES_PER_BAR])
+            composition = np.concatenate((np.zeros((len(composition), MIN_NOTE)), composition), axis=1)
+            midi.write_midifile('out/result_{}.mid'.format(s), midi_encode(composition))
 
-with tf.Session() as sess:
-    print('Generating...')
-    gen_model = Model(1, 1, training=False)
-    gen_model.saver.restore(sess, model_file)
-
-    for s in range(5):
-        print('s={}'.format(s))
-        composition = gen_model.generate(sess, np.random.choice(sequences)[:NOTES_PER_BAR])
-        composition = np.concatenate((np.zeros((len(composition), MIN_NOTE)), composition), axis=1)
-        midi.write_midifile('out/result_{}.mid'.format(s), midi_encode(composition))
+if __name__ == '__main__':
+    main()
