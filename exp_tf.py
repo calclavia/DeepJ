@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import argparse
+from sklearn import metrics
 from tqdm import tqdm
 
 from dataset import get_all_files
@@ -9,13 +10,13 @@ from midi_util import *
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 BATCH_SIZE = 1
-TIME_STEPS = 20
+TIME_STEPS = 16
 model_file = 'out/saves/model'
 
 class Model:
     def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS):
-        state_size = 300
-        num_layers = 2
+        state_size = 200
+        num_layers = 1
         global_dropout = 0.5
         """
         Input
@@ -29,10 +30,11 @@ class Model:
         RNN
         """
         ### RNN Layer ###
-        cell = tf.nn.rnn_cell.GRUCell(state_size)
-        cell = tf.nn.rnn_cell.DropoutWrapper(cell, input_keep_prob=global_dropout)
-        cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers)
-        cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=global_dropout)
+        with tf.variable_scope('rnn', reuse=True):
+            cell = tf.nn.rnn_cell.GRUCell(state_size)
+            cell = tf.nn.rnn_cell.DropoutWrapper(cell, input_keep_prob=global_dropout)
+            cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers)
+            cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=global_dropout)
 
         # Initial state of the memory.
         init_state = cell.zero_state(batch_size, tf.float32)
@@ -49,12 +51,15 @@ class Model:
             logits = tf.matmul(rnn_outputs, W) + b
 
             # Next note predictions
-            self.preds = tf.nn.sigmoid(logits)
+            self.prob = tf.nn.sigmoid(logits)
+            # self.prob = tf.nn.softmax(logits)
+            self.pred = tf.round(self.prob)
 
         """
         Loss
         """
         total_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, target_reshaped))
+        # total_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, target_reshaped))
         train_step = tf.train.AdamOptimizer().minimize(total_loss)
 
         """
@@ -73,11 +78,18 @@ class Model:
         self.saver = tf.train.Saver()
 
     def train(self, sess, data_it, num_epochs=100, verbose=True):
+        total_steps = 0
+
         for epoch in range(num_epochs):
+            # Metrics
             training_loss = 0
+            f1_score = 0
+
             t_state = None
 
+            # Bar
             t = tqdm(data_it)
+            t.set_description('{}/{}'.format(epoch + 1, num_epochs))
 
             for step, (X, Y) in enumerate(t):
                 feed_dict = { self.note_in: X, self.note_target: Y }
@@ -85,7 +97,8 @@ class Model:
                 if t_state is not None:
                     feed_dict[self.init_state] = t_state
 
-                t_loss, t_state, _ = sess.run([
+                pred, t_loss, t_state, _ = sess.run([
+                        self.pred,
                         self.loss,
                         self.final_state,
                         self.train_step
@@ -94,9 +107,13 @@ class Model:
                 )
 
                 training_loss += t_loss
-                t.set_postfix(loss=training_loss/(step + 1))
+                total_steps += 1
+                # Compute F-1 score of all timesteps and batches
+                f1_score += metrics.f1_score(Y[0], pred, average='weighted')
+                t.set_postfix(loss=training_loss/(step + 1), f1=f1_score/(step + 1))
 
-            self.saver.save(sess, model_file)
+                if total_steps % 1000 == 0:
+                    self.saver.save(sess, model_file)
 
     def generate(self, sess, length=NOTES_PER_BAR * 2):
         # Resulting generation
@@ -114,13 +131,15 @@ class Model:
                 # First prediction
                 feed_dict = { self.note_in: [[current_note]] }
 
-            preds, state = sess.run([self.preds, self.final_state], feed_dict)
+            preds, state = sess.run([self.prob, self.final_state], feed_dict)
             preds = preds[0]
             # Randomly choose classes for each class
             current_note = np.zeros(NUM_NOTES)
 
             for n in range(NUM_NOTES):
                 current_note[n] = 1 if np.random.random() <= preds[n] else 0
+            # note_index = np.random.choice(len(preds), p=preds)
+            # current_note[note_index] = 1
 
             results.append(current_note)
         return results
@@ -152,15 +171,16 @@ print('Preparing training data')
 
 # Create training data
 # Scale. 8 * 4 notes
-sequences = [load_midi(f) for f in get_all_files(['data/classical/bach'])]
-sequences = [m[:, MIN_NOTE:MAX_NOTE] for m in sequences]
+# sequences = [load_midi(f) for f in get_all_files(['data/classical/bach'])]
+# sequences = [m[:, MIN_NOTE:MAX_NOTE] for m in sequences]
 
 sequence = [48, 50, 52, 53, 55, 57, 59, 60]
+# sequence = [one_hot(x - MIN_NOTE, NUM_NOTES) for x in sequence]
 sequence = [one_hot(x - MIN_NOTE, NUM_NOTES) + one_hot(x - MIN_NOTE - 12, NUM_NOTES) for x in sequence]
 sequence = [[x] * 4 for x in sequence]
 sequence = [y for x in sequence for y in x]
 
-sequence = sequences[0]
+# sequence = sequences[0]
 
 w_seq = np.concatenate((np.zeros((len(sequence), MIN_NOTE)), sequence), axis=1)
 midi.write_midifile('out/baseline.mid', midi_encode(w_seq))
@@ -176,7 +196,7 @@ if args.train:
         print('Training...')
         train_model = Model()
         sess.run(tf.global_variables_initializer())
-        train_model.train(sess, list(zip(train_data, label_data)), 1)
+        train_model.train(sess, list(zip(train_data, label_data)), 200)
 
 reset_graph()
 

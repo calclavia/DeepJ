@@ -120,12 +120,14 @@ def midi_encode(composition,
 
         current = data
 
+    tick += 1
+
     # Turn off all remaining on notes
     for index, vol in np.ndenumerate(current):
         if vol > 0:
             # Was on, but now turned off
             evt = midi.NoteOffEvent(
-                tick=(tick + 1 - last_event_tick) * step,
+                tick=(tick - last_event_tick) * step,
                 pitch=index[0]
             )
             track.append(evt)
