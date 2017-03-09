@@ -21,15 +21,43 @@ class Model:
         self.init_states = []
         self.final_states = []
 
-        def rnn(units, out):
-            cell = tf.contrib.rnn.GRUCell(units)
-            # Initial state of the memory.
-            init_state = cell.zero_state(batch_size, tf.float32)
-            rnn_out, final_state = tf.nn.dynamic_rnn(cell, note_in, initial_state=init_state)
-            rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
-            self.init_states.append(init_state)
-            self.final_states.append(final_state)
-            return rnn_out
+        def rnn(units):
+            """
+            Recurrent layer
+            """
+            def f(x):
+                cell = tf.contrib.rnn.GRUCell(units)
+                # Initial state of the memory.
+                init_state = cell.zero_state(batch_size, tf.float32)
+                rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
+                rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
+                self.init_states.append(init_state)
+                self.final_states.append(final_state)
+                return rnn_out
+            return f
+
+        def rnn_conv(name, units, filter_size, stride=1):
+            """
+            Recurrent convolution Layer
+            """
+            def f(x, contexts):
+                total_len = int(x.get_shape()[2])
+                outs = []
+                assert total_len % stride == 0, (total_len, stride)
+                print(name, 'units =', units, 'filter_size =', filter_size, 'stride =', stride)
+                for i in range(0, total_len, stride):
+                    with tf.variable_scope(name, reuse=i > 0):
+                        inv_input = tf.concat([x[:, :, i:i+filter_size], contexts], 2)
+                        outs.append(rnn(units)(inv_input))
+                        if i + filter_size == total_len:
+                            break
+                out = tf.concat(outs, 2)
+                # Perform max pooling
+                out = tf.nn.pool(out, [2], strides=[2], pooling_type='MAX', padding='VALID', data_format='NCW')
+                assert out.get_shape()[0] == batch_size
+                assert out.get_shape()[1] == time_steps
+                return out
+            return f
 
         """
         Input
@@ -49,28 +77,19 @@ class Model:
         # Context to help generation
         contexts = tf.concat([beat_in, progress_in], 2)
 
+        # Note input
+        out = note_in
         """
         Note invariant block
         """
-        # Output of RNN for each note
-        rnn_note_outs = []
-
-        for i in range(NUM_NOTES):
-            with tf.variable_scope('rnn1', reuse=i > 0):
-                inv_input = tf.concat([note_in[:, :, i:i+1], contexts], 2)
-                rnn_note_outs.append(rnn(128, inv_input))
-
-        # Output of RNN for every octave
-        rnn_octave_outs = []
-
-        for i in range(NUM_OCTAVES):
-            with tf.variable_scope('rnn2', reuse=i > 0):
-                inv_input = tf.concat(rnn_note_outs[i:i+OCTAVE] + [contexts], 2)
-                rnn_octave_outs.append(rnn(512, inv_input))
-
-        out = tf.concat(rnn_octave_outs, 2)
-        assert out.get_shape()[0] == batch_size
-        assert out.get_shape()[1] == time_steps
+        last_units = 1
+        for i in range(2):
+            units = 128
+            filter_size = last_units * (2 ** i)
+            stride = last_units
+            out = rnn_conv('rc' + str(i), units, filter_size, stride)(out, contexts)
+            last_units = units
+            print(out)
 
         """
         Sigmoid Layer
