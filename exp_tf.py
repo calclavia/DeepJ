@@ -7,17 +7,15 @@ from tqdm import tqdm
 from dataset import get_all_files
 from music import *
 from midi_util import *
+from keras.layers.recurrent import GRU
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
-BATCH_SIZE = 1
+BATCH_SIZE = 16
 TIME_STEPS = 16
 model_file = 'out/saves/model'
 
 class Model:
-    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS):
-        state_size = 200
-        num_layers = 1
-        global_dropout = 0.5
+    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout = 0.5):
         """
         Input
         """
@@ -26,40 +24,59 @@ class Model:
         # Target note to predict
         note_target = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES])
 
-        """
-        RNN
-        """
-        ### RNN Layer ###
-        with tf.variable_scope('rnn', reuse=True):
-            cell = tf.nn.rnn_cell.GRUCell(state_size)
-            cell = tf.nn.rnn_cell.DropoutWrapper(cell, input_keep_prob=global_dropout)
-            cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers)
-            cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=global_dropout)
+        # Main output pathway
+        out = note_in
 
+        """
+        Conv
+        """
+        with tf.variable_scope('conv1'):
+            fil = tf.get_variable('W', [3, NUM_NOTES, NUM_NOTES])
+            out = tf.nn.conv1d(out, fil, stride=1, padding='SAME')
+            out = tf.nn.relu(out)
+            out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
+
+        """
+        Note invariant
+        """
+        state_size = 200
+        # Output of the same RNN for each note
+        rnn_note_outs = []
+
+        # Every single note connects to the same note invariant RNN
+        cell = tf.contrib.rnn.GRUCell(state_size)
+        # TODO: There are 48 RNN states that we've to keep track of?
         # Initial state of the memory.
         init_state = cell.zero_state(batch_size, tf.float32)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell, note_in, initial_state=init_state)
 
-        ### Sigmoid Layer ###
-        with tf.variable_scope('predict'):
-            W = tf.get_variable('W', [state_size, NUM_NOTES])
-            b = tf.get_variable('b', [NUM_NOTES], initializer=tf.constant_initializer(0.0))
+        for i in range(NUM_NOTES):
+            with tf.variable_scope('rnn', reuse=i > 0):
+                # There are a bunch of RNN states now...
+                rnn_out, final_state = tf.nn.dynamic_rnn(cell, out[:, :, i:i+1], initial_state=init_state)
+                rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
 
-            # Reshape rnn_outputs for training
-            rnn_outputs = tf.reshape(rnn_outputs, [-1, state_size])
-            target_reshaped = tf.reshape(note_target, [-1, NUM_NOTES])
-            logits = tf.matmul(rnn_outputs, W) + b
+            ### Sigmoid layer that predicts the one note only ###
+            with tf.variable_scope('predict', reuse=i > 0):
+                logits = tf.layers.dense(inputs=rnn_out, units=1)
+                assert logits.get_shape()[0] == batch_size
+                assert logits.get_shape()[1] == time_steps
+                assert logits.get_shape()[2] == 1
+            rnn_note_outs.append(logits)
 
-            # Next note predictions
-            self.prob = tf.nn.sigmoid(logits)
-            # self.prob = tf.nn.softmax(logits)
-            self.pred = tf.round(self.prob)
+        out = logits = tf.concat(rnn_note_outs, 2)
+        assert out.get_shape()[0] == batch_size
+        assert out.get_shape()[1] == time_steps
+        assert out.get_shape()[2] == NUM_NOTES
+
+        # Next note predictions
+        self.prob = tf.nn.sigmoid(logits)
+        # self.prob = tf.nn.softmax(logits)
+        self.pred = tf.round(self.prob)
 
         """
         Loss
         """
-        total_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, target_reshaped))
-        # total_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, target_reshaped))
+        total_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=note_target))
         train_step = tf.train.AdamOptimizer().minimize(total_loss)
 
         """
@@ -85,6 +102,7 @@ class Model:
             training_loss = 0
             f1_score = 0
 
+            # TODO: Should reset after one sequence.
             t_state = None
 
             # Bar
@@ -109,7 +127,7 @@ class Model:
                 training_loss += t_loss
                 total_steps += 1
                 # Compute F-1 score of all timesteps and batches
-                f1_score += metrics.f1_score(Y[0], pred, average='weighted')
+                f1_score += np.mean([metrics.f1_score(y, p, average='weighted') for y, p in zip(Y, pred)])
                 t.set_postfix(loss=training_loss/(step + 1), f1=f1_score/(step + 1))
 
                 if total_steps % 1000 == 0:
@@ -196,13 +214,13 @@ if args.train:
         print('Training...')
         train_model = Model()
         sess.run(tf.global_variables_initializer())
-        train_model.train(sess, list(zip(train_data, label_data)), 200)
+        train_model.train(sess, list(zip(train_data, label_data)), 100)
 
 reset_graph()
 
 with tf.Session() as sess:
     print('Generating...')
-    gen_model = Model(1, 1)
+    gen_model = Model(1, 1, training=False)
     gen_model.saver.restore(sess, model_file)
 
     for s in range(4):
