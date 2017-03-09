@@ -15,7 +15,37 @@ TIME_STEPS = 32
 model_file = 'out/saves/model'
 
 class Model:
-    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout = 0.5):
+    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5):
+        units = 256
+
+        self.init_states = []
+        self.final_states = []
+
+        def conv(out):
+            """
+            A convolution layer
+            """
+            with tf.variable_scope('conv'):
+                out = tf.layers.conv1d(
+                    inputs=out,
+                    filters=NUM_NOTES,
+                    kernel_size=3,
+                    padding='valid',
+                    activation=tf.nn.relu
+                )
+                out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
+            return out
+
+        def rnn(out):
+            cell = tf.contrib.rnn.GRUCell(units)
+            # Initial state of the memory.
+            init_state = cell.zero_state(batch_size, tf.float32)
+            rnn_out, final_state = tf.nn.dynamic_rnn(cell, note_in, initial_state=init_state)
+            rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
+            self.init_states.append(init_state)
+            self.final_states.append(final_state)
+            return rnn_out
+
         """
         Input
         """
@@ -27,26 +57,22 @@ class Model:
         # Main output pathway
         out = note_in
 
-        """
-        Conv
-        """
-        with tf.variable_scope('conv1'):
-            fil = tf.get_variable('W', [3, NUM_NOTES, NUM_NOTES])
-            out = tf.nn.conv1d(out, fil, stride=1, padding='SAME')
-            out = tf.nn.relu(out)
-            out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
+        # Note processing block
+        # Reshape to convolve over notes
+        out = tf.transpose(out, [0, 2, 1])
+        out = conv(out)
+        out = tf.transpose(out, [0, 2, 1])
+        print(out)
+        out = rnn(out)
 
-        """
-        Note invariant
-        """
-        state_size = 256
+        # out = conv(out)
 
         """
         # Output of the same RNN for each note
         rnn_note_outs = []
 
         # Every single note connects to the same note invariant RNN
-        cell = tf.contrib.rnn.GRUCell(state_size)
+        cell = tf.contrib.rnn.GRUCell(units)
         # TODO: There are 48 RNN states that we've to keep track of?
         # Initial state of the memory.
         init_state = cell.zero_state(batch_size, tf.float32)
@@ -71,17 +97,8 @@ class Model:
         assert out.get_shape()[2] == NUM_NOTES
         """
 
-        ### Simple approach ###
-        # TODO: Current performs better
-        ### RNN Layer ###
-        cell = tf.contrib.rnn.GRUCell(state_size)
-        # Initial state of the memory.
-        init_state = cell.zero_state(batch_size, tf.float32)
-        rnn_out, final_state = tf.nn.dynamic_rnn(cell, note_in, initial_state=init_state)
-        rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
-
         ### Sigmoid Layer ###
-        logits = tf.layers.dense(inputs=rnn_out, units=NUM_NOTES)
+        logits = tf.layers.dense(inputs=out, units=NUM_NOTES)
 
         """
         Consolidate logits into predictions
@@ -102,9 +119,6 @@ class Model:
         """
         self.note_in = note_in
         self.note_target = note_target
-
-        self.init_state = init_state
-        self.final_state = final_state
 
         self.loss = total_loss
         self.train_step = train_step
@@ -127,20 +141,21 @@ class Model:
 
             for seq in t:
                 # Reset state
-                t_state = None
+                states = [None for _ in self.init_states]
 
                 for X, Y in tqdm(seq):
+                    # Build feed-dict
                     feed_dict = { self.note_in: X, self.note_target: Y }
 
-                    if t_state is not None:
-                        feed_dict[self.init_state] = t_state
+                    for tf_s, s in zip(self.init_states, states):
+                        if s is not None:
+                            feed_dict[tf_s] = s
 
-                    pred, t_loss, t_state, _ = sess.run([
+                    pred, t_loss, _, *states = sess.run([
                             self.pred,
                             self.loss,
-                            self.final_state,
                             self.train_step
-                        ],
+                        ] + self.final_states,
                         feed_dict
                     )
 
@@ -156,23 +171,26 @@ class Model:
                         self.saver.save(sess, model_file)
                     total_steps += 1
 
+        # Save the last epoch
+        self.saver.save(sess, model_file)
+
     def generate(self, sess, inspiration, length=NOTES_PER_BAR * 16):
         # Resulting generation
         results = []
-        # Current RNN state
-        state = None
+        # Reset state
+        states = [None for _ in self.init_states]
         # Current note
         current_note = np.zeros(NUM_NOTES)
 
         for i in range(length + len(inspiration)):
-            if state is not None:
-                # Not the first prediction
-                feed_dict = { self.note_in: [[current_note]], self.init_state: state }
-            else:
-                # First prediction
-                feed_dict = { self.note_in: [[current_note]] }
+            # Build feed dict
+            feed_dict = { self.note_in: [[current_note]] }
 
-            prob, state = sess.run([self.prob, self.final_state], feed_dict)
+            for tf_s, s in zip(self.init_states, states):
+                if s is not None:
+                    feed_dict[tf_s] = s
+
+            prob, *states = sess.run([self.prob] + self.final_states, feed_dict)
 
             if i < len(inspiration):
                 # Priming notes
