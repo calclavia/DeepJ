@@ -17,16 +17,19 @@ TIME_STEPS = 32
 model_file = 'out/saves/model'
 
 class Model:
-    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5):
+    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.tanh):
         self.init_states = []
         self.final_states = []
+
+        def repeat(x):
+            return np.reshape(np.repeat(x, batch_size * time_steps), [batch_size, time_steps, -1])
 
         def rnn(units):
             """
             Recurrent layer
             """
             def f(x):
-                cell = tf.contrib.rnn.GRUCell(units)
+                cell = tf.contrib.rnn.GRUCell(units, activation=activation)
                 # Initial state of the memory.
                 init_state = cell.zero_state(batch_size, tf.float32)
                 rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
@@ -36,24 +39,37 @@ class Model:
                 return rnn_out
             return f
 
-        def rnn_conv(name, units, filter_size, stride=1):
+        def rnn_conv(name, units, filter_size, stride=1, include_note_pitch=False):
             """
             Recurrent convolution Layer
             """
             def f(x, contexts):
                 total_len = int(x.get_shape()[2])
                 outs = []
-                assert total_len % stride == 0, (total_len, stride)
-                print(name, 'units =', units, 'filter_size =', filter_size, 'stride =', stride)
+                if total_len % stride != 0:
+                    print('Warning! Stride not divisible.', total_len, stride)
+
+                print('Layer {}: units={} len={} filter={} stride={}'.format(name, units,total_len, filter_size, stride))
+
                 for i in range(0, total_len, stride):
                     with tf.variable_scope(name, reuse=i > 0):
-                        inv_input = tf.concat([x[:, :, i:i+filter_size], contexts], 2)
+                        inv_input = [x[:, :, i:i+filter_size], contexts]
+
+                        # Include the context of how high the current input is.
+                        if include_note_pitch:
+                            # Position of note and pitch class of note
+                            inv_input += [
+                                tf.constant(repeat(i / (total_len - 1)), dtype='float'),
+                                tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float')
+                            ]
+
+                        inv_input = tf.concat(inv_input, 2)
                         outs.append(rnn(units)(inv_input))
                         if i + filter_size == total_len:
                             break
                 out = tf.concat(outs, 2)
                 # Perform max pooling
-                out = tf.nn.pool(out, [2], strides=[2], pooling_type='MAX', padding='VALID', data_format='NCW')
+                # out = tf.nn.pool(out, [2], strides=[2], pooling_type='MAX', padding='VALID', data_format='NCW')
                 assert out.get_shape()[0] == batch_size
                 assert out.get_shape()[1] == time_steps
                 return out
@@ -79,22 +95,41 @@ class Model:
 
         # Note input
         out = note_in
+        print(out)
         """
         Note invariant block
         """
         last_units = 1
         for i in range(2):
-            units = 128
-            filter_size = last_units * (2 ** i)
-            stride = last_units
-            out = rnn_conv('rc' + str(i), units, filter_size, stride)(out, contexts)
+            # TODO: This stride makes more sense, but slower.
+            # units = 32 * 2 ** i
+            # filter_size = last_units * (2 ** i)
+            # stride = last_units
+            units = 128 * 2 ** i
+            filter_size = last_units * (4 ** i)
+            stride = filter_size
+
+            # Pad if not divisible
+            remain = int(out.get_shape()[2]) % stride
+            if remain != 0:
+                remain = int(out.get_shape()[2]) - remain
+                print('Padding remain:', remain)
+                out = tf.pad(out, [[0, 0], [0, 0], [remain // 2, remain // 2]])
+
+            out = rnn_conv('rc' + str(i), units, filter_size, stride, include_note_pitch=i == 0)(out, contexts)
             last_units = units
             print(out)
+
+        """ Dense Layer """
+        out = tf.layers.dense(inputs=out, units=1024, activation=activation)
+        out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
+        print(out)
 
         """
         Sigmoid Layer
         """
         logits = tf.layers.dense(inputs=out, units=NUM_NOTES)
+        print(logits)
 
         # Next note predictions
         self.prob = tf.nn.sigmoid(logits)
@@ -120,7 +155,8 @@ class Model:
         self.train_step = train_step
 
         # Saver
-        self.saver = tf.train.Saver()
+        with tf.device('/cpu:0'):
+            self.saver = tf.train.Saver()
 
     def train(self, sess, train_seqs, num_epochs=100, verbose=True):
         patience = 10
@@ -281,7 +317,7 @@ def main():
 
     if args.train:
         with tf.Session() as sess:
-            print('Training...')
+            print('Training batch_size={} time_steps={}'.format(BATCH_SIZE, TIME_STEPS))
             train_model = Model()
             sess.run(tf.global_variables_initializer())
             if args.load:
