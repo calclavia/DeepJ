@@ -13,11 +13,11 @@ from keras.layers.recurrent import GRU
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 BATCH_SIZE = 64
-TIME_STEPS = 32
+TIME_STEPS = 16
 model_file = 'out/saves/model'
 
 class Model:
-    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.tanh):
+    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.relu, rnn_layers=1):
         self.init_states = []
         self.final_states = []
 
@@ -30,6 +30,7 @@ class Model:
             """
             def f(x):
                 cell = tf.contrib.rnn.GRUCell(units, activation=activation)
+                # cell = tf.contrib.rnn.MultiRNNCell([cell] * rnn_layers)
                 # Initial state of the memory.
                 init_state = cell.zero_state(batch_size, tf.float32)
                 rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
@@ -39,33 +40,40 @@ class Model:
                 return rnn_out
             return f
 
+        # TODO: Back this up
         def rnn_conv(name, units, filter_size, stride=1, include_note_pitch=False):
             """
-            Recurrent convolution Layer
+            Recurrent convolution Layer.
+            Given a tensor of shape [batch_size, time_steps, features, channels],
+            outputs a tensor of shape [batch_size, time_steps, features, channels]
             """
             def f(x, contexts):
-                total_len = int(x.get_shape()[2])
+                num_features = int(x.get_shape()[2])
+                # num_channels = int(x.get_shape()[3])
+
                 outs = []
-                if total_len % stride != 0:
-                    print('Warning! Stride not divisible.', total_len, stride)
 
-                print('Layer {}: units={} len={} filter={} stride={}'.format(name, units,total_len, filter_size, stride))
+                if num_features % stride != 0:
+                    print('Warning! Stride not divisible.', num_features, stride)
 
-                for i in range(0, total_len, stride):
-                    with tf.variable_scope(name, reuse=i > 0):
+                print('Layer {}: units={} len={} filter={} stride={}'.format(name, units, num_features, filter_size, stride))
+
+                # Convolve every channel independently
+                for i in range(0, num_features, stride):
+                    with tf.variable_scope(name, reuse=len(outs) > 0):
                         inv_input = [x[:, :, i:i+filter_size], contexts]
 
                         # Include the context of how high the current input is.
                         if include_note_pitch:
                             # Position of note and pitch class of note
                             inv_input += [
-                                tf.constant(repeat(i / (total_len - 1)), dtype='float'),
+                                tf.constant(repeat(i / (num_features - 1)), dtype='float'),
                                 tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float')
                             ]
 
                         inv_input = tf.concat(inv_input, 2)
                         outs.append(rnn(units)(inv_input))
-                        if i + filter_size == total_len:
+                        if i + filter_size == num_features:
                             break
                 out = tf.concat(outs, 2)
                 # Perform max pooling
@@ -96,17 +104,23 @@ class Model:
         # Note input
         out = note_in
         print(out)
+
+        """
+        Pitch class binning:
+        Count the number of pitch classes occurences
+        """
+        # pitch_class_bins = tf.reduce_sum([note_in[i:i+OCTAVE] for i in range(NUM_OCTAVES)], axis=0)
+
         """
         Note invariant block
         """
         last_units = 1
-        for i in range(2):
-            # TODO: This stride makes more sense, but slower.
+        for i, units in enumerate([128]):
+            # TODO: This stride makes more sense...
             # units = 32 * 2 ** i
             # filter_size = last_units * (2 ** i)
             # stride = last_units
-            units = 128 * 2 ** i
-            filter_size = last_units * (4 ** i)
+            filter_size = last_units
             stride = filter_size
 
             # Pad if not divisible
@@ -121,9 +135,11 @@ class Model:
             print(out)
 
         """ Dense Layer """
+        """
         out = tf.layers.dense(inputs=out, units=1024, activation=activation)
         out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
         print(out)
+        """
 
         """
         Sigmoid Layer
@@ -158,7 +174,8 @@ class Model:
         with tf.device('/cpu:0'):
             self.saver = tf.train.Saver()
 
-    def train(self, sess, train_seqs, num_epochs=100, verbose=True):
+    def train(self, sess, train_seqs, num_epochs, verbose=True):
+        total_steps = 0
         patience = 10
         no_improvement = 0
         best_fscore = 0
@@ -209,22 +226,25 @@ class Model:
                     f1_score += np.mean([metrics.f1_score(y, p, average='weighted') for y, p in zip(label, pred)])
                     t.set_postfix(loss=training_loss / step, f1=f1_score / step)
 
-            # Early stopping
-            if f1_score > best_fscore:
-                self.saver.save(sess, model_file)
-                best_fscore = f1_score
-                no_improvement = 0
-            else:
-                no_improvement += 1
+                    if total_steps % 1000 == 0:
+                        # Early stopping
+                        if f1_score > best_fscore:
+                            self.saver.save(sess, model_file)
+                            best_fscore = f1_score
+                            no_improvement = 0
+                        else:
+                            no_improvement += 1
 
-                if no_improvement > patience:
-                    break
+                            if no_improvement > patience:
+                                break
+
+                    total_steps += 1
 
         # Save the last epoch
         self.saver.save(sess, model_file)
 
-    def generate(self, sess, inspiration, length=NOTES_PER_BAR * 16):
-        total_len = length + len(inspiration)
+    def generate(self, sess, inspiration=None, length=NOTES_PER_BAR * 4):
+        total_len = length + (len(inspiration) if inspiration is not None else 0)
         # Resulting generation
         results = []
         # Reset state
@@ -249,7 +269,7 @@ class Model:
 
             prob, *states = sess.run([self.prob] + self.final_states, feed_dict)
 
-            if i < len(inspiration):
+            if inspiration is not None and i < len(inspiration):
                 # Priming notes
                 current_note = inspiration[i]
             else:
@@ -335,7 +355,7 @@ def main():
 
         for s in range(5):
             print('s={}'.format(s))
-            composition = gen_model.generate(sess, np.random.choice(sequences)[:NOTES_PER_BAR])
+            composition = gen_model.generate(sess)#,np.random.choice(sequences)[:NOTES_PER_BAR])
             composition = np.concatenate((np.zeros((len(composition), MIN_NOTE)), composition), axis=1)
             midi.write_midifile('out/result_{}.mid'.format(s), midi_encode(composition))
 
