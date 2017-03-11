@@ -195,7 +195,7 @@ def load_midi(fname):
     cache_path = os.path.join('data', 'cache', fname + '.npy')
     try:
         music = np.load(cache_path)
-        print('Loading {} from cache'.format(fname))
+        # print('Loading {} from cache'.format(fname))
         return music
     except Exception as e:
         # Perform caching

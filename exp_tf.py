@@ -17,7 +17,9 @@ TIME_STEPS = 16
 model_file = 'out/saves/model'
 
 class Model:
-    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.relu, rnn_layers=1):
+    def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.tanh, rnn_layers=1):
+        dropout_keep_prob = 0.5 if training else 1
+
         self.init_states = []
         self.final_states = []
 
@@ -40,7 +42,6 @@ class Model:
                 return rnn_out
             return f
 
-        # TODO: Back this up
         def rnn_conv(name, units, filter_size, stride=1, include_note_pitch=False):
             """
             Recurrent convolution Layer.
@@ -83,6 +84,52 @@ class Model:
                 return out
             return f
 
+        def note_block(name):
+            """
+            Recurrent convolution Layer.
+            Given a tensor of shape [batch_size, time_steps, features, channels],
+            outputs a tensor of shape [batch_size, time_steps, features, channels]
+            """
+            def f(x, contexts):
+                num_features = int(x.get_shape()[2])
+
+                outs = []
+
+                # Process every note independently
+                for i in range(num_features):
+                    with tf.variable_scope(name, reuse=len(outs) > 0):
+                        inv_input = tf.concat([
+                            x[:, :, i:i+1],
+                            contexts,
+                            # Position of note
+                            tf.constant(repeat(i / (num_features - 1)), dtype='float'),
+                            # Pitch class of current note
+                            tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float')
+                        ], 2)
+
+                        # First layer
+                        cell_1 = tf.contrib.rnn.GRUCell(256, activation=activation)
+                        cell_1 = tf.contrib.rnn.DropoutWrapper(cell_1, input_keep_prob=dropout_keep_prob)
+                        # Second layer
+                        cell_2 = tf.contrib.rnn.GRUCell(64, activation=activation)
+                        cell_2 = tf.contrib.rnn.DropoutWrapper(cell_2, input_keep_prob=dropout_keep_prob)
+
+                        cell = tf.contrib.rnn.MultiRNNCell([cell_1, cell_2])
+                        cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=dropout_keep_prob)
+
+                        # Initial state of the memory.
+                        init_state = cell.zero_state(batch_size, tf.float32)
+                        rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
+                        self.init_states.append(init_state)
+                        self.final_states.append(final_state)
+
+                        outs.append(rnn_out)
+                out = tf.concat(outs, 2)
+                assert out.get_shape()[0] == batch_size
+                assert out.get_shape()[1] == time_steps
+                return out
+            return f
+
         """
         Input
         """
@@ -114,6 +161,7 @@ class Model:
         """
         Note invariant block
         """
+        """
         last_units = 1
         for i, units in enumerate([128]):
             # TODO: This stride makes more sense...
@@ -133,13 +181,14 @@ class Model:
             out = rnn_conv('rc' + str(i), units, filter_size, stride, include_note_pitch=i == 0)(out, contexts)
             last_units = units
             print(out)
+        """
+        out = note_block('note_block')(out, contexts)
+        print(out)
 
         """ Dense Layer """
-        """
-        out = tf.layers.dense(inputs=out, units=1024, activation=activation)
+        out = tf.layers.dense(inputs=out, units=512, activation=activation)
         out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
         print(out)
-        """
 
         """
         Sigmoid Layer
