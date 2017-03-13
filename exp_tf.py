@@ -16,6 +16,26 @@ BATCH_SIZE = 32
 TIME_STEPS = 16
 model_file = 'out/saves/model'
 
+def f1_summary(predicted, actual):
+    # F1 score statistic
+    # Count true positives, true negatives, false positives and false negatives.
+    tp = tf.count_nonzero(predicted * actual)
+    tn = tf.count_nonzero((predicted - 1) * (actual - 1))
+    fp = tf.count_nonzero(predicted * (actual - 1))
+    fn = tf.count_nonzero((predicted - 1) * actual)
+
+    # Calculate accuracy, precision, recall and F1 score.
+    accuracy = (tp + tn) / (tp + fp + fn + tn)
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    fmeasure = (2 * precision * recall) / (precision + recall)
+
+    # Add metrics to TensorBoard.
+    tf.summary.scalar('Accuracy', accuracy)
+    tf.summary.scalar('Precision', precision)
+    tf.summary.scalar('Recall', recall)
+    tf.summary.scalar('f-measure', fmeasure)
+
 class Model:
     def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.tanh, rnn_layers=1):
         dropout_keep_prob = 0.5 if training else 1
@@ -251,6 +271,7 @@ class Model:
         Statistics
         """
         tf.summary.scalar('loss', total_loss)
+        f1_summary(self.pred, note_target)
         self.merged_summaries = tf.summary.merge_all()
 
     def train(self, sess, train_seqs, num_epochs, verbose=True):
