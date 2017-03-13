@@ -247,7 +247,14 @@ class Model:
         with tf.device('/cpu:0'):
             self.saver = tf.train.Saver()
 
+        """
+        Statistics
+        """
+        tf.summary.scalar('loss', total_loss)
+        self.merged_summaries = tf.summary.merge_all()
+
     def train(self, sess, train_seqs, num_epochs, verbose=True):
+        writer = tf.summary.FileWriter('out/summary', sess.graph, flush_secs=3)
         total_steps = 0
         patience = 10
         no_improvement = 0
@@ -271,7 +278,6 @@ class Model:
                 states = [None for _ in self.init_states]
 
                 for note_in, beat_in, progress_in, label in tqdm(seq):
-                    # TODO: Dataset is bugged.
                     # Build feed-dict
                     feed_dict = {
                         self.note_in: note_in,
@@ -285,13 +291,17 @@ class Model:
                         if s is not None:
                             feed_dict[tf_s] = s
 
-                    pred, t_loss, _, *states = sess.run([
+                    pred, summary, t_loss, _, *states = sess.run([
                             self.pred,
+                            self.merged_summaries,
                             self.loss,
                             self.train_step
                         ] + self.final_states,
                         feed_dict
                     )
+
+                    # Add summary to Tensorboard
+                    writer.add_summary(summary, total_steps)
 
                     training_loss += t_loss
                     step += 1
@@ -405,7 +415,7 @@ def main():
     # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
     # TODO: Random transpoe?
     # TODO: Random slices of subsequence?
-    sequences = [load_midi(f) for f in get_all_files(['data/classical'])]
+    sequences = [load_midi(f) for f in get_all_files(['data/classical/bach'])]
     sequences = [np.minimum(np.ceil(m[:, MIN_NOTE:MAX_NOTE]), 1) for m in sequences]
     train_seqs = process(sequences)
 
