@@ -91,26 +91,31 @@ class Model:
             outputs a tensor of shape [batch_size, time_steps, features, channels]
             """
             def f(x, contexts):
-                num_features = int(x.get_shape()[2])
-
                 outs = []
 
+                pitch_class_bins = tf.reduce_sum([x[:, :, i*OCTAVE:i*OCTAVE+OCTAVE] for i in range(NUM_OCTAVES)], axis=0)
+                print('Pitch class bins', pitch_class_bins)
+
+                # Pad by one octave
+                x_padded = tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]])
+                print('Padded note input', x_padded)
+
                 # Process every note independently
-                for i in range(num_features):
+                for i in range(OCTAVE, NUM_NOTES + OCTAVE):
                     with tf.variable_scope(name, reuse=len(outs) > 0):
                         inv_input = tf.concat([
-                            x[:, :, i:i+1],
+                            x[:, :, i - OCTAVE:i + OCTAVE + 1],
                             contexts,
                             # Position of note
-                            tf.constant(repeat(i / (num_features - 1)), dtype='float'),
+                            tf.constant(repeat(i / (NUM_NOTES - 1)), dtype='float'),
                             # Pitch class of current note
-                            tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float')
+                            tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float'),
+                            pitch_class_bins
                         ], 2)
 
                         # First layer
-                        cell_1 = tf.contrib.rnn.GRUCell(256, activation=activation)
+                        cell_1 = tf.contrib.rnn.GRUCell(128, activation=activation)
                         cell_1 = tf.contrib.rnn.DropoutWrapper(cell_1, input_keep_prob=dropout_keep_prob)
-                        # Second layer
                         cell_2 = tf.contrib.rnn.GRUCell(64, activation=activation)
                         cell_2 = tf.contrib.rnn.DropoutWrapper(cell_2, input_keep_prob=dropout_keep_prob)
 
@@ -156,7 +161,6 @@ class Model:
         Pitch class binning:
         Count the number of pitch classes occurences
         """
-        # pitch_class_bins = tf.reduce_sum([note_in[i:i+OCTAVE] for i in range(NUM_OCTAVES)], axis=0)
 
         """
         Note invariant block
@@ -184,12 +188,7 @@ class Model:
         """
         out = note_block('note_block')(out, contexts)
         print(out)
-
-        """ Dense Layer """
-        out = tf.layers.dense(inputs=out, units=512, activation=activation)
-        out = tf.layers.dropout(inputs=out, rate=dropout, training=training)
-        print(out)
-
+        
         """
         Sigmoid Layer
         """
@@ -235,13 +234,14 @@ class Model:
             f1_score = 0
             step = 0
 
-            # TODO: Shuffle sequence orders.
-            # Bar
-            t = tqdm(train_seqs)
+            # Shuffle sequence orders.
+            order = np.random.permutation(len(train_seqs))
+            t = tqdm(order)
             t.set_description('{}/{}'.format(epoch + 1, num_epochs))
 
             # Train every single sequence
-            for seq in t:
+            for i in t:
+                seq = train_seqs[i]
                 # Reset state
                 states = [None for _ in self.init_states]
 
@@ -292,7 +292,7 @@ class Model:
         # Save the last epoch
         self.saver.save(sess, model_file)
 
-    def generate(self, sess, inspiration=None, length=NOTES_PER_BAR * 4):
+    def generate(self, sess, inspiration=None, length=NOTES_PER_BAR * 16):
         total_len = length + (len(inspiration) if inspiration is not None else 0)
         # Resulting generation
         results = []
