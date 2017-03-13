@@ -12,7 +12,7 @@ from constants import NUM_STYLES, styles
 from keras.layers.recurrent import GRU
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 TIME_STEPS = 16
 model_file = 'out/saves/model'
 
@@ -84,7 +84,7 @@ class Model:
                 return out
             return f
 
-        def note_block(name):
+        def time_axis_block(name, num_units=128):
             """
             Recurrent convolution Layer.
             Given a tensor of shape [batch_size, time_steps, features, channels],
@@ -97,8 +97,8 @@ class Model:
                 print('Pitch class bins', pitch_class_bins)
 
                 # Pad by one octave
-                x_padded = tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]])
-                print('Padded note input', x_padded)
+                x = tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]])
+                print('Padded note input by octave', x)
 
                 # Process every note independently
                 for i in range(OCTAVE, NUM_NOTES + OCTAVE):
@@ -113,25 +113,76 @@ class Model:
                             pitch_class_bins
                         ], 2)
 
-                        # First layer
-                        cell_1 = tf.contrib.rnn.GRUCell(128, activation=activation)
-                        cell_1 = tf.contrib.rnn.DropoutWrapper(cell_1, input_keep_prob=dropout_keep_prob)
-                        cell_2 = tf.contrib.rnn.GRUCell(64, activation=activation)
-                        cell_2 = tf.contrib.rnn.DropoutWrapper(cell_2, input_keep_prob=dropout_keep_prob)
+                        outs.append(rnn(num_units)(inv_input))
 
-                        cell = tf.contrib.rnn.MultiRNNCell([cell_1, cell_2])
-                        cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=dropout_keep_prob)
+                # Stack all outputs into a new dimension
+                out = tf.stack(outs, axis=2)
 
-                        # Initial state of the memory.
-                        init_state = cell.zero_state(batch_size, tf.float32)
-                        rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
-                        self.init_states.append(init_state)
-                        self.final_states.append(final_state)
-
-                        outs.append(rnn_out)
-                out = tf.concat(outs, 2)
+                print(name, out)
                 assert out.get_shape()[0] == batch_size
                 assert out.get_shape()[1] == time_steps
+                assert out.get_shape()[2] == NUM_NOTES
+                assert out.get_shape()[3] == num_units
+
+                return out
+            return f
+
+        def note_axis_block(name, num_units=64):
+            """
+            The pitch block that conditions each note's generation on the
+            previous note within one time step.
+            """
+            def f(x, target):
+                """
+                Parameters:
+                    x - The output of the time axis layer.
+                        [batch, time_steps, notes, features]
+                    target - The target output for training.
+                              [batch, time_steps, notes]
+                """
+                # TODO: Could try using non-recurrent network.
+
+                num_time_steps = x.get_shape()[1]
+                outs = []
+
+                # Every time slice has a note-axis RNN
+                for t in range(num_time_steps):
+                    # [batch, notes, features]
+                    input_for_time = x[:, t, :, :]
+                    # [batch, notes, 1]
+                    target_for_time = tf.expand_dims(target[:, t, :], -1)
+                    # Shift target vector for prediction
+                    target_for_time = tf.pad(target_for_time, [[0, 0], [1, 0], [0, 0]])
+                    # Remove last note
+                    target_for_time = target_for_time[:, :-1, :]
+
+                    assert target_for_time.get_shape()[0] == input_for_time.get_shape()[0]
+                    assert target_for_time.get_shape()[1] == NUM_NOTES
+                    assert target_for_time.get_shape()[2] == 1
+
+                    rnn_input = tf.concat([
+                        # Features for each note
+                        input_for_time,
+                        # Conditioned on the previously generated note
+                        target_for_time
+                    ], 2)
+
+                    with tf.variable_scope(name, reuse=len(outs) > 0):
+                        rnn_out = rnn(num_units)(rnn_input)
+
+                        # Dense prediction layer
+                        rnn_out = tf.layers.dense(inputs=rnn_out, units=1)
+                        rnn_out = tf.squeeze(rnn_out)
+                        outs.append(rnn_out)
+
+                # Merge note-axis outputs for each time step.
+                out = tf.stack(outs, axis=1)
+
+                print(name, out)
+                assert out.get_shape()[0] == batch_size
+                assert out.get_shape()[1] == time_steps
+                assert out.get_shape()[2] == NUM_NOTES
+
                 return out
             return f
 
@@ -155,48 +206,21 @@ class Model:
 
         # Note input
         out = note_in
-        print(out)
+        print('note_in', out)
 
         """
         Pitch class binning:
         Count the number of pitch classes occurences
         """
 
-        """
-        Note invariant block
-        """
-        """
-        last_units = 1
-
-        for i in range(3):
-            # TODO: This stride makes more sense, but slower.
-            # units = 32 * 2 ** i
-            # filter_size = last_units * (2 ** i)
-            # stride = last_units
-            filter_size = last_units
-            stride = filter_size
-
-            # Pad if not divisible
-            remain = int(out.get_shape()[2]) % stride
-            if remain != 0:
-                remain = int(out.get_shape()[2]) - remain
-                print('Padding remain:', remain)
-                out = tf.pad(out, [[0, 0], [0, 0], [remain // 2, remain // 2]])
-
-            out = rnn_conv('rc' + str(i), units, filter_size, stride, include_note_pitch=i == 0)(out, contexts)
-            last_units = units
-            print(out)
-        """
-        out = note_block('note_block')(out, contexts)
-        print(out)
+        out = time_axis_block('time_axis_block')(out, contexts)
+        out = note_axis_block('note_axis_block')(out, note_target)
 
         """
         Sigmoid Layer
         """
-        logits = tf.layers.dense(inputs=out, units=NUM_NOTES)
-        print(logits)
-
         # Next note predictions
+        logits = out
         self.prob = tf.nn.sigmoid(logits)
         # Classification prediction for f1 score
         self.pred = tf.round(self.prob)
