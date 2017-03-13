@@ -167,8 +167,9 @@ class Model:
         """
         """
         last_units = 1
-        for i, units in enumerate([128]):
-            # TODO: This stride makes more sense...
+
+        for i in range(3):
+            # TODO: This stride makes more sense, but slower.
             # units = 32 * 2 ** i
             # filter_size = last_units * (2 ** i)
             # stride = last_units
@@ -188,7 +189,7 @@ class Model:
         """
         out = note_block('note_block')(out, contexts)
         print(out)
-        
+
         """
         Sigmoid Layer
         """
@@ -380,7 +381,7 @@ def main():
     # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
     # TODO: Random transpoe?
     # TODO: Random slices of subsequence?
-    sequences = [load_midi(f) for f in get_all_files(styles)]
+    sequences = [load_midi(f) for f in get_all_files(['data/classical'])]
     sequences = [np.minimum(np.ceil(m[:, MIN_NOTE:MAX_NOTE]), 1) for m in sequences]
     train_seqs = process(sequences)
 
