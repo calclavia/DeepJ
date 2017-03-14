@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import argparse
-from sklearn import metrics
 from tqdm import tqdm
 
 from dataset import process_stateful, load_music_styles, get_all_files, compute_beat, compute_completion
@@ -9,32 +8,12 @@ from music import *
 from midi_util import *
 from util import chunk
 from constants import NUM_STYLES, styles
-from keras.layers.recurrent import GRU
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 BATCH_SIZE = 32
 TIME_STEPS = 16
 model_file = 'out/saves/model'
 
-def f1_summary(predicted, actual):
-    # F1 score statistic
-    # Count true positives, true negatives, false positives and false negatives.
-    tp = tf.count_nonzero(predicted * actual)
-    tn = tf.count_nonzero((predicted - 1) * (actual - 1))
-    fp = tf.count_nonzero(predicted * (actual - 1))
-    fn = tf.count_nonzero((predicted - 1) * actual)
-
-    # Calculate accuracy, precision, recall and F1 score.
-    accuracy = (tp + tn) / (tp + fp + fn + tn)
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-    fmeasure = (2 * precision * recall) / (precision + recall)
-
-    # Add metrics to TensorBoard.
-    tf.summary.scalar('Accuracy', accuracy)
-    tf.summary.scalar('Precision', precision)
-    tf.summary.scalar('Recall', recall)
-    tf.summary.scalar('f-measure', fmeasure)
 
 class Model:
     def __init__(self, batch_size=BATCH_SIZE, time_steps=TIME_STEPS, training=True, dropout=0.5, activation=tf.nn.tanh, rnn_layers=1):
@@ -228,11 +207,6 @@ class Model:
         out = note_in
         print('note_in', out)
 
-        """
-        Pitch class binning:
-        Count the number of pitch classes occurences
-        """
-
         out = time_axis_block('time_axis_block')(out, contexts)
         out = note_axis_block('note_axis_block')(out, note_target)
 
@@ -270,21 +244,38 @@ class Model:
         """
         Statistics
         """
-        tf.summary.scalar('loss', total_loss)
-        f1_summary(self.pred, note_target)
+        self.build_summary(self.pred, note_target)
+
+    def build_summary(self, predicted, actual):
+        # F1 score statistic
+        # Count true positives, true negatives, false positives and false negatives.
+        tp = tf.count_nonzero(predicted * actual)
+        tn = tf.count_nonzero((predicted - 1) * (actual - 1))
+        fp = tf.count_nonzero(predicted * (actual - 1))
+        fn = tf.count_nonzero((predicted - 1) * actual)
+
+        # Calculate accuracy, precision, recall and F1 score.
+        accuracy = (tp + tn) / (tp + fp + fn + tn)
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        self.fmeasure = (2 * precision * recall) / (precision + recall)
+
+        # Add metrics to TensorBoard.
+        tf.summary.scalar('Accuracy', accuracy)
+        tf.summary.scalar('Precision', precision)
+        tf.summary.scalar('Recall', recall)
+        tf.summary.scalar('f-measure', self.fmeasure)
+
+        tf.summary.scalar('loss', self.loss)
+
         self.merged_summaries = tf.summary.merge_all()
 
     def train(self, sess, train_seqs, num_epochs, verbose=True):
         writer = tf.summary.FileWriter('out/summary', sess.graph, flush_secs=3)
         total_steps = 0
-        patience = 10
-        no_improvement = 0
-        best_fscore = 0
 
         for epoch in range(num_epochs):
             # Metrics
-            training_loss = 0
-            f1_score = 0
             step = 0
 
             # Shuffle sequence orders.
@@ -312,10 +303,9 @@ class Model:
                         if s is not None:
                             feed_dict[tf_s] = s
 
-                    pred, summary, t_loss, _, *states = sess.run([
+                    pred, summary, _, *states = sess.run([
                             self.pred,
                             self.merged_summaries,
-                            self.loss,
                             self.train_step
                         ] + self.final_states,
                         feed_dict
@@ -324,24 +314,10 @@ class Model:
                     # Add summary to Tensorboard
                     writer.add_summary(summary, total_steps)
 
-                    training_loss += t_loss
                     step += 1
-                    # Compute F-1 score of all timesteps and batches
-                    # For every single sample in the batch
-                    f1_score += np.mean([metrics.f1_score(y, p, average='weighted') for y, p in zip(label, pred)])
-                    t.set_postfix(loss=training_loss / step, f1=f1_score / step)
 
                     if total_steps % 1000 == 0:
-                        # Early stopping
-                        if f1_score > best_fscore:
-                            self.saver.save(sess, model_file)
-                            best_fscore = f1_score
-                            no_improvement = 0
-                        else:
-                            no_improvement += 1
-
-                            if no_improvement > patience:
-                                break
+                        self.saver.save(sess, model_file, global_step=total_steps)
 
                     total_steps += 1
 
