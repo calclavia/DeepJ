@@ -244,6 +244,9 @@ class Model:
         """
         Statistics
         """
+        # Current global step we are on
+        global_step = tf.Variable(0, name='global_step')
+        self.inc_step = global_step.assign_add(1)
         self.build_summary(self.pred, note_target)
 
     def build_summary(self, predicted, actual):
@@ -272,12 +275,8 @@ class Model:
 
     def train(self, sess, train_seqs, num_epochs, verbose=True):
         writer = tf.summary.FileWriter('out/summary', sess.graph, flush_secs=3)
-        total_steps = 0
 
         for epoch in range(num_epochs):
-            # Metrics
-            step = 0
-
             # Shuffle sequence orders.
             order = np.random.permutation(len(train_seqs))
             t = tqdm(order)
@@ -286,7 +285,7 @@ class Model:
             # Train every single sequence
             for i in t:
                 seq = train_seqs[i]
-                # Reset state
+                # Reset state every sequence
                 states = [None for _ in self.init_states]
 
                 for note_in, beat_in, progress_in, label in tqdm(seq):
@@ -303,23 +302,20 @@ class Model:
                         if s is not None:
                             feed_dict[tf_s] = s
 
-                    pred, summary, _, *states = sess.run([
+                    pred, summary, step, _, *states = sess.run([
                             self.pred,
                             self.merged_summaries,
-                            self.train_step
+                            self.inc_step,
+                            self.train_step,
                         ] + self.final_states,
                         feed_dict
                     )
 
                     # Add summary to Tensorboard
-                    writer.add_summary(summary, total_steps)
+                    writer.add_summary(summary, step)
 
-                    step += 1
-
-                    if total_steps % 1000 == 0:
+                    if step % 1000 == 0:
                         self.saver.save(sess, model_file, global_step=total_steps)
-
-                    total_steps += 1
 
         # Save the last epoch
         self.saver.save(sess, model_file)
