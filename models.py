@@ -216,11 +216,14 @@ class MusicModel:
         # Classification prediction for f1 score
         self.pred = tf.round(self.prob)
 
+        # Current global step we are on
+        self.global_step = tf.Variable(0, name='global_step', trainable=False)
+
         """
         Loss
         """
         total_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=note_target))
-        train_step = tf.train.AdamOptimizer().minimize(total_loss)
+        train_step = tf.train.AdamOptimizer().minimize(total_loss, global_step=self.global_step)
 
         """
         Set instance vars
@@ -241,9 +244,6 @@ class MusicModel:
         """
         Statistics
         """
-        # Current global step we are on
-        global_step = tf.Variable(0, name='global_step')
-        self.inc_step = global_step.assign_add(1)
         self.build_summary(self.pred, note_target)
 
     def build_summary(self, predicted, actual):
@@ -285,7 +285,8 @@ class MusicModel:
                 # Reset state every sequence
                 states = [None for _ in self.init_states]
 
-                for note_in, beat_in, progress_in, style_in, label in tqdm(seq):
+                tt = tqdm(seq)
+                for note_in, beat_in, progress_in, style_in, label in tt:
                     # Build feed-dict
                     feed_dict = {
                         self.note_in: note_in,
@@ -302,7 +303,7 @@ class MusicModel:
                     pred, summary, step, _, *states = sess.run([
                             self.pred,
                             self.merged_summaries,
-                            self.inc_step,
+                            self.global_step,
                             self.train_step,
                         ] + self.final_states,
                         feed_dict
@@ -314,10 +315,12 @@ class MusicModel:
                     if step % 100 == 0:
                         self.saver.save(sess, model_file, global_step=step)
 
+                    tt.set_description('Step {}'.format(step))
+
         # Save the last epoch
         self.saver.save(sess, model_file)
 
-    def generate(self, sess, style, inspiration=None, length=NOTES_PER_BAR * 4):
+    def generate(self, sess, style, inspiration=None, length=NOTES_PER_BAR * 8):
         total_len = length + (len(inspiration) if inspiration is not None else 0)
         # Resulting generation
         results = []

@@ -3,6 +3,7 @@ import tensorflow as tf
 import argparse
 from tqdm import tqdm
 import itertools
+import os.path
 
 from dataset import load_styles, load_process_styles, unclamp_midi, clamp_midi
 from music import *
@@ -13,8 +14,7 @@ import midi
 
 BATCH_SIZE = 64
 TIME_STEPS = 16
-# TODO: Model not restoring the latest file
-model_file = 'out/saves/model-36800'
+model_file = 'out/saves/model'
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -31,15 +31,17 @@ def main():
         if args.train:
             print('Training batch_size={} time_steps={}'.format(BATCH_SIZE, TIME_STEPS))
             train_model = MusicModel(BATCH_SIZE, TIME_STEPS)
-            sess.run(tf.global_variables_initializer())
 
-            if args.load:
-                train_model.saver.restore(sess, model_file)
+            latest_model = tf.train.latest_checkpoint(os.path.dirname(model_file))
+
+            if args.load and latest_model is not None:
+                print('Restoring saved model {}'.format(latest_model))
+                train_model.saver.restore(sess, latest_model)
             else:
+                print('Initializing new model')
                 sess.run(tf.global_variables_initializer())
 
-            # TODO: Model not restoring the latest file
-            train_model.train(sess, train_seqs, 1000, 'out/saves/model')
+            train_model.train(sess, train_seqs, 1000, model_file)
         else:
             print('Generating...')
             sequences = [clamp_midi(s) for s in load_styles(styles)]
@@ -51,6 +53,9 @@ def main():
 
             for generate in range(5):
                 for style in all_styles:
+                    # Skip 0 sum style
+                    if np.sum(style) == 0:
+                        continue
                     print('Sample: {} Style:'.format(generate, style))
                     composition = gen_model.generate(sess, style / np.sum(style), np.random.choice(sequences)[:NOTES_PER_BAR])
                     mf = midi_encode(unclamp_midi(composition))
