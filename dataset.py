@@ -1,14 +1,9 @@
 """
 Preprocesses MIDI files
 """
-from preprocess import midi_io, melodies_lib
-import os
 import numpy as np
-from tqdm import tqdm
-from collections import deque
-from joblib import Parallel, delayed
+from constants import NUM_STYLES
 import math
-import random
 
 from music import MIN_NOTE, MAX_NOTE, NOTES_PER_BAR
 from midi_util import load_midi
@@ -35,13 +30,12 @@ def stagger(data, time_steps):
         dataY.append(data[i + 1:(i + time_steps + 1)])
     return dataX, dataY
 
-def process(sequences, batch_size, time_steps):
+def process(sequences, batch_size, time_steps, style):
     # Clamps the sequence
     sequences = [clamp_midi(s) for s in sequences]
     # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
     # TODO: Random transpoe?
     # TODO: Random slices of subsequence?
-
     train_seqs = []
 
     for seq in sequences:
@@ -53,12 +47,17 @@ def process(sequences, batch_size, time_steps):
         progress_data = [compute_completion(i, len(seq)) for i in range(len(seq))]
         progress_data, _ = stagger(progress_data, time_steps)
 
+        style_data = [one_hot(style, NUM_STYLES) for i in range(len(seq))]
+        style_data, _ = stagger(style_data, time_steps)
+
         # Chunk into batches
         train_data = chunk(train_data, batch_size)
         beat_data = chunk(beat_data, batch_size)
         progress_data = chunk(progress_data, batch_size)
+        style_data = chunk(style_data, batch_size)
         label_data = chunk(label_data, batch_size)
-        train_seqs.append(list(zip(train_data, beat_data, progress_data, label_data)))
+        
+        train_seqs.append(list(zip(train_data, beat_data, progress_data, style_data, label_data)))
     return train_seqs
 
 def load_styles(styles):
@@ -66,6 +65,16 @@ def load_styles(styles):
     Loads all MIDI files as a piano roll.
     """
     return [load_midi(f) for f in get_all_files(styles)]
+
+def load_process_styles(styles, batch_size, time_steps):
+    """
+    Loads all MIDI files as a piano roll.
+    """
+    training_data = []
+    for style_id, style in enumerate(styles):
+        seqs = [load_midi(f) for f in get_all_files([style])]
+        training_data += process(seqs, batch_size, time_steps, style_id)
+    return training_data
 
 def clamp_midi(sequence):
     """

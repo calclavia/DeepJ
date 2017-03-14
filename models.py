@@ -76,7 +76,7 @@ class MusicModel:
                 return out
             return f
 
-        def time_axis_block(name, num_units=128):
+        def time_axis_block(name, num_units=256):
             """
             Recurrent convolution Layer.
             Given a tensor of shape [batch_size, time_steps, features, channels],
@@ -119,7 +119,7 @@ class MusicModel:
                 return out
             return f
 
-        def note_axis_block(name, num_units=64):
+        def note_axis_block(name, num_units=128):
             """
             The pitch block that conditions each note's generation on the
             previous note within one time step.
@@ -183,7 +183,7 @@ class MusicModel:
         # Input note (multi-hot vector)
         note_in = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES], name='note_in')
         # Input beat (clock representation)
-        beat_in = tf.placeholder(tf.float32, [batch_size, time_steps, 2], name='beat_in')
+        beat_in = tf.placeholder(tf.float32, [batch_size, time_steps, NOTES_PER_BAR], name='beat_in')
         # Input progress (scalar representation)
         progress_in = tf.placeholder(tf.float32, [batch_size, time_steps, 1], name='progress_in')
         # Style bias (one-hot representation)
@@ -193,7 +193,7 @@ class MusicModel:
         note_target = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES], name='target_in')
 
         # Context to help generation
-        contexts = tf.concat([beat_in, progress_in], 2)
+        contexts = tf.concat([beat_in, progress_in, style_in], 2)
 
         # Note input
         out = note_in
@@ -280,13 +280,13 @@ class MusicModel:
                 # Reset state every sequence
                 states = [None for _ in self.init_states]
 
-                for note_in, beat_in, progress_in, label in tqdm(seq):
+                for note_in, beat_in, progress_in, style_in, label in tqdm(seq):
                     # Build feed-dict
                     feed_dict = {
                         self.note_in: note_in,
                         self.beat_in: beat_in,
                         self.progress_in: progress_in,
-                        # self.style_in: X[3],
+                        self.style_in: style_in,
                         self.note_target: label
                     }
 
@@ -312,7 +312,7 @@ class MusicModel:
         # Save the last epoch
         self.saver.save(sess, model_file)
 
-    def generate(self, sess, inspiration=None, length=NOTES_PER_BAR * 4):
+    def generate(self, sess, style, inspiration=None, length=NOTES_PER_BAR * 4):
         total_len = length + (len(inspiration) if inspiration is not None else 0)
         # Resulting generation
         results = []
@@ -325,6 +325,7 @@ class MusicModel:
         for i in tqdm(range(total_len)):
             current_beat = compute_beat(i, NOTES_PER_BAR)
             current_progress = compute_completion(i, total_len)
+
             # The next note being built.
             next_note = np.zeros(NUM_NOTES)
 
@@ -334,6 +335,7 @@ class MusicModel:
                     self.note_in: [[prev_note]],
                     self.beat_in: [[current_beat]],
                     self.progress_in: [[current_progress]],
+                    self.style_in: [[style]],
                     self.note_target: [[next_note]]
                 }
 

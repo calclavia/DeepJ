@@ -3,12 +3,12 @@ import tensorflow as tf
 import argparse
 from tqdm import tqdm
 
-from dataset import load_styles, process, unclamp_midi, clamp_midi
+from dataset import load_styles, load_process_styles, unclamp_midi, clamp_midi
 from music import *
-from constants import NUM_STYLES, styles
+from constants import styles, NUM_STYLES
 from models import MusicModel
 
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 TIME_STEPS = 16
 model_file = 'out/saves/model'
 
@@ -22,7 +22,7 @@ def main():
 
     with tf.Session() as sess:
         # Load training data
-        train_seqs = process(load_styles(styles), BATCH_SIZE, TIME_STEPS)
+        train_seqs = load_process_styles(styles, BATCH_SIZE, TIME_STEPS)
 
         if args.train:
             print('Training batch_size={} time_steps={}'.format(BATCH_SIZE, TIME_STEPS))
@@ -36,15 +36,19 @@ def main():
         else:
             print('Generating...')
             sequences = [clamp_midi(s) for s in load_styles(styles)]
+            # All possible style enumerations
+            all_styles = [np.array(i, dtype=float) for i in itertools.product([0, 1], repeat=NUM_STYLES)]
 
             gen_model = MusicModel(1, 1, training=False)
             gen_model.saver.restore(sess, model_file)
 
-            for s in range(5):
-                print('s={}'.format(s))
-                composition = gen_model.generate(sess, np.random.choice(sequences)[:NOTES_PER_BAR])
-                mf = midi_encode(unclamp_midi(composition))
-                midi.write_midifile('out/result_{}.mid'.format(s), mf)
+            for generate in range(5):
+                print('Sample {}'.format(generate))
+
+                for style in all_styles:
+                    composition = gen_model.generate(sess, style / np.sum(style), np.random.choice(sequences)[:NOTES_PER_BAR])
+                    mf = midi_encode(unclamp_midi(composition))
+                    midi.write_midifile('out/result_{}_{}.mid'.format(generate), mf)
 
 if __name__ == '__main__':
     main()
