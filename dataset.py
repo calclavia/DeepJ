@@ -56,7 +56,7 @@ def process(sequences, batch_size, time_steps, style):
         progress_data = chunk(progress_data, batch_size)
         style_data = chunk(style_data, batch_size)
         label_data = chunk(label_data, batch_size)
-        
+
         train_seqs.append(list(zip(train_data, beat_data, progress_data, style_data, label_data)))
     return train_seqs
 
@@ -86,4 +86,4 @@ def unclamp_midi(sequence):
     """
     Restore clamped MIDI sequence back to MIDI note values
     """
-    return np.concatenate((np.zeros((len(sequence), MIN_NOTE)), composition), axis=1)
+    return np.concatenate((np.zeros((len(sequence), MIN_NOTE)), sequence), axis=1)
