@@ -3,4 +3,3 @@ keras
 gym
 tensorflow
 joblib
-scikit-learn
