@@ -265,7 +265,7 @@ class MusicModel:
 
         self.merged_summaries = tf.summary.merge_all()
 
-    def train(self, sess, train_seqs, num_epochs, verbose=True):
+    def train(self, sess, train_seqs, num_epochs, model_file, verbose=True):
         writer = tf.summary.FileWriter('out/summary', sess.graph, flush_secs=3)
 
         for epoch in range(num_epochs):

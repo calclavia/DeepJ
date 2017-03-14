@@ -1,3 +1,6 @@
+"""
+Handles MIDI file loading
+"""
 import midi
 import numpy as np
 import os
@@ -7,67 +10,6 @@ from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BEAT, NOTE_OFF, NO_EVENT, MI
 DEFAULT_RES = 96
 MIDI_MAX_NOTES = 128
 MAX_VELOCITY = 127
-
-def midi_encode_melody(melody,
-                       resolution=DEFAULT_RES,
-                       step=DEFAULT_RES // NOTES_PER_BEAT):
-    """
-    Converts a sequence of melodies to a piano roll
-    """
-    # Instantiate a MIDI Pattern (contains a list of tracks)
-    pattern = midi.Pattern()
-    # Resolution is in pulses per quarter note
-    pattern.resolution = resolution
-    # Instantiate a MIDI Track (contains a list of MIDI events)
-    track = midi.Track()
-    # Append the track to the pattern
-    pattern.append(track)
-
-    track.append(midi.SetTempoEvent(bpm=130))
-
-    velocity = 100
-    last_note = None
-    last_event = 0
-    noop_ticks = 0
-
-    for i, action in enumerate(melody):
-        if action == NO_EVENT:
-            noop_ticks += 1
-            continue
-
-        noop_ticks = 0
-
-        # If a note is currently being played, turn it off
-        if last_note != None:
-            track.append(
-                midi.NoteOffEvent(
-                    tick=(i - last_event) * step,
-                    pitch=last_note
-                )
-            )
-            last_event = i
-
-        if action != NOTE_OFF:
-            # A note is played. Turn it on!
-            pitch = action + MIN_NOTE - MIN_CLASS
-
-            # Turn a note on
-            track.append(
-                midi.NoteOnEvent(
-                    tick=(i - last_event) * step,
-                    velocity=velocity,
-                    pitch=pitch
-                )
-            )
-            last_note = pitch
-            last_event = i
-
-    # Add the end of track event, append it to the track
-    eot = midi.EndOfTrackEvent(tick=0)
-    track.append(eot)
-
-    return pattern
-
 
 def midi_encode(composition,
                 resolution=NOTES_PER_BEAT,
