@@ -10,6 +10,7 @@ NUM_NOTES = MAX_NOTE - MIN_NOTE
 
 class MusicModel:
     def __init__(self, batch_size, time_steps, training=True, dropout=0.5, activation=tf.nn.tanh, rnn_layers=1):
+        input_dropout_keep_prob = 0.25 if training else 1
         dropout_keep_prob = 0.5 if training else 1
 
         self.init_states = []
@@ -24,11 +25,11 @@ class MusicModel:
             """
             def f(x):
                 cell = tf.contrib.rnn.GRUCell(units, activation=activation)
+                cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=dropout_keep_prob)
                 # cell = tf.contrib.rnn.MultiRNNCell([cell] * rnn_layers)
                 # Initial state of the memory.
                 init_state = cell.zero_state(batch_size, tf.float32)
                 rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
-                rnn_out = tf.layers.dropout(inputs=rnn_out, rate=dropout, training=training)
                 self.init_states.append(init_state)
                 self.final_states.append(final_state)
                 return rnn_out
@@ -134,6 +135,9 @@ class MusicModel:
                 """
                 # TODO: Could try using non-recurrent network.
                 num_time_steps = x.get_shape()[1]
+                # Prevent being over dependent upon wrong note
+                target = tf.nn.dropout(target, input_dropout_keep_prob)
+
                 outs = []
 
                 # Every time slice has a note-axis RNN
@@ -197,6 +201,7 @@ class MusicModel:
 
         # Note input
         out = note_in
+        out = tf.nn.dropout(out, input_dropout_keep_prob)
         print('note_in', out)
 
         out = time_axis_block('time_axis_block')(out, contexts)
