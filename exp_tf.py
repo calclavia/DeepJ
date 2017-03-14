@@ -140,7 +140,6 @@ class Model:
                               [batch, time_steps, notes]
                 """
                 # TODO: Could try using non-recurrent network.
-
                 num_time_steps = x.get_shape()[1]
                 outs = []
 
@@ -171,7 +170,7 @@ class Model:
 
                         # Dense prediction layer
                         rnn_out = tf.layers.dense(inputs=rnn_out, units=1)
-                        rnn_out = tf.squeeze(rnn_out)
+                        rnn_out = tf.squeeze(rnn_out, axis=[2])
                         outs.append(rnn_out)
 
                 # Merge note-axis outputs for each time step.
@@ -314,13 +313,13 @@ class Model:
                     # Add summary to Tensorboard
                     writer.add_summary(summary, step)
 
-                    if step % 1000 == 0:
-                        self.saver.save(sess, model_file, global_step=total_steps)
+                    if step % 100 == 0:
+                        self.saver.save(sess, model_file, global_step=step)
 
         # Save the last epoch
         self.saver.save(sess, model_file)
 
-    def generate(self, sess, inspiration=None, length=NOTES_PER_BAR * 16):
+    def generate(self, sess, inspiration=None, length=NOTES_PER_BAR * 4):
         total_len = length + (len(inspiration) if inspiration is not None else 0)
         # Resulting generation
         results = []
@@ -328,36 +327,42 @@ class Model:
         states = [None for _ in self.init_states]
 
         # Current note
-        current_note = np.zeros(NUM_NOTES)
-        current_beat = compute_beat(0, NOTES_PER_BAR)
-        current_progress = compute_completion(0, total_len)
+        prev_note = np.zeros(NUM_NOTES)
 
-        for i in range(total_len):
-            # Build feed dict
-            feed_dict = {
-                self.note_in: [[current_note]],
-                self.beat_in: [[current_beat]],
-                self.progress_in: [[current_progress]]
-            }
+        for i in tqdm(range(total_len)):
+            current_beat = compute_beat(i, NOTES_PER_BAR)
+            current_progress = compute_completion(i, total_len)
+            # The next note being built.
+            next_note = np.zeros(NUM_NOTES)
 
-            for tf_s, s in zip(self.init_states, states):
-                if s is not None:
-                    feed_dict[tf_s] = s
+            for n in range(NUM_NOTES):
+                # Build feed dict
+                feed_dict = {
+                    self.note_in: [[prev_note]],
+                    self.beat_in: [[current_beat]],
+                    self.progress_in: [[current_progress]],
+                    self.note_target: [[next_note]]
+                }
 
-            prob, *states = sess.run([self.prob] + self.final_states, feed_dict)
+                for tf_s, s in zip(self.init_states, states):
+                    if s is not None:
+                        feed_dict[tf_s] = s
 
-            if inspiration is not None and i < len(inspiration):
-                # Priming notes
-                current_note = inspiration[i]
-            else:
-                prob = prob[0][0]
-                # Randomly choose classes for each class
-                current_note = np.zeros(NUM_NOTES)
+                prob, *next_states = sess.run([self.prob] + self.final_states, feed_dict)
 
-                for n in range(NUM_NOTES):
-                    current_note[n] = 1 if np.random.random() <= prob[n] else 0
+                if inspiration is not None and i < len(inspiration):
+                    # Priming notes
+                    next_note = inspiration[i]
+                    break
+                else:
+                    # Choose one probability at a time.
+                    prob = prob[0][0]
+                    next_note[n] = 1 if np.random.random() <= prob[n] else 0
 
-                results.append(current_note)
+            results.append(next_note)
+            # Only advance state after one note has been predicted.
+            states = next_states
+            prev_note = next_note
         return results
 
 def reset_graph():
@@ -432,7 +437,7 @@ def main():
 
         for s in range(5):
             print('s={}'.format(s))
-            composition = gen_model.generate(sess)#,np.random.choice(sequences)[:NOTES_PER_BAR])
+            composition = gen_model.generate(sess, np.random.choice(sequences)[:NOTES_PER_BAR])
             composition = np.concatenate((np.zeros((len(composition), MIN_NOTE)), composition), axis=1)
             midi.write_midifile('out/result_{}.mid'.format(s), midi_encode(composition))
 
