@@ -13,7 +13,7 @@ from midi_util import midi_encode
 import midi
 
 BATCH_SIZE = 64
-TIME_STEPS = 16
+TIME_STEPS = 32
 model_file = 'out/saves/model'
 
 def main():

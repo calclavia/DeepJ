@@ -392,6 +392,11 @@ class MusicModel:
         writer = tf.summary.FileWriter('out/summary', sess.graph, flush_secs=3)
 
         for epoch in range(num_epochs):
+            # Progress bar metrics
+            training_loss = 0
+            f_score = 0
+            e_step = 0
+
             # Shuffle sequence orders.
             order = np.random.permutation(len(train_seqs))
             t = tqdm(order)
@@ -418,10 +423,12 @@ class MusicModel:
                         if s is not None:
                             feed_dict[tf_s] = s
 
-                    pred, summary, step, _, *states = sess.run([
+                    pred, summary, step, t_loss, t_f_score, _, *states = sess.run([
                             self.pred,
                             self.merged_summaries,
                             self.global_step,
+                            self.loss,
+                            self.fmeasure,
                             self.train_step,
                         ] + self.final_states,
                         feed_dict
@@ -433,7 +440,12 @@ class MusicModel:
                     if step % 100 == 0:
                         self.saver.save(sess, model_file, global_step=step)
 
+                    # Update progress bar info
+                    training_loss += t_loss
+                    f_score += t_f_score
+                    step += 1
                     tt.set_description('Step {}'.format(step))
+                    t.set_postfix(loss=training_loss / e_step, f1=f_score / e_step)
 
         # Save the last epoch
         self.saver.save(sess, model_file)
