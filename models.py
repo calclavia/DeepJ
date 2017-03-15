@@ -6,6 +6,11 @@ from util import one_hot
 from tqdm import tqdm
 from dataset import compute_beat, compute_completion
 
+from keras.layers import Activation
+from keras.layers.core import Flatten, Reshape, RepeatVector, Dense
+from keras.layers.convolutional import Conv1D
+from keras.layers.pooling import MaxPooling1D
+
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 
 class MusicModel:
@@ -24,9 +29,8 @@ class MusicModel:
             Recurrent layer
             """
             def f(x):
-                cell = tf.contrib.rnn.GRUCell(units, activation=activation)
-                cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=dropout_keep_prob)
-                # cell = tf.contrib.rnn.MultiRNNCell([cell] * rnn_layers)
+                cells = [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.GRUCell(num_units, activation=activation), output_keep_prob=dropout_keep_prob) for num_units in units]
+                cell = tf.contrib.rnn.MultiRNNCell(cells)
                 # Initial state of the memory.
                 init_state = cell.zero_state(batch_size, tf.float32)
                 rnn_out, final_state = tf.nn.dynamic_rnn(cell, x, initial_state=init_state)
@@ -61,8 +65,8 @@ class MusicModel:
                         if include_note_pitch:
                             # Position of note and pitch class of note
                             inv_input += [
-                                tf.constant(repeat(i / (num_features - 1)), dtype='float'),
-                                tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float')
+                                tf.constant(repeat(i / (num_features - 1)), dtype=tf.float32),
+                                tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype=tf.float32)
                             ]
 
                         inv_input = tf.concat(inv_input, 2)
@@ -77,7 +81,7 @@ class MusicModel:
                 return out
             return f
 
-        def time_axis_block(name, num_units=256):
+        def time_axis_block(name, units=[256, 256]):
             """
             Recurrent convolution Layer.
             Given a tensor of shape [batch_size, time_steps, features, channels],
@@ -100,13 +104,13 @@ class MusicModel:
                             x[:, :, i - OCTAVE:i + OCTAVE + 1],
                             contexts,
                             # Position of note
-                            tf.constant(repeat(i / (NUM_NOTES - 1)), dtype='float'),
+                            tf.constant(repeat(i / (NUM_NOTES - 1)), dtype=tf.float32),
                             # Pitch class of current note
-                            tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype='float'),
+                            tf.constant(repeat(one_hot(i % OCTAVE, OCTAVE)), dtype=tf.float32),
                             pitch_class_bins
                         ], 2)
 
-                        outs.append(rnn(num_units)(inv_input))
+                        outs.append(rnn(units)(inv_input))
 
                 # Stack all outputs into a new dimension
                 out = tf.stack(outs, axis=2)
@@ -115,12 +119,12 @@ class MusicModel:
                 assert out.get_shape()[0] == batch_size
                 assert out.get_shape()[1] == time_steps
                 assert out.get_shape()[2] == NUM_NOTES
-                assert out.get_shape()[3] == num_units
+                assert out.get_shape()[3] == units[-1]
 
                 return out
             return f
 
-        def note_axis_block(name, num_units=128):
+        def note_axis_block(name, units=[128, 64]):
             """
             The pitch block that conditions each note's generation on the
             previous note within one time step.
@@ -128,10 +132,8 @@ class MusicModel:
             def f(x, target):
                 """
                 Parameters:
-                    x - The output of the time axis layer.
-                        [batch, time_steps, notes, features]
-                    target - The target output for training.
-                              [batch, time_steps, notes]
+                    x - The output of the time axis layer. [batch, time_steps, notes, features]
+                    target - The target output for training. [batch, time_steps, notes]
                 """
                 # TODO: Could try using non-recurrent network.
                 num_time_steps = x.get_shape()[1]
@@ -158,6 +160,109 @@ class MusicModel:
                     rnn_input = tf.concat([
                         # Features for each note
                         input_for_time,
+                        # Conditioned on the previously generated note
+                        target_for_time
+                    ], 2)
+
+                    with tf.variable_scope(name, reuse=len(outs) > 0):
+                        rnn_out = rnn(units)(rnn_input)
+
+                        # Dense prediction layer
+                        rnn_out = tf.layers.dense(inputs=rnn_out, units=1)
+                        rnn_out = tf.squeeze(rnn_out, axis=[2])
+                        outs.append(rnn_out)
+
+                # Merge note-axis outputs for each time step.
+                out = tf.stack(outs, axis=1)
+
+                print(name, out)
+                assert out.get_shape()[0] == batch_size
+                assert out.get_shape()[1] == time_steps
+                assert out.get_shape()[2] == NUM_NOTES
+
+                return out
+            return f
+
+        def note_conv(name):
+            def f(x):
+                with tf.name_scope('note_conv'):
+                    num_time_steps = x.get_shape()[1]
+                    outs = []
+
+                    # Convolve each time slice
+                    for t in range(num_time_steps):
+                        # [batch, notes]
+                        input_for_time = x[:, t, :]
+                        # [batch, notes, 1]
+                        input_for_time = tf.expand_dims(input_for_time, -1)
+
+                        with tf.variable_scope(name, reuse=len(outs) > 0):
+                            out = input_for_time
+                            # TODO: Resnet implementation
+                            out = Conv1D(32, 3)(out)
+                            # out = MaxPooling1D(2)(out)
+                            out = Activation('relu')(out)
+
+                            out = Conv1D(64, 3)(out)
+                            # out = MaxPooling1D(2)(out)
+                            out = Activation('relu')(out)
+
+                            out = Conv1D(128, 3)(out)
+                            # out = MaxPooling1D(2)(out)
+                            out = Activation('relu')(out)
+
+                            out = Conv1D(256, 3)(out)
+                            # out = MaxPooling1D(2)(out)
+                            out = Activation('relu')(out)
+
+                            out = tf.reshape(out, [batch_size, -1])
+                            outs.append(out)
+
+                out = tf.stack(outs, axis=1)
+                print(name, out)
+
+                assert out.get_shape()[0] == batch_size
+                assert out.get_shape()[1] == time_steps
+
+                return out
+            return f
+
+        def note_axis_2(name, num_units=64):
+            """
+            The pitch block that conditions each note's generation on the
+            previous note within one time step.
+            """
+            def f(x, target):
+                """
+                Parameters:
+                    x - The output of the time axis layer. [batch, time_steps, features]
+                    target - The target output for training. [batch, time_steps, notes]
+                """
+                # TODO: Could try using non-recurrent network.
+                num_time_steps = x.get_shape()[1]
+                # Prevent being over dependent upon wrong note
+                target = tf.nn.dropout(target, input_dropout_keep_prob)
+
+                outs = []
+
+                # Every time slice has a note-axis RNN
+                for t in range(num_time_steps):
+                    # Slice time
+                    input_for_time = x[:, t, :]
+                    # [batch, notes, 1]
+                    target_for_time = tf.expand_dims(target[:, t, :], -1)
+                    # Shift target vector for prediction
+                    target_for_time = tf.pad(target_for_time, [[0, 0], [1, 0], [0, 0]])
+                    # Remove last note
+                    target_for_time = target_for_time[:, :-1, :]
+
+                    assert target_for_time.get_shape()[0] == input_for_time.get_shape()[0]
+                    assert target_for_time.get_shape()[1] == NUM_NOTES
+                    assert target_for_time.get_shape()[2] == 1
+
+                    rnn_input = tf.concat([
+                        # Repeat features for each note
+                        RepeatVector(NUM_NOTES)(input_for_time),
                         # Conditioned on the previously generated note
                         target_for_time
                     ], 2)
@@ -207,6 +312,15 @@ class MusicModel:
         out = time_axis_block('time_axis_block')(out, contexts)
         out = note_axis_block('note_axis_block')(out, note_target)
 
+        # out = note_conv('note_conv')(out)
+
+        # RNN in between
+        # out = tf.concat([out, beat_in, progress_in, style_in], 2)
+        # out = rnn(256)(out)
+
+        # out = note_axis_2('note_axis_block')(out, note_target)
+        # out = Dense(NUM_NOTES)(out)
+
         """
         Sigmoid Layer
         """
@@ -244,21 +358,25 @@ class MusicModel:
         """
         Statistics
         """
-        self.build_summary(self.pred, note_target)
+        with tf.name_scope('summary'):
+            self.build_summary(self.pred, note_target)
 
     def build_summary(self, predicted, actual):
         # F1 score statistic
         # Count true positives, true negatives, false positives and false negatives.
-        tp = tf.count_nonzero(predicted * actual)
-        tn = tf.count_nonzero((predicted - 1) * (actual - 1))
-        fp = tf.count_nonzero(predicted * (actual - 1))
-        fn = tf.count_nonzero((predicted - 1) * actual)
+        tp = tf.count_nonzero(predicted * actual, dtype=tf.float32)
+        tn = tf.count_nonzero((predicted - 1) * (actual - 1), dtype=tf.float32)
+        fp = tf.count_nonzero(predicted * (actual - 1), dtype=tf.float32)
+        fn = tf.count_nonzero((predicted - 1) * actual, dtype=tf.float32)
 
         # Calculate accuracy, precision, recall and F1 score.
         accuracy = (tp + tn) / (tp + fp + fn + tn)
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
-        self.fmeasure = (2 * precision * recall) / (precision + recall)
+        # Prevent divide by zero
+        zero = tf.constant(0, dtype=tf.float32)
+        precision = tf.cond(tf.not_equal(tp, 0), lambda: tp / (tp + fp), lambda: zero)
+        recall = tf.cond(tf.not_equal(tp, 0), lambda: tp / (tp + fn), lambda: zero)
+        pre_f = 2 * precision * recall
+        self.fmeasure = tf.cond(tf.not_equal(pre_f, 0), lambda: pre_f / (precision + recall), lambda: zero)
 
         # Add metrics to TensorBoard.
         tf.summary.scalar('Accuracy', accuracy)
