@@ -443,7 +443,7 @@ class MusicModel:
                     # Update progress bar info
                     training_loss += t_loss
                     f_score += t_f_score
-                    step += 1
+                    e_step += 1
                     tt.set_description('Step {}'.format(step))
                     t.set_postfix(loss=training_loss / e_step, f1=f_score / e_step)
 

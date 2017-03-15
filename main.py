@@ -13,7 +13,7 @@ from midi_util import midi_encode
 import midi
 
 BATCH_SIZE = 64
-TIME_STEPS = 32
+TIME_STEPS = 8
 model_file = 'out/saves/model'
 
 def main():
@@ -49,7 +49,8 @@ def main():
             all_styles = [np.array(i, dtype=float) for i in itertools.product([0, 1], repeat=NUM_STYLES)]
 
             gen_model = MusicModel(1, 1, training=False)
-            gen_model.saver.restore(sess, model_file)
+            latest_model = tf.train.latest_checkpoint(os.path.dirname(model_file))
+            gen_model.saver.restore(sess, latest_model)
 
             for generate in range(5):
                 for style in all_styles:
