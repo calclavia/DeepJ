@@ -93,7 +93,7 @@ def note_axis_block(dropout=1, units=[64]):
     The pitch block that conditions each note's generation on the
     previous note within one time step.
     """
-    def f(x, target):
+    def f(x, target, style):
         """
         Parameters:
             x - The output of the time axis layer. [batch, time_steps, notes, features]
@@ -104,6 +104,17 @@ def note_axis_block(dropout=1, units=[64]):
         time_steps = x.get_shape()[1]
         num_features = x.get_shape()[3]
 
+        dim_style = style.get_shape()[1]
+
+        # Repeat style for all note inputs
+        style = RepeatVector(NUM_NOTES)(style)
+
+        # Process target
+        # Shift target vector for prediction (removing the last note)
+        target = tf.pad(target[:, :, :-1], [[0, 0], [0, 0], [1, 0]])
+        # Expand by 1 dimension [batch, time_steps, notes, 1]
+        target = tf.expand_dims(target, -1)
+
         outs = []
 
         # Every time slice has a note-axis RNN
@@ -112,11 +123,7 @@ def note_axis_block(dropout=1, units=[64]):
                 # [batch, notes, features]
                 input_for_time = x[:, t, :, :]
                 # [batch, notes, 1]
-                target_for_time = tf.expand_dims(target[:, t, :], -1)
-                # Shift target vector for prediction
-                target_for_time = tf.pad(target_for_time, [[0, 0], [1, 0], [0, 0]])
-                # Remove last note
-                target_for_time = target_for_time[:, :-1, :]
+                target_for_time = target[:, t, :, :]
 
                 assert target_for_time.get_shape()[0] == batch_size
                 assert target_for_time.get_shape()[1] == NUM_NOTES
@@ -125,13 +132,15 @@ def note_axis_block(dropout=1, units=[64]):
                 rnn_input = tf.concat([
                     # Features for each note
                     input_for_time,
+                    # Style context
+                    style,
                     # Conditioned on the previously generated note
                     target_for_time
                 ], 2, name='note_axis_input')
 
                 assert rnn_input.get_shape()[0] == batch_size
                 assert rnn_input.get_shape()[1] == NUM_NOTES
-                assert rnn_input.get_shape()[2] == num_features + 1
+                assert rnn_input.get_shape()[2] == num_features + dim_style + 1
 
                 rnn_out, *_ = rnn(units, dropout)(rnn_input)
 
@@ -149,8 +158,10 @@ def note_axis_block(dropout=1, units=[64]):
 
         return out
     return f
+
 class MusicModel:
     def __init__(self, batch_size, time_steps, training=True):
+        # Dropout keep probabilities
         input_dropout = 0.8 if training else 1
         dropout = 0.5 if training else 1
 
@@ -168,13 +179,20 @@ class MusicModel:
         # Input progress (scalar representation)
         self.progress_in = tf.placeholder(tf.float32, [batch_size, time_steps, 1], name='progress_in')
         # Style bias (one-hot representation)
-        self.style_in = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_STYLES], name='style_in')
+        self.style_in = tf.placeholder(tf.float32, [batch_size, NUM_STYLES], name='style_in')
 
         # Target note to predict
         self.note_target = tf.placeholder(tf.float32, [batch_size, time_steps, NUM_NOTES], name='target_in')
 
+        # Create distributed representation of style
+        with tf.variable_scope('style_distributed'):
+            style_dist = tf.layers.dense(self.style_in, units=64, activation=tf.nn.tanh)
+            style_dist = tf.nn.dropout(style_dist, dropout)
+            # Repeat the style input over time steps
+            style_dist_repeat = RepeatVector(time_steps)(style_dist)
+
         # Context to help generation
-        contexts = tf.concat([self.beat_in, self.progress_in, self.style_in], 2, name='context')
+        contexts = tf.concat([self.beat_in, self.progress_in, style_dist_repeat], 2, name='context')
 
         # Note input
         out = self.note_in
@@ -189,7 +207,7 @@ class MusicModel:
         with tf.variable_scope('note_axis'):
             # Prevent being over dependent upon wrong note
             target = tf.nn.dropout(self.note_target, input_dropout)
-            out = note_axis_block(dropout)(out, target)
+            out = note_axis_block(dropout)(out, target, style_dist)
         """
         Sigmoid Layer
         """
@@ -330,7 +348,7 @@ class MusicModel:
                     self.note_in: [[prev_note]],
                     self.beat_in: [[current_beat]],
                     self.progress_in: [[current_progress]],
-                    self.style_in: [[style]],
+                    self.style_in: [style],
                     self.note_target: [[next_note]]
                 }
 
