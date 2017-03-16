@@ -2,9 +2,11 @@
 Preprocesses MIDI files
 """
 import numpy as np
-from constants import NUM_STYLES
 import math
+from joblib import Parallel, delayed
+import multiprocessing
 
+from constants import NUM_STYLES
 from music import MIN_NOTE, MAX_NOTE, NOTES_PER_BAR
 from midi_util import load_midi
 from util import chunk, get_all_files, one_hot
@@ -76,7 +78,8 @@ def load_process_styles(styles, batch_size, time_steps):
     """
     training_data = []
     for style_id, style in enumerate(styles):
-        seqs = [load_midi(f) for f in get_all_files([style])]
+        # Parallel process all files
+        seqs = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(load_midi)(f) for f in get_all_files([style]))
         training_data += process(seqs, batch_size, time_steps, style_id)
     return training_data
 
