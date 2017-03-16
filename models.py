@@ -89,7 +89,7 @@ def time_axis_block(dropout, units=[128, 128]):
         return out, init_states, final_states
     return f
 
-def note_axis_block(dropout):
+def note_axis_block(dropout, units=[64, 64, 128, 128, 256, 256]):
     """
     The pitch block that conditions each note's generation on the
     previous note within one time step.
@@ -148,7 +148,7 @@ def note_axis_block(dropout):
 
                 # TODO: Verify correctness
                 # Create large enough dialation to cover all notes
-                for l, num_units in enumerate([64, 64, 128, 128, 256, 256]):
+                for l, num_units in enumerate(units):
                     prev_out = out
                     out = Conv1D(num_units, 2, dilation_rate=2 ** l, padding='causal')(out)
                     out = tf.nn.relu(out)
@@ -176,7 +176,7 @@ def note_axis_block(dropout):
     return f
 
 class MusicModel:
-    def __init__(self, batch_size, time_steps, training=True):
+    def __init__(self, batch_size, time_steps, training=True, style_units=32):
         # Dropout keep probabilities
         input_dropout = 0.75 if training else 1
         dropout = 0.5 if training else 1
@@ -202,7 +202,7 @@ class MusicModel:
 
         # Create distributed representation of style
         with tf.variable_scope('style_distributed'):
-            style_dist = tf.layers.dense(self.style_in, units=32, activation=tf.nn.tanh)
+            style_dist = tf.layers.dense(self.style_in, units=style_units, activation=tf.nn.tanh)
             style_dist = tf.nn.dropout(style_dist, dropout)
             # Repeat the style input over time steps
             style_dist_repeat = RepeatVector(time_steps)(style_dist)

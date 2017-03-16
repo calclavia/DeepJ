@@ -36,7 +36,7 @@ def process(sequences, batch_size, time_steps, style):
     # Pad the training data with one timestep of blank notes.
     padding = [np.zeros_like(sequences[0]) for t in range(time_steps)]
     sequences = padding + sequences
-    
+
     # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
     # TODO: Random slices of subsequence?
     train_seqs = []
@@ -84,7 +84,10 @@ def clamp_midi(sequence):
     """
     Clamps the midi base on the MIN and MAX notes
     """
-    return np.minimum(np.ceil(sequence[:, MIN_NOTE:MAX_NOTE]), 1)
+    sequence = np.ceil(sequence[:, MIN_NOTE:MAX_NOTE])
+    assert sequence >= 0
+    assert sequence <= 1
+    return sequence
 
 def unclamp_midi(sequence):
     """
