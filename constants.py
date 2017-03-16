@@ -12,8 +12,8 @@ TIME_STEPS = 16
 
 # Hyper Parameters
 STYLE_UNITS = 32
-TIME_AXIS_UNITS = [128, 128]
-NOTE_AXIS_UNITS = [64, 64, 128, 128, 256, 256]
+TIME_AXIS_UNITS = [256, 256]
+NOTE_AXIS_UNITS = [128, 128, 256, 256, 512, 512]
 
 # Move file save location
 model_file = 'out/saves/model'

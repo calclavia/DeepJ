@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from music import NOTES_PER_BAR, MAX_NOTE, MIN_NOTE, NUM_OCTAVES, OCTAVE
-from constants import NUM_STYLES
+from constants import *
 from util import one_hot
 from tqdm import tqdm
 from dataset import compute_beat, compute_completion
