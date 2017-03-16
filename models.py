@@ -37,7 +37,7 @@ def rnn(units, dropout):
         return rnn_out, init_state, final_state
     return f
 
-def time_axis_block(dropout=1, units=[128]):
+def time_axis_block(dropout, units=[128, 128]):
     """
     Note invariant time axis layer.
     """
@@ -89,7 +89,7 @@ def time_axis_block(dropout=1, units=[128]):
         return out, init_states, final_states
     return f
 
-def note_axis_block(dropout=1):
+def note_axis_block(dropout):
     """
     The pitch block that conditions each note's generation on the
     previous note within one time step.
@@ -146,6 +146,7 @@ def note_axis_block(dropout=1):
 
                 out = rnn_input
 
+                # TODO: Verify correctness
                 # Create large enough dialation to cover all notes
                 for l, num_units in enumerate([64, 64, 128, 128, 256, 256]):
                     prev_out = out
@@ -175,7 +176,7 @@ def note_axis_block(dropout=1):
 class MusicModel:
     def __init__(self, batch_size, time_steps, training=True):
         # Dropout keep probabilities
-        input_dropout = 0.8 if training else 1
+        input_dropout = 0.75 if training else 1
         dropout = 0.5 if training else 1
 
         # RNN states
@@ -312,19 +313,24 @@ class MusicModel:
                         if s is not None:
                             feed_dict[tf_s] = s
 
-                    pred, summary, step, t_loss, t_f_score, _, *states = sess.run([
-                            self.pred,
-                            self.merged_summaries,
-                            self.global_step,
-                            self.loss,
-                            self.fmeasure,
-                            self.train_step,
-                        ] + self.final_states,
-                        feed_dict
-                    )
+                    # Build query
+                    query = [
+                        self.pred,
+                        self.global_step,
+                        self.loss,
+                        self.fmeasure,
+                        self.train_step,
+                    ] + self.final_states
 
-                    # Add summary to Tensorboard
-                    writer.add_summary(summary, step)
+                    # Summary every 10 steps
+                    if step % 10 == 0:
+                        query = [self.merged_summaries] + query
+                        summary, pred, step, t_loss, t_f_score, _, *states = sess.run(query, feed_dict)
+
+                        # Add summary to Tensorboard
+                        writer.add_summary(summary, step)
+                    else:
+                        pred, step, t_loss, t_f_score, _, *states = sess.run(query, feed_dict)
 
                     if step % 100 == 0:
                         self.saver.save(sess, model_file, global_step=step)
