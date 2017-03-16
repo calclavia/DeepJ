@@ -157,7 +157,7 @@ def note_axis_block(dropout):
                     # TODO: Skip connection vs residual connections?
                     if l > 0 and l % 2 != 0:
                         out += prev_out
-                    
+
                     out = tf.nn.dropout(out, dropout)
 
                 # Dense prediction layer
@@ -296,6 +296,7 @@ class MusicModel:
 
             # Train every single sequence
             for i in t:
+                step = 0
                 seq = train_seqs[i]
                 # Reset state every sequence
                 states = [None for _ in self.init_states]
