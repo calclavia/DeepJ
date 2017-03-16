@@ -157,6 +157,8 @@ def note_axis_block(dropout):
                     # TODO: Skip connection vs residual connections?
                     if l > 0 and l % 2 != 0:
                         out += prev_out
+                    
+                    out = tf.nn.dropout(out, dropout)
 
                 # Dense prediction layer
                 out = tf.layers.dense(inputs=out, units=1)
