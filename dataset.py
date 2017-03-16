@@ -88,8 +88,8 @@ def clamp_midi(sequence):
     Clamps the midi base on the MIN and MAX notes
     """
     sequence = np.ceil(sequence[:, MIN_NOTE:MAX_NOTE])
-    assert sequence >= 0
-    assert sequence <= 1
+    assert (sequence >= 0).all()
+    assert (sequence <= 1).all()
     return sequence
 
 def unclamp_midi(sequence):
