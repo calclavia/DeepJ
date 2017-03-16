@@ -37,7 +37,7 @@ def rnn(units, dropout):
         return rnn_out, init_state, final_state
     return f
 
-def time_axis_block(dropout, units=[128, 128]):
+def time_axis_block(dropout, units=TIME_AXIS_UNITS):
     """
     Note invariant time axis layer.
     """
@@ -89,7 +89,7 @@ def time_axis_block(dropout, units=[128, 128]):
         return out, init_states, final_states
     return f
 
-def note_axis_block(dropout, units=[64, 64, 128, 128, 256, 256]):
+def note_axis_block(dropout, units=NOTE_AXIS_UNITS):
     """
     The pitch block that conditions each note's generation on the
     previous note within one time step.
@@ -176,7 +176,7 @@ def note_axis_block(dropout, units=[64, 64, 128, 128, 256, 256]):
     return f
 
 class MusicModel:
-    def __init__(self, batch_size, time_steps, training=True, style_units=32):
+    def __init__(self, batch_size, time_steps, training=True, style_units=STYLE_UNITS):
         # Dropout keep probabilities
         input_dropout = 0.75 if training else 1
         dropout = 0.5 if training else 1
