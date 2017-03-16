@@ -12,8 +12,6 @@ from keras.layers.pooling import MaxPooling1D
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 
-activation = tf.nn.relu
-
 def repeat(x, batch_size, time_steps):
     return np.reshape(np.repeat(x, batch_size * time_steps), [batch_size, time_steps, -1])
 
@@ -28,7 +26,7 @@ def rnn(units, dropout):
         with tf.variable_scope('rnn'):
             batch_size = x.get_shape()[0]
             # Create recurrent cells
-            cells = [tf.contrib.rnn.GRUCell(num_units, activation=activation) for num_units in units]
+            cells = [tf.contrib.rnn.GRUCell(num_units) for num_units in units]
             # Apply dropout to output of all layers
             cells = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=dropout) for cell in cells]
             cell = tf.contrib.rnn.MultiRNNCell(cells)
@@ -149,14 +147,14 @@ def note_axis_block(dropout=1):
                 out = rnn_input
 
                 # Create large enough dialation to cover all notes
-                for l in range(6):
+                for l, num_units in enumerate([64, 64, 128, 128, 256, 256]):
                     prev_out = out
-                    out = Conv1D(128, 2, dilation_rate=2 ** l, padding='causal')(out)
-                    out = activation(out)
+                    out = Conv1D(num_units, 2, dilation_rate=2 ** l, padding='causal')(out)
+                    out = tf.nn.relu(out)
 
                     # Residual connection
                     # TODO: Skip connection vs residual connections?
-                    if l > 0:
+                    if l > 0 and l % 2 != 0:
                         out += prev_out
 
                 # Dense prediction layer
@@ -201,7 +199,7 @@ class MusicModel:
 
         # Create distributed representation of style
         with tf.variable_scope('style_distributed'):
-            style_dist = tf.layers.dense(self.style_in, units=32, activation=activation)
+            style_dist = tf.layers.dense(self.style_in, units=32, activation=tf.nn.tanh)
             style_dist = tf.nn.dropout(style_dist, dropout)
             # Repeat the style input over time steps
             style_dist_repeat = RepeatVector(time_steps)(style_dist)
@@ -341,7 +339,7 @@ class MusicModel:
         # Save the last epoch
         self.saver.save(sess, model_file)
 
-    def generate(self, sess, style, inspiration=None, length=NOTES_PER_BAR * 8):
+    def generate(self, sess, style, inspiration=None, length=NOTES_PER_BAR * 16):
         total_len = length + (len(inspiration) if inspiration is not None else 0)
         # Resulting generation
         results = []
