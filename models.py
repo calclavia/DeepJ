@@ -151,14 +151,13 @@ def note_axis_block(dropout, units=NOTE_AXIS_UNITS):
                 for l, num_units in enumerate(units):
                     prev_out = out
                     out = Conv1D(num_units, 2, dilation_rate=2 ** l, padding='causal')(out)
+
                     out = tf.nn.relu(out)
+                    out = tf.nn.dropout(out, dropout)
 
                     # Residual connection
-                    # TODO: Skip connection vs residual connections?
-                    if l > 0 and l % 2 != 0:
+                    if l > 0:
                         out += prev_out
-
-                    out = tf.nn.dropout(out, dropout)
 
                 # Dense prediction layer
                 out = tf.layers.dense(inputs=out, units=1)
