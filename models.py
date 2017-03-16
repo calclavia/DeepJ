@@ -6,12 +6,13 @@ from util import one_hot
 from tqdm import tqdm
 from dataset import compute_beat, compute_completion
 
-from keras.layers import Activation
 from keras.layers.core import Flatten, Reshape, RepeatVector, Dense
 from keras.layers.convolutional import Conv1D
 from keras.layers.pooling import MaxPooling1D
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
+
+activation = tf.nn.relu
 
 def repeat(x, batch_size, time_steps):
     return np.reshape(np.repeat(x, batch_size * time_steps), [batch_size, time_steps, -1])
@@ -26,8 +27,10 @@ def rnn(units, dropout):
     def f(x):
         with tf.variable_scope('rnn'):
             batch_size = x.get_shape()[0]
-
-            cells = [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.GRUCell(num_units), output_keep_prob=dropout) for num_units in units]
+            # Create recurrent cells
+            cells = [tf.contrib.rnn.GRUCell(num_units, activation=activation) for num_units in units]
+            # Apply dropout to output of all layers
+            cells = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=dropout) for cell in cells]
             cell = tf.contrib.rnn.MultiRNNCell(cells)
             # Initial state of the memory.
             init_state = cell.zero_state(batch_size, tf.float32)
@@ -88,7 +91,7 @@ def time_axis_block(dropout=1, units=[128]):
         return out, init_states, final_states
     return f
 
-def note_axis_block(dropout=1, units=[64]):
+def note_axis_block(dropout=1):
     """
     The pitch block that conditions each note's generation on the
     previous note within one time step.
@@ -102,12 +105,13 @@ def note_axis_block(dropout=1, units=[64]):
         # TODO: Could try using non-recurrent network.
         batch_size = x.get_shape()[0]
         time_steps = x.get_shape()[1]
+        num_notes = x.get_shape()[2]
         num_features = x.get_shape()[3]
 
         dim_style = style.get_shape()[1]
 
         # Repeat style for all note inputs
-        style = RepeatVector(NUM_NOTES)(style)
+        style = RepeatVector(num_notes)(style)
 
         # Process target
         # Shift target vector for prediction (removing the last note)
@@ -126,7 +130,7 @@ def note_axis_block(dropout=1, units=[64]):
                 target_for_time = target[:, t, :, :]
 
                 assert target_for_time.get_shape()[0] == batch_size
-                assert target_for_time.get_shape()[1] == NUM_NOTES
+                assert target_for_time.get_shape()[1] == num_notes
                 assert target_for_time.get_shape()[2] == 1
 
                 rnn_input = tf.concat([
@@ -139,22 +143,33 @@ def note_axis_block(dropout=1, units=[64]):
                 ], 2, name='note_axis_input')
 
                 assert rnn_input.get_shape()[0] == batch_size
-                assert rnn_input.get_shape()[1] == NUM_NOTES
+                assert rnn_input.get_shape()[1] == num_notes
                 assert rnn_input.get_shape()[2] == num_features + dim_style + 1
 
-                rnn_out, *_ = rnn(units, dropout)(rnn_input)
+                out = rnn_input
+
+                # Create large enough dialation to cover all notes
+                for l in range(6):
+                    prev_out = out
+                    out = Conv1D(128, 2, dilation_rate=2 ** l, padding='causal')(out)
+                    out = activation(out)
+
+                    # Residual connection
+                    # TODO: Skip connection vs residual connections?
+                    if l > 0:
+                        out += prev_out
 
                 # Dense prediction layer
-                rnn_out = tf.layers.dense(inputs=rnn_out, units=1)
-                rnn_out = tf.squeeze(rnn_out, axis=[2], name='note_logit')
-                outs.append(rnn_out)
+                out = tf.layers.dense(inputs=out, units=1)
+                out = tf.squeeze(out, axis=[2], name='note_logit')
+                outs.append(out)
 
         # Merge note-axis outputs for each time step.
         out = tf.stack(outs, axis=1, name='note_logits')
 
         assert out.get_shape()[0] == batch_size
         assert out.get_shape()[1] == time_steps
-        assert out.get_shape()[2] == NUM_NOTES
+        assert out.get_shape()[2] == num_notes
 
         return out
     return f
@@ -186,7 +201,7 @@ class MusicModel:
 
         # Create distributed representation of style
         with tf.variable_scope('style_distributed'):
-            style_dist = tf.layers.dense(self.style_in, units=64, activation=tf.nn.tanh)
+            style_dist = tf.layers.dense(self.style_in, units=32, activation=activation)
             style_dist = tf.nn.dropout(style_dist, dropout)
             # Repeat the style input over time steps
             style_dist_repeat = RepeatVector(time_steps)(style_dist)
@@ -223,7 +238,8 @@ class MusicModel:
         """
         Loss
         """
-        self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=self.note_target))
+        note_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=self.note_target))
+        self.loss = note_loss
         self.train_step = tf.train.AdamOptimizer().minimize(self.loss, global_step=self.global_step)
 
         # Saver
