@@ -150,8 +150,8 @@ def note_axis_block(dropout=1, units=[64]):
         return out
     return f
 class MusicModel:
-    def __init__(self, batch_size, time_steps, training=True, dropout=0.5, rnn_layers=1):
-        input_dropout = 0.2 if training else 1
+    def __init__(self, batch_size, time_steps, training=True):
+        input_dropout = 0.8 if training else 1
         dropout = 0.5 if training else 1
 
         # RNN states
@@ -339,9 +339,8 @@ class MusicModel:
                         feed_dict[tf_s] = s
 
                 prob, *next_states = sess.run([self.prob] + self.final_states, feed_dict)
-                print(prob)
+
                 if inspiration is not None and i < len(inspiration):
-                    print('Priming')
                     # Priming notes
                     next_note = inspiration[i]
                     break
