@@ -4,4 +4,3 @@ gym
 tensorflow-gpu
 joblib
 tqdm
-python-midi
