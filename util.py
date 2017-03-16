@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import math
 
 from music import *
 from rl import A3CAgent
@@ -11,8 +12,14 @@ def one_hot(i, nb_classes):
     return arr
 
 def chunk(a, size):
-    trim_size = (len(a) // size) * size
-    return np.swapaxes(np.split(np.array(a[:trim_size]), size), 0, 1)
+    # Zero pad extra spaces
+    target_size = math.ceil(len(a) / float(size)) * size
+    inc_size = target_size - len(a)
+    assert inc_size >= 0 and inc_size < size, inc_size
+    a = np.array(a)
+    a = np.pad(a, [(0, inc_size)] + [(0, 0) for i in range(len(a.shape) - 1)], mode='constant')
+    assert a.shape[0] == target_size
+    return np.swapaxes(np.split(a, size), 0, 1)
 
 def get_all_files(paths):
     potential_files = []
