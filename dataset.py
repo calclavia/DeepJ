@@ -33,8 +33,11 @@ def stagger(data, time_steps):
 def process(sequences, batch_size, time_steps, style):
     # Clamps the sequence
     sequences = [clamp_midi(s) for s in sequences]
+    # Pad the training data with one timestep of blank notes.
+    padding = [np.zeros_like(sequences[0]) for t in range(time_steps)]
+    sequences = padding + sequences
+    
     # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
-    # TODO: Random transpoe? (If lacking in dataset)
     # TODO: Random slices of subsequence?
     train_seqs = []
 
