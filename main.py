@@ -10,6 +10,7 @@ from music import *
 from constants import *
 from models import MusicModel
 from midi_util import midi_encode
+from util import count_number_trainable_params
 import midi
 
 def main():
@@ -39,6 +40,7 @@ def main():
                 print('Initializing new model')
                 sess.run(tf.global_variables_initializer())
 
+            print('# of parameters: ', count_number_trainable_params())
             train_model.train(sess, train_seqs, 1000, model_file)
         else:
             print('Generating...')
