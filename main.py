@@ -7,14 +7,10 @@ import os.path
 
 from dataset import load_styles, load_process_styles, unclamp_midi, clamp_midi
 from music import *
-from constants import styles, NUM_STYLES
+from constants import *
 from models import MusicModel
 from midi_util import midi_encode
 import midi
-
-BATCH_SIZE = 64
-TIME_STEPS = 8
-model_file = 'out/saves/model'
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
