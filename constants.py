@@ -10,7 +10,7 @@ NUM_STYLES = len(styles)
 # Training parameters
 BATCH_SIZE = 32
 SEQUENCE_LENGTH = NOTES_PER_BAR * 8
-TIME_STEPS = SEQUENCE_LENGTH
+TIME_STEPS = 16
 
 # Hyper Parameters
 STYLE_UNITS = 32
