@@ -1,3 +1,4 @@
+from music import NOTES_PER_BAR
 import os
 
 # Define the musical styles
@@ -7,8 +8,9 @@ styles = ['data/baroque', 'data/classical', 'data/romantic']
 NUM_STYLES = len(styles)
 
 # Training parameters
-BATCH_SIZE = 128
-TIME_STEPS = 8
+BATCH_SIZE = 32
+SEQUENCE_LENGTH = NOTES_PER_BAR * 8
+TIME_STEPS = SEQUENCE_LENGTH
 
 # Hyper Parameters
 STYLE_UNITS = 32

@@ -210,7 +210,9 @@ class MusicModel:
             style_dist_repeat = RepeatVector(time_steps)(style_dist)
 
         # Context to help generation
-        contexts = tf.concat([self.beat_in, self.progress_in, style_dist_repeat], 2, name='context')
+        # TODO: Progress disabled.
+        # contexts = tf.concat([self.beat_in, self.progress_in, style_dist_repeat], 2, name='context')
+        contexts = tf.concat([self.beat_in, style_dist_repeat], 2, name='context')
 
         # Note input
         out = self.note_in

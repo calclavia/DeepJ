@@ -3,10 +3,11 @@ Preprocesses MIDI files
 """
 import numpy as np
 import math
+import random
 from joblib import Parallel, delayed
 import multiprocessing
 
-from constants import NUM_STYLES
+from constants import *
 from music import MIN_NOTE, MAX_NOTE, NOTES_PER_BAR
 from midi_util import load_midi
 from util import chunk, get_all_files, one_hot
@@ -26,8 +27,7 @@ def stagger(data, time_steps):
 
     # First note prediction
     data = [np.zeros_like(data[0])] + list(data)
-
-    for i in range(len(data) - time_steps - 1):
+    for i in range(len(data) - time_steps):
         dataX.append(data[i:(i + time_steps)])
         dataY.append(data[i + 1:(i + time_steps + 1)])
     return dataX, dataY
@@ -36,11 +36,14 @@ def process(sequences, batch_size, time_steps, style):
     # Clamps the sequence
     sequences = [clamp_midi(s) for s in sequences]
     # Pad the training data with one timestep of blank notes.
-    padding = [np.zeros_like(sequences[0]) for t in range(time_steps)]
-    sequences = padding + sequences
+    # padding = [np.zeros_like(sequences[0]) for t in range(time_steps)]
+    # sequences = padding + sequences
+
+    # Slice sequences to target length
+    # TODO: Implement random sequence slicing
+    sequences = [ss for s in sequences for ss in chunk(s, SEQUENCE_LENGTH)]
 
     # TODO: Cirriculum training. Increasing complexity. Increasing timestep details?
-    # TODO: Random slices of subsequence?
     train_seqs = []
 
     style_hot = one_hot(style, NUM_STYLES)
@@ -65,6 +68,11 @@ def process(sequences, batch_size, time_steps, style):
 
         train_seqs.append(list(zip(train_data, beat_data, progress_data, style_data, label_data)))
     return train_seqs
+
+def random_subseq(sequence, time_steps, division_len=NOTES_PER_BAR):
+    # Make random starting position of sequence
+    start = random.randrange(0, len(sequence) - time_steps, division_len)
+    return sequence[start:start + time_steps]
 
 def load_styles(styles):
     """
