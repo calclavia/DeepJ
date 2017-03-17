@@ -57,7 +57,7 @@ def main():
                     # Skip 0 sum style
                     if np.sum(style) == 0:
                         continue
-                    print('Sample: {} Style:'.format(generate, style))
+                    print('Sample: {} Style: {}'.format(generate, style))
                     composition = gen_model.generate(sess, style / np.sum(style), np.random.choice(sequences)[:NOTES_PER_BAR])
                     mf = midi_encode(unclamp_midi(composition))
                     midi.write_midifile('out/result_{}_{}.mid'.format(generate, style), mf)

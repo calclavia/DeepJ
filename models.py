@@ -146,6 +146,7 @@ def note_axis_block(dropout, units=NOTE_AXIS_UNITS):
 
                 out = rnn_input
 
+                """
                 # TODO: Verify correctness
                 # Create large enough dialation to cover all notes
                 for l, num_units in enumerate(units):
@@ -158,6 +159,8 @@ def note_axis_block(dropout, units=NOTE_AXIS_UNITS):
                     # Residual connection
                     if l > 0:
                         out += prev_out
+                """
+                rnn_out, *_ = rnn([128, 64], dropout)(rnn_input)
 
                 # Dense prediction layer
                 out = tf.layers.dense(inputs=out, units=1)
