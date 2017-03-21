@@ -1,7 +1,7 @@
 import tensorflow as tf
 from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape
 from keras.models import Model, load_model
-from keras.callbacks import ModelCheckpoint, LambdaCallback
+from keras.callbacks import ModelCheckpoint, LambdaCallback, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.layers.merge import Concatenate
 from collections import deque
 from tqdm import tqdm
@@ -12,7 +12,6 @@ from dataset import *
 from music import OCTAVE, NUM_OCTAVES
 from midi_util import midi_encode
 import midi
-
 
 def f1_score(actual, predicted):
     # F1 score statistic
@@ -127,7 +126,12 @@ def train(model, gen):
         if epoch % 10 == 0:
             write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model))
 
-    cbs = [ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True)]
+    cbs = [
+        ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True),
+        ReduceLROnPlateau(monitor='loss', patience=3),
+        EarlyStopping(monitor='loss', patience=9),
+        TensorBoard(log_dir='out/logs', histogram_freq=1)
+    ]
 
     if gen:
         cbs += [LambdaCallback(on_epoch_end=epoch_cb)]
