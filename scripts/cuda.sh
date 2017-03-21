@@ -4,10 +4,13 @@
 # Run this file from the parent dir of the repository
 
 # Download CUDA
-wget -O cuda.deb https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1404-8-0-local-ga2_8.0.61-1_amd64-deb
+if test -e "cuda.deb"
+then
+  wget -O cuda.deb https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1404-8-0-local-ga2_8.0.61-1_amd64-deb
+fi
 
 # Ensure same name is used
-yes | sudo dpkg -i cuda.deb
+sudo dpkg -i cuda.deb
 yes | sudo apt-get update
 yes | sudo apt-get install cuda
 

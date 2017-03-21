@@ -16,3 +16,4 @@ cd ../
 
 # Install project requirements
 cd music-generator
+pip3 install -r requirements.txt
