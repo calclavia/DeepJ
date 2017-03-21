@@ -1,10 +1,12 @@
 import tensorflow as tf
-from keras.layers import Input, LSTM, Dense
+from keras.layers import Input, LSTM, Dense, Lambda
 from keras.models import Model, load_model
 from keras.callbacks import ModelCheckpoint
+from keras.layers.merge import Concatenate
 
 from constants import SEQUENCE_LENGTH
 from dataset import *
+from music import OCTAVE
 
 def f1_score(actual, predicted):
     # F1 score statistic
@@ -25,15 +27,25 @@ def f1_score(actual, predicted):
     return fmeasure
 
 def build_model():
-    note_in = Input(shape=(SEQUENCE_LENGTH, NUM_NOTES))
+    notes_in = Input((SEQUENCE_LENGTH, NUM_NOTES))
 
-    shared_lstm = LSTM(256)
+    """ Time axis """
+    # Pad note by one octave
+    pad_note_layer = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')
+    padded_notes = pad_note_layer(notes_in)
+    time_axis_rnn = LSTM(128, return_sequences=True, name='time_axis_rnn')
+    time_axis_outs = []
 
-    out = shared_lstm(note_in)
+    for n in range(OCTAVE, NUM_NOTES + OCTAVE):
+        # Input one octave of notes
+        octave_in = Lambda(lambda x: x[:, :, n - OCTAVE:n + OCTAVE + 1], name='note_' + str(n))(padded_notes)
+        time_axis_outs.append(time_axis_rnn(octave_in))
+    out = Concatenate()(time_axis_outs)
 
+    """ Prediction Layer """
     predictions = Dense(NUM_NOTES, activation='sigmoid')(out)
 
-    model = Model(inputs=note_in, outputs=predictions)
+    model = Model(notes_in, predictions)
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc', f1_score])
     return model
 
@@ -45,11 +57,15 @@ def train():
 
     try:
         model = load_model('out/model.h5')
+        print('Loaded model from file.')
     except:
         model = build_model()
+        print('Created new model.')
+
+    model.summary()
 
     cbs = [ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True)]
-    model.fit(train_data, train_labels, epochs=10, callbacks=cbs)
+    model.fit(train_data, train_labels, epochs=1000, callbacks=cbs)
 
 if __name__ == '__main__':
     main()

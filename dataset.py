@@ -97,7 +97,8 @@ def stagger_2(data, time_steps):
 
     for i in range(len(data) - time_steps):
         dataX.append(data[i:i + time_steps])
-        dataY.append(data[i + time_steps])
+        dataY.append(data[i + 1:(i + time_steps + 1)])
+        # dataY.append(data[i + time_steps])
     return dataX, dataY
 
 def load_all(styles, batch_size, time_steps):
