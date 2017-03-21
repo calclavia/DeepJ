@@ -55,7 +55,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
         pitch_class_const = tf.constant(one_hot(n % OCTAVE, OCTAVE), dtype=tf.float32)
         pitch_class_in = Lambda(lambda x: tf.reshape(tf.tile(pitch_class_const, [tf.shape(x)[0] * time_steps]), [tf.shape(x)[0], time_steps, OCTAVE]))(notes_in)
 
-        time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in])
+        time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in, beat_in])
         time_axis_out = time_axis_rnn(time_axis_in)
         time_axis_outs.append(time_axis_out)
 
