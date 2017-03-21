@@ -13,24 +13,6 @@ from music import OCTAVE, NUM_OCTAVES
 from midi_util import midi_encode
 import midi
 
-def f1_score(actual, predicted):
-    # F1 score statistic
-    # Count true positives, true negatives, false positives and false negatives.
-    tp = tf.count_nonzero(predicted * actual, dtype=tf.float32)
-    tn = tf.count_nonzero((predicted - 1) * (actual - 1), dtype=tf.float32)
-    fp = tf.count_nonzero(predicted * (actual - 1), dtype=tf.float32)
-    fn = tf.count_nonzero((predicted - 1) * actual, dtype=tf.float32)
-
-    # Calculate accuracy, precision, recall and F1 score.
-    accuracy = (tp + tn) / (tp + fp + fn + tn)
-    # Prevent divide by zero
-    zero = tf.constant(0, dtype=tf.float32)
-    precision = tf.cond(tf.not_equal(tp, 0), lambda: tp / (tp + fp), lambda: zero)
-    recall = tf.cond(tf.not_equal(tp, 0), lambda: tp / (tp + fn), lambda: zero)
-    pre_f = 2 * precision * recall
-    fmeasure = tf.cond(tf.not_equal(pre_f, 0), lambda: pre_f / (precision + recall), lambda: zero)
-    return fmeasure
-
 def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units=128):
     notes_in = Input((time_steps, NUM_NOTES))
     beat_in = Input((time_steps, NOTES_PER_BAR))
@@ -138,18 +120,18 @@ def train(model, gen):
 def generate(model):
     print('Generating')
     notes_memory = deque([np.zeros(NUM_NOTES) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
-    beat_memory = deque([np.zeros(NUM_NOTES) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
+    beat_memory = deque([np.zeros(NOTES_PER_BAR) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
 
     results = []
 
-    for t in tqdm(range(NOTES_PER_BAR * 4)):
+    for t in tqdm(range(NOTES_PER_BAR * 8)):
 
         # The next note being built.
         next_note = np.zeros(NUM_NOTES)
 
         # Generate each note individually
         for n in range(NUM_NOTES):
-            predictions = model.predict([np.array([notes_memory]), np.array([notes_memory[1:] + [next_note]]), np.array([beat_memory])])
+            predictions = model.predict([np.array([notes_memory]), np.array([list(notes_memory)[1:] + [next_note]]), np.array([beat_memory])])
             # We only care about the last time step
             prob = predictions[0][-1]
             # Flip on randomly
