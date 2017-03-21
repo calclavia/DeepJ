@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.layers import Input, LSTM, Dense, Dropout, Lambda
+from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape
 from keras.models import Model, load_model
 from keras.callbacks import ModelCheckpoint, LambdaCallback
 from keras.layers.merge import Concatenate
@@ -32,17 +32,16 @@ def f1_score(actual, predicted):
     fmeasure = tf.cond(tf.not_equal(pre_f, 0), lambda: pre_f / (precision + recall), lambda: zero)
     return fmeasure
 
-def build_model():
-    notes_in = Input((SEQUENCE_LENGTH, NUM_NOTES))
+def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=128, note_axis_units=64):
+    notes_in = Input((time_steps, NUM_NOTES))
     # Target input for conditioning
-    targets_in = Input((SEQUENCE_LENGTH, NUM_NOTES))
+    chosen_in = Input((time_steps, NUM_NOTES))
 
     """ Time axis """
     # Pad note by one octave
-    x = Dropout(0.2)(notes_in)
-    pad_note_layer = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')
-    padded_notes = pad_note_layer(x)
-    time_axis_rnn = LSTM(64, return_sequences=True, activation='tanh', name='time_axis_rnn')
+    out = Dropout(0.2)(notes_in)
+    padded_notes = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')(out)
+    time_axis_rnn = LSTM(time_axis_units, return_sequences=True, activation='tanh', name='time_axis_rnn')
     time_axis_outs = []
 
     for n in range(OCTAVE, NUM_NOTES + OCTAVE):
@@ -50,18 +49,38 @@ def build_model():
         octave_in = Lambda(lambda x: x[:, :, n - OCTAVE:n + OCTAVE + 1], name='note_' + str(n))(padded_notes)
         time_axis_out = time_axis_rnn(octave_in)
         time_axis_outs.append(time_axis_out)
-    out = Concatenate()(time_axis_outs)
 
+    out = Concatenate()(time_axis_outs)
     out = Dropout(0.5)(out)
 
-    # Shift target one note to the left.
-    shift_target = Lambda(lambda x: tf.pad(x[:, :, :-1], [[0, 0], [0, 0], [1, 0]]))(targets_in)
+    """ Note Axis & Prediction Layer """
+    # Shift target one note to the left. []
+    shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1], [[0, 0], [0, 0], [1, 0]]))(chosen_in)
+    shift_chosen = Dropout(0.2)(shift_chosen)
+    shift_chosen = Lambda(lambda x: tf.expand_dims(x, -1))(shift_chosen)
+    note_axis_rnn = LSTM(note_axis_units, return_sequences=True, activation='tanh', name='note_axis_rnn')
+    prediction_layer = Dense(1, activation='sigmoid')
+    note_axis_outs = []
 
-    """ Prediction Layer """
-    prediction_layer = Dense(NUM_NOTES, activation='sigmoid')
-    predictions = prediction_layer(out)
+    # Reshape inputs
+    # [batch, time, notes, features]
+    out = Reshape((time_steps, NUM_NOTES, -1))(out)
+    # [batch, time, notes, 1]
+    shift_chosen = Reshape((time_steps, NUM_NOTES, -1))(shift_chosen)
+    # [batch, time, notes, features + 1]
+    note_axis_input = Concatenate(axis=3)([out, shift_chosen])
 
-    model = Model([notes_in, targets_in], predictions)
+    for t in range(time_steps):
+        # [batch, notes, features + 1]
+        sliced = Lambda(lambda x: note_axis_input[:, t, :, :], name='time_' + str(t))(out)
+        note_axis_out = note_axis_rnn(sliced)
+        note_axis_out = Dropout(0.5)(note_axis_out)
+        note_axis_out = prediction_layer(note_axis_out)
+        note_axis_out = Reshape((NUM_NOTES,))(note_axis_out)
+        note_axis_outs.append(note_axis_out)
+    out = Lambda(lambda x: tf.stack(x, axis=1))(note_axis_outs)
+
+    model = Model([notes_in, chosen_in], out)
     model.compile(optimizer='adam', loss='binary_crossentropy')
     return model
 
@@ -93,7 +112,7 @@ def train(model):
 
     cbs = [
         ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True),
-        LambdaCallback(on_epoch_end=lambda epoch: write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model)))
+        LambdaCallback(on_epoch_end=lambda epoch, _: write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model)))
     ]
     model.fit([train_data, train_labels], train_labels, epochs=1000, callbacks=cbs)
 
