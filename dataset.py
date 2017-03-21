@@ -94,8 +94,8 @@ def load_process_styles(styles, batch_size, time_steps):
 
 def stagger_2(data, time_steps):
     dataX, dataY = [], []
-
-    for i in range(len(data) - time_steps):
+    # Chop a sequence into measures
+    for i in range(0, len(data) - time_steps, NOTES_PER_BAR):
         dataX.append(data[i:i + time_steps])
         dataY.append(data[i + 1:(i + time_steps + 1)])
         # dataY.append(data[i + time_steps])

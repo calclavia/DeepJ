@@ -4,3 +4,4 @@ gym
 tensorflow-gpu
 joblib
 tqdm
+h5py
