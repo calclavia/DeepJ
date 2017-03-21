@@ -72,7 +72,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=128, note_axis_units
 
     for t in range(time_steps):
         # [batch, notes, features + 1]
-        sliced = Lambda(lambda x: note_axis_input[:, t, :, :], name='time_' + str(t))(out)
+        sliced = Lambda(lambda x: x[:, t, :, :], name='time_' + str(t))(note_axis_input)
         note_axis_out = note_axis_rnn(sliced)
         note_axis_out = Dropout(0.5)(note_axis_out)
         note_axis_out = prediction_layer(note_axis_out)
