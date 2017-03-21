@@ -53,7 +53,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
         pitch_pos_in = Lambda(lambda x: tf.fill([tf.shape(x)[0], time_steps, 1], n / (NUM_NOTES - 1)))(notes_in)
         # Pitch class of current note
         pitch_class_const = tf.constant(one_hot(n % OCTAVE, OCTAVE), dtype=tf.float32)
-        pitch_class_in = Lambda(lambda x: tf.reshape(tf.tile(pitch_class_const, [tf.shape(x)[0] * time_steps]), [tf.shape(x)[0], time_steps, 1]))(notes_in)
+        pitch_class_in = Lambda(lambda x: tf.reshape(tf.tile(pitch_class_const, [tf.shape(x)[0] * time_steps]), [tf.shape(x)[0], time_steps, OCTAVE]))(notes_in)
 
         time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in])
         time_axis_out = time_axis_rnn(time_axis_in)
@@ -139,25 +139,26 @@ def train(model, gen):
 def generate(model):
     print('Generating')
     notes_memory = deque([np.zeros(NUM_NOTES) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
+    beat_memory = deque([np.zeros(NUM_NOTES) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
+
     results = []
 
-    def make_batch(next_note):
-        note_hist = list(notes_memory)
-        return [np.array([note_hist]), np.array([note_hist[1:] + [next_note]])]
-
     for t in tqdm(range(NOTES_PER_BAR * 4)):
+
         # The next note being built.
         next_note = np.zeros(NUM_NOTES)
 
         # Generate each note individually
         for n in range(NUM_NOTES):
-            predictions = model.predict(make_batch(next_note))
+            predictions = model.predict([np.array([notes_memory]), np.array([notes_memory[1:] + [next_note]]), np.array([beat_memory])])
             # We only care about the last time step
             prob = predictions[0][-1]
             # Flip on randomly
             next_note[n] = 1 if np.random.random() <= prob[n] else 0
 
         notes_memory.append(next_note)
+        # Consistent with dataset representation
+        beat_memory.append(compute_beat(t, NOTES_PER_BAR))
         results.append(next_note)
 
     return results
