@@ -36,6 +36,7 @@ def repeat(x, batch_size, time_steps):
 
 def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units=128):
     notes_in = Input((time_steps, NUM_NOTES))
+    beat_in = Input((time_steps, NOTES_PER_BAR))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES))
 
@@ -56,7 +57,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
         # Pitch class of current note
         # pitch_class_in = Lambda(lambda x: tf.constant(repeat(one_hot(n % OCTAVE, OCTAVE), tf.shape(x)[0], tf.shape(x)[1])))(octave_in)
 
-        time_axis_in = Concatenate()([octave_in, pitch_pos_in])
+        time_axis_in = Concatenate()([octave_in, pitch_pos_in, beat_in])
         # time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in])
         time_axis_out = time_axis_rnn(time_axis_in)
         time_axis_outs.append(time_axis_out)
@@ -91,7 +92,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
         note_axis_outs.append(note_axis_out)
     out = Lambda(lambda x: tf.stack(x, axis=1))(note_axis_outs)
 
-    model = Model([notes_in, chosen_in], out)
+    model = Model([notes_in, chosen_in, beat_in], out)
     model.compile(optimizer='adam', loss='binary_crossentropy')
     return model
 
@@ -136,7 +137,7 @@ def train(model, gen):
     if gen:
         cbs += [LambdaCallback(on_epoch_end=epoch_cb)]
 
-    model.fit([train_data, train_labels], train_labels, epochs=1000, callbacks=cbs)
+    model.fit(train_data, train_labels, epochs=1000, callbacks=cbs)
 
 def generate(model):
     print('Generating')

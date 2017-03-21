@@ -109,6 +109,7 @@ def load_all(styles, batch_size, time_steps):
     (For Keras)
     """
     training_data = []
+    beat_data = []
     training_labels = []
 
     for style_id, style in enumerate(styles):
@@ -124,7 +125,13 @@ def load_all(styles, batch_size, time_steps):
                 training_data += train_data
                 training_labels += label_data
 
-    return np.array(training_data), np.array(training_labels)
+                beats, _ = stagger_2([compute_beat(i, NOTES_PER_BAR) for i in range(len(seq))], time_steps)
+                beat_data += beats
+
+    training_data = np.array(training_data)
+    beat_data = np.array(beat_data)
+    training_labels = np.array(training_labels)
+    return [training_data, training_labels, beat_data], training_labels
 
 def clamp_midi(sequence):
     """
