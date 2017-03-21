@@ -31,9 +31,6 @@ def f1_score(actual, predicted):
     fmeasure = tf.cond(tf.not_equal(pre_f, 0), lambda: pre_f / (precision + recall), lambda: zero)
     return fmeasure
 
-def repeat(x, batch_size, time_steps):
-    return np.reshape(np.repeat(x, batch_size * time_steps), [batch_size, time_steps, -1])
-
 def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units=128):
     notes_in = Input((time_steps, NUM_NOTES))
     beat_in = Input((time_steps, NOTES_PER_BAR))
@@ -55,10 +52,10 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
         # Pitch position of note
         pitch_pos_in = Lambda(lambda x: tf.fill([tf.shape(x)[0], time_steps, 1], n / (NUM_NOTES - 1)))(notes_in)
         # Pitch class of current note
-        # pitch_class_in = Lambda(lambda x: tf.constant(repeat(one_hot(n % OCTAVE, OCTAVE), tf.shape(x)[0], tf.shape(x)[1])))(octave_in)
+        pitch_class_const = tf.constant(one_hot(n % OCTAVE, OCTAVE), dtype=tf.float32)
+        pitch_class_in = Lambda(lambda x: tf.reshape(tf.tile(pitch_class_const, [tf.shape(x)[0] * time_steps]), [tf.shape(x)[0], time_steps, 1]))(notes_in)
 
-        time_axis_in = Concatenate()([octave_in, pitch_pos_in, beat_in])
-        # time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in])
+        time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in])
         time_axis_out = time_axis_rnn(time_axis_in)
         time_axis_outs.append(time_axis_out)
 
