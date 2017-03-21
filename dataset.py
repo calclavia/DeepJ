@@ -94,6 +94,8 @@ def load_process_styles(styles, batch_size, time_steps):
 
 def stagger_2(data, time_steps):
     dataX, dataY = [], []
+    # Buffer training for first note
+    data = ([np.zeros_like(data[0])] * time_steps) + list(data)
     # Chop a sequence into measures
     for i in range(0, len(data) - time_steps, NOTES_PER_BAR):
         dataX.append(data[i:i + time_steps])
