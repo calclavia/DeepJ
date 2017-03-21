@@ -9,7 +9,7 @@ import argparse
 
 from constants import SEQUENCE_LENGTH
 from dataset import *
-from music import OCTAVE
+from music import OCTAVE, NUM_OCTAVES
 from midi_util import midi_encode
 import midi
 
@@ -32,7 +32,10 @@ def f1_score(actual, predicted):
     fmeasure = tf.cond(tf.not_equal(pre_f, 0), lambda: pre_f / (precision + recall), lambda: zero)
     return fmeasure
 
-def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=64, note_axis_units=64):
+def repeat(x, batch_size, time_steps):
+    return np.reshape(np.repeat(x, batch_size * time_steps), [batch_size, time_steps, -1])
+
+def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units=128):
     notes_in = Input((time_steps, NUM_NOTES))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES))
@@ -41,13 +44,22 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=64, note_axis_units=
     # Pad note by one octave
     out = Dropout(0.2)(notes_in)
     padded_notes = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')(out)
+    pitch_class_bins = Lambda(lambda x: tf.reduce_sum([x[:, :, i*OCTAVE:i*OCTAVE+OCTAVE] for i in range(NUM_OCTAVES)], axis=0), name='pitch_class_bins')(out)
+
     time_axis_rnn = LSTM(time_axis_units, return_sequences=True, activation='tanh', name='time_axis_rnn')
     time_axis_outs = []
 
     for n in range(OCTAVE, NUM_NOTES + OCTAVE):
         # Input one octave of notes
         octave_in = Lambda(lambda x: x[:, :, n - OCTAVE:n + OCTAVE + 1], name='note_' + str(n))(padded_notes)
-        time_axis_out = time_axis_rnn(octave_in)
+        # Pitch position of note
+        pitch_pos_in = Lambda(lambda x: tf.fill([tf.shape(x)[0], time_steps, 1], n / (NUM_NOTES - 1)))(notes_in)
+        # Pitch class of current note
+        # pitch_class_in = Lambda(lambda x: tf.constant(repeat(one_hot(n % OCTAVE, OCTAVE), tf.shape(x)[0], tf.shape(x)[1])))(octave_in)
+
+        time_axis_in = Concatenate()([octave_in, pitch_pos_in])
+        # time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in])
+        time_axis_out = time_axis_rnn(time_axis_in)
         time_axis_outs.append(time_axis_out)
 
     out = Concatenate()(time_axis_outs)
@@ -116,7 +128,7 @@ def train(model, gen):
             write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model))
 
     cbs = [ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True)]
-    
+
     if gen:
         cbs += [LambdaCallback(on_epoch_end=epoch_cb)]
 
