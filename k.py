@@ -1,7 +1,7 @@
 import tensorflow as tf
 from keras.layers import Input, LSTM, Dense, Dropout, Lambda
 from keras.models import Model, load_model
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, LambdaCallback
 from keras.layers.merge import Concatenate
 from collections import deque
 from tqdm import tqdm
@@ -12,6 +12,7 @@ from dataset import *
 from music import OCTAVE
 from midi_util import midi_encode
 import midi
+
 
 def f1_score(actual, predicted):
     # F1 score statistic
@@ -41,7 +42,7 @@ def build_model():
     x = Dropout(0.2)(notes_in)
     pad_note_layer = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')
     padded_notes = pad_note_layer(x)
-    time_axis_rnn = LSTM(256, return_sequences=True, activation='tanh', name='time_axis_rnn')
+    time_axis_rnn = LSTM(64, return_sequences=True, activation='tanh', name='time_axis_rnn')
     time_axis_outs = []
 
     for n in range(OCTAVE, NUM_NOTES + OCTAVE):
@@ -60,8 +61,8 @@ def build_model():
     prediction_layer = Dense(NUM_NOTES, activation='sigmoid')
     predictions = prediction_layer(out)
 
-    model = Model(notes_in, predictions)
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
+    model = Model([notes_in, targets_in], predictions)
+    model.compile(optimizer='adam', loss='binary_crossentropy')
     return model
 
 def main():
@@ -69,14 +70,12 @@ def main():
     parser.add_argument('--train', default=False, action='store_true', help='Train model?')
     args = parser.parse_args()
 
+    model = build_or_load()
+
     if args.train:
-        print('Training')
-        train()
+        train(model)
     else:
-        print('Generating')
-        results = generate()
-        mf = midi_encode(unclamp_midi(results))
-        midi.write_midifile('out/result.mid', mf)
+        write_file(SAMPLES_DIR + '/result.mid', generate(model))
 
 def build_or_load():
     model = build_model()
@@ -88,29 +87,32 @@ def build_or_load():
     model.summary()
     return model
 
-def train():
+def train(model):
+    print('Training')
     train_data, train_labels = load_all(['data/baroque'], BATCH_SIZE, SEQUENCE_LENGTH)
 
-    model = build_or_load()
+    cbs = [
+        ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True),
+        LambdaCallback(on_epoch_end=lambda epoch: write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model)))
+    ]
+    model.fit([train_data, train_labels], train_labels, epochs=1000, callbacks=cbs)
 
-    cbs = [ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True)]
-    model.fit(train_data, train_labels, epochs=1000, callbacks=cbs)
-
-def generate():
-    model = build_or_load()
-
+def generate(model):
+    print('Generating')
     notes_memory = deque([np.zeros(NUM_NOTES) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
     results = []
 
-    def make_batch():
-        return np.array([notes_memory])
+    def make_batch(next_note):
+        note_hist = list(notes_memory)
+        return [np.array([note_hist]), np.array([note_hist[1:] + [next_note]])]
 
     for t in tqdm(range(NOTES_PER_BAR * 4)):
         # The next note being built.
         next_note = np.zeros(NUM_NOTES)
 
+        # Generate each note individually
         for n in range(NUM_NOTES):
-            predictions = model.predict(make_batch())
+            predictions = model.predict(make_batch(next_note))
             # We only care about the last time step
             prob = predictions[0][-1]
             # Flip on randomly
@@ -120,6 +122,10 @@ def generate():
         results.append(next_note)
 
     return results
+
+def write_file(name, results):
+    mf = midi_encode(unclamp_midi(results))
+    midi.write_midifile(name, mf)
 
 if __name__ == '__main__':
     main()

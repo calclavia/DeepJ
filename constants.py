@@ -22,3 +22,4 @@ NOTE_AXIS_UNITS = [128, 128, 128, 128, 128, 128]
 # Move file save location
 model_file = 'out/saves/model'
 model_dir = os.path.dirname(model_file)
+SAMPLES_DIR = 'out'
