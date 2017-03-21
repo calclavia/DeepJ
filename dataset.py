@@ -27,6 +27,7 @@ def stagger(data, time_steps):
 
     # First note prediction
     data = [np.zeros_like(data[0])] + list(data)
+
     for i in range(len(data) - time_steps):
         dataX.append(data[i:(i + time_steps)])
         dataY.append(data[i + 1:(i + time_steps + 1)])
@@ -86,10 +87,41 @@ def load_process_styles(styles, batch_size, time_steps):
     """
     training_data = []
     for style_id, style in enumerate(styles):
-        # Parallel process all files
+        # Parallel process all files into a list of music sequences
         seqs = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(load_midi)(f) for f in get_all_files([style]))
         training_data += process(seqs, batch_size, time_steps, style_id)
     return training_data
+
+def stagger_2(data, time_steps):
+    dataX, dataY = [], []
+
+    for i in range(len(data) - time_steps):
+        dataX.append(data[i:i + time_steps])
+        dataY.append(data[i + time_steps])
+    return dataX, dataY
+
+def load_all(styles, batch_size, time_steps):
+    """
+    Loads all MIDI files as a piano roll.
+    (For Keras)
+    """
+    training_data = []
+    training_labels = []
+
+    for style_id, style in enumerate(styles):
+        # Parallel process all files into a list of music sequences
+        seqs = Parallel(n_jobs=multiprocessing.cpu_count(), backend='threading')(delayed(load_midi)(f) for f in get_all_files([style]))
+
+        for seq in seqs:
+            if len(seq) >= time_steps:
+                # Clamp MIDI to note range
+                seq = clamp_midi(seq)
+                # Create training data and labels
+                train_data, label_data = stagger_2(seq, time_steps)
+                training_data += train_data
+                training_labels += label_data
+
+    return np.array(training_data), np.array(training_labels)
 
 def clamp_midi(sequence):
     """

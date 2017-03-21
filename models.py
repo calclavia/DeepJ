@@ -10,8 +10,6 @@ from keras.layers.core import Flatten, Reshape, RepeatVector, Dense
 from keras.layers.convolutional import Conv1D
 from keras.layers.pooling import MaxPooling1D
 
-NUM_NOTES = MAX_NOTE - MIN_NOTE
-
 def repeat(x, batch_size, time_steps):
     return np.reshape(np.repeat(x, batch_size * time_steps), [batch_size, time_steps, -1])
 
