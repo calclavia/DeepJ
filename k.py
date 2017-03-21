@@ -87,12 +87,13 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=64, note_axis_units=
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--train', default=False, action='store_true', help='Train model?')
+    parser.add_argument('--gen', default=False, action='store_true', help='Generate after each epoch?')
     args = parser.parse_args()
 
     model = build_or_load()
 
     if args.train:
-        train(model)
+        train(model, args.gen)
     else:
         write_file(SAMPLES_DIR + '/result.mid', generate(model))
 
@@ -106,7 +107,7 @@ def build_or_load():
     model.summary()
     return model
 
-def train(model):
+def train(model, gen):
     print('Training')
     train_data, train_labels = load_all(['data/baroque'], BATCH_SIZE, SEQUENCE_LENGTH)
 
@@ -114,10 +115,11 @@ def train(model):
         if epoch % 10 == 0:
             write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model))
 
-    cbs = [
-        ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True),
-        LambdaCallback(on_epoch_end=epoch_cb)
-    ]
+    cbs = [ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True)]
+    
+    if gen:
+        cbs += [LambdaCallback(on_epoch_end=epoch_cb)]
+
     model.fit([train_data, train_labels], train_labels, epochs=1000, callbacks=cbs)
 
 def generate(model):
