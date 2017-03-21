@@ -32,7 +32,7 @@ def f1_score(actual, predicted):
     fmeasure = tf.cond(tf.not_equal(pre_f, 0), lambda: pre_f / (precision + recall), lambda: zero)
     return fmeasure
 
-def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=128, note_axis_units=64):
+def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=64, note_axis_units=64):
     notes_in = Input((time_steps, NUM_NOTES))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES))
@@ -110,9 +110,13 @@ def train(model):
     print('Training')
     train_data, train_labels = load_all(['data/baroque'], BATCH_SIZE, SEQUENCE_LENGTH)
 
+    def epoch_cb(epoch, _):
+        if epoch % 10 == 0:
+            write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model))
+
     cbs = [
         ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True),
-        LambdaCallback(on_epoch_end=lambda epoch, _: write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model)))
+        LambdaCallback(on_epoch_end=epoch_cb)
     ]
     model.fit([train_data, train_labels], train_labels, epochs=1000, callbacks=cbs)
 
