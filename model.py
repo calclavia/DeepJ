@@ -12,17 +12,18 @@ class DeepJ(nn.Module):
         super().__init__()
         self.num_notes = num_notes
         self.time_axis = TimeAxis(num_notes)
-        self.note_axis = NoteAxis()
+        self.note_axis = NoteAxis(num_notes)
 
-    def forward(self, input, state):
-        pass
+    def forward(self, note_input, states):
+        out, states = self.time_axis(note_input, states)
+        out = self.note_axis(out)
+        return out, states
 
     def init_states(self, batch_size):
         """
         Initializes the recurrent states
         """
-        # TODO: CUDA
-        pass
+        return self.time_axis.init_states(batch_size)
 
 class TimeAxis(nn.Module):
     """
@@ -49,7 +50,7 @@ class TimeAxis(nn.Module):
                             .unsqueeze(0)  / OCTAVE
         assert self.pitch_class.size() == (1, num_notes, OCTAVE)
 
-    def forward(self, note_in, state):
+    def forward(self, note_in, states):
         """
         Args:
             input: batch_size x num_notes
@@ -66,7 +67,7 @@ class TimeAxis(nn.Module):
         chord_context = torch.sum(batch_chord_context, 2).unsqueeze(2)
 
         outs = []
-        states = []
+        next_states = []
 
         # Every note feeds through the shared RNN
         for n in range(self.num_notes):
@@ -76,16 +77,67 @@ class TimeAxis(nn.Module):
 
             rnn_input = torch.cat((pitch_pos, pitch_class, vicinity, chord_context), 1)
             rnn_input = rnn_input.view(1, batch_size, -1)
-            out, state = self.rnn(rnn_input, state[n])
+            out, state = self.rnn(rnn_input, states[n])
 
             outs.append(out)
-            states.append(state)
+            next_states.append(state)
 
         x = torch.stack(outs, dim=1)
-        return x, states
+        return x, next_states
+
+    def init_states(self, batch_size):
+        """
+        Initializes the recurrent states
+        """
+        return [(Variable(torch.zeros(1, batch_size, self.num_units)).cuda(),
+                Variable(torch.zeros(1, batch_size, self.num_units)).cuda())
+                for i in range(self.num_notes)]
 
 class NoteAxis(nn.Module):
     """
     Note axis module that learns conditional note generation.
     """
-    pass
+    def __init__(self, num_notes, num_units=128, num_layers=2):
+        super().__init__()
+        self.num_notes = num_notes
+        self.num_units = num_units
+
+        self.input_dropout = nn.Dropout(0.2)
+        self.dropout = nn.Dropout(0.5)
+        self.rnn = nn.LSTM(num_notes, num_units, num_layers, dropout=0.5)
+        self.output = nn.Linear(num_units, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, note_features, targets):
+        """
+        Args:
+            note_features: Features for each note [batch_size, num_notes, features]
+            targets: Target notes [batch_size, num_notes] (for training)
+        """
+        batch_size = note_features.size()[0]
+
+        targets = self.input_dropout(targets)
+        # Used for the first target
+        # TODO: Variable this?
+        zero_target = Variable(torch.zeros((batch_size, self.num_notes))).cuda()
+
+        # Note axis hidden state
+        state = (Variable(torch.zeros(1, batch_size, self.num_units)).cuda(),
+                Variable(torch.zeros(1, batch_size, self.num_units)).cuda())
+
+        outs = []
+
+        for n in range(self.num_notes):
+            # Slice out the current note's feature
+            feature_in = note_features[:, n, :].view(1, batch_size, -1)
+            condition_in =
+
+            out, state = self.rnn(rnn_in, state)
+
+            # Make a probability prediction
+            out = self.output(out)
+            out = self.sigmoid(out)
+            outs.append(outs)
+
+        out = torch.cat(outs, 1)
+        return out
