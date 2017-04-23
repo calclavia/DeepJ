@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 def train(model, data_generator):
     """
-    Trains a model by iterating through a data_generator.
+    Trains a model on multiple batches by iterating through a data_generator.
     """
     step = 1
     # Number of training steps per epoch
