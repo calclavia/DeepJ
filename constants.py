@@ -1,0 +1,1 @@
+BATCH_SIZE = 32

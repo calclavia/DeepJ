@@ -6,20 +6,17 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, num_notes):
         super().__init__()
+        self.num_notes = num_notes
+        self.time_axis = TimeAxis()
+        self.note_axis = NoteAxis()
 
     def forward(self, input, state):
         pass
 
-    def init_states(self):
+    def init_states(self, batch_size):
         """
         Initializes the recurrent states
-        """
-        pass
-
-    def train(self, input_seq, target_seq):
-        """
-        Trains the model on a single batch of sequences.
         """
         pass
