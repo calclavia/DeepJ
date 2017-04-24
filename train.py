@@ -22,14 +22,17 @@ def train(model, data_generator):
     all_losses = []
     total_loss = 0
 
-    t = tqdm(data_generator, total=epoch_len)
+    t = tqdm(total=epoch_len)
 
-    for data in t:
+    for data in data_generator:
+        t.set_description('Epoch {}'.format(epoch))
+
         loss = train_step(model, *data)
+
         total_loss += loss
         avg_loss = total_loss / step
-        t.set_description('Epoch {}'.format(epoch))
         t.set_postfix(loss=avg_loss)
+        t.update()
 
         if step % epoch_len == 0:
             all_losses.append(avg_loss)
@@ -45,6 +48,9 @@ def train(model, data_generator):
 
             step = 0
             epoch += 1
+
+            t.close()
+            t = tqdm(total=epoch_len)
 
         step += 1
 
@@ -80,6 +86,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading...')
     generator = batcher(sampler(load_styles()))
+    print()
     print('=== Training ===')
     # print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()#.cuda()
