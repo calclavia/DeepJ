@@ -1,2 +1,4 @@
 tqdm
 matplotlib
+numpy
+joblib
