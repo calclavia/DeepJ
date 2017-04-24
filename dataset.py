@@ -77,19 +77,19 @@ def sampler(style_seqs, seq_len=SEQ_LEN):
     flat_seq = [x for y in style_seqs for x in y]
     style_tags = torch.stack([torch.from_numpy(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
 
-    note_in, replay_in = zip(*flat_seq)
+    note_seqs, replay_seqs = zip(*flat_seq)
 
-    note_in = [x for x in note_in if len(x) > seq_len]
-    replay_in = [x for x in replay_in if len(x) > seq_len]
-    beat_tags = extract_beat(note_in)
+    note_seqs = [clamp_midi(x) for x in note_seqs if len(x) > seq_len]
+    replay_seqs = [clamp_midi(x) for x in replay_seqs if len(x) > seq_len]
+    beat_tags = extract_beat(note_seqs)
 
     while True:
-        comp_index, r = random_comp_subseq(note_in, seq_len, 1)
+        comp_index, r = random_comp_subseq(note_seqs, seq_len, 1)
 
-        yield (torch.from_numpy(note_in[comp_index][r[0]:r[1]]), \
-               torch.from_numpy(replay_in[comp_index][r[0]:r[1]]), \
-               torch.from_numpy(beat_tags[comp_index][r[0]:r[1]]), \
-               style_tags[comp_index])
+        yield (torch.from_numpy(note_seqs[comp_index][r[0]:r[1]]).float(), \
+               torch.from_numpy(replay_seqs[comp_index][r[0]:r[1]]).float(), \
+               torch.from_numpy(beat_tags[comp_index][r[0]:r[1]]).float(), \
+               style_tags[comp_index].float())
 
 def batcher(sampler, batch_size=BATCH_SIZE):
     """

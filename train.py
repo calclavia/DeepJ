@@ -61,15 +61,16 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     states = model.init_states(BATCH_SIZE)
 
     # Zero out the gradient
-    model.zero_grad()
+    optimizer.zero_grad()
 
     loss = 0
 
     # Iterate through the entire sequence
     for i in range(note_seq.size()[0] - 1):
         # TODO: We can apply custom input based on mistakes.
-        output, states = model(note_seq[i], states)
-        loss += criterion(output, sequence[i + 1])
+        targets = note_seq[:, i + 1]
+        output, states = model(note_seq[:, i], targets, states)
+        loss += criterion(output, targets)
 
     loss.backward()
     optimizer.step()
