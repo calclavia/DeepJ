@@ -52,8 +52,7 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     """
     Trains the model on a single batch of sequence.
     """
-    # TODO: Verify loss correctness
-    criterion = nn.NLLLoss()
+    criterion = nn.BCELoss()
     # TODO: Clip gradient if needed.
     optimizer = optim.Adam(model.parameters())
 
@@ -82,6 +81,7 @@ def main():
     print('Loading...')
     generator = batcher(sampler(load_styles()))
     print('=== Training ===')
+    # print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()#.cuda()
     train(model, generator)
 
