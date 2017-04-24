@@ -1,10 +1,10 @@
 """
 Preprocesses MIDI files
 """
-import torch
+import numpy
 import math
 import random
-from joblib import Parallel, delayed
+from tqdm import tqdm
 import multiprocessing
 
 from constants import *
@@ -38,14 +38,14 @@ def random_comp_subseq(compositions, length, division_len=NOTES_PER_BAR):
     subseq_range = random_subseq(compositions[comp_index], length, division_len)
     return comp_index, subseq_range
 
-def load_styles(styles):
+def load_styles(styles=STYLES):
     """
     Loads all music styles into a list of compositions
     """
     style_seqs = []
-    for style in styles:
+    for style in tqdm(styles):
         # Parallel process all files into a list of music sequences
-        style_seq = Parallel(n_jobs=multiprocessing.cpu_count(), backend='threading')(delayed(load_midi)(f) for f in get_all_files([style]))
+        style_seq = [load_midi(f) for f in tqdm(get_all_files([style]))]
         style_seqs.append(style_seq)
     return style_seqs
 
@@ -91,7 +91,7 @@ def sampler(style_seqs, seq_len=SEQ_LEN):
         note_labels = compositions[comp_index][r[0] + 1:r[1] + 1]
         yield [comp, comp_style, comp_beat], [note_labels]
 
-def batcher(sampler, batch_size):
+def batcher(sampler, batch_size=BATCH_SIZE):
     """
     Bundles samples into batches
     """

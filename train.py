@@ -1,10 +1,12 @@
-import time
+import os
 import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+
+from dataset import *
 from constants import *
 
 def train(model, data_generator):
@@ -68,3 +70,16 @@ def train_step(model, note_seq):
     loss.backward()
     optimizer.step()
     return loss.data[0] / input_line_tensor.size()[0]
+
+def main():
+    print('=== Dataset ===')
+    os.makedirs(OUT_DIR, exist_ok=True)
+    print('Loading...')
+    style_seqs = load_styles()
+    print('Creating data generator...')
+    generator = batcher(sampler(style_seqs))
+    print('=== Training ===')
+    train()
+
+if __name__ == '__main__':
+    main()

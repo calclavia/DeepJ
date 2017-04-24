@@ -157,8 +157,8 @@ def midi_decode(pattern,
 
 def load_midi(fname):
     p = midi.read_midifile(fname)
-    cache_path_music = os.path.join('data', 'cache', fname + '_music.npy')
-    cache_path_artic = os.path.join('data', 'cache', fname + '_artic.npy')
+    cache_path_music = os.path.join(CACHE_DIR, fname + '_music.npy')
+    cache_path_artic = os.path.join(CACHE_DIR, fname + '_artic.npy')
     try:
         music = np.load(cache_path_music)
         artic = np.load(cache_path_artic)
@@ -167,7 +167,6 @@ def load_midi(fname):
     except Exception as e:
         # Perform caching
         os.makedirs(os.path.dirname(cache_path_music), exist_ok=True)
-        print('Caching {}'.format(fname))
 
         music, artic = midi_decode(p)
         np.save(cache_path_music, music)

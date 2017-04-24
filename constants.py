@@ -21,4 +21,8 @@ MAX_VELOCITY = 127
 
 # Trainin Parameters
 BATCH_SIZE = 32
-SEQ_LEN = 8 * NOTES_PER_BEAT
+SEQ_LEN = 4 * NOTES_PER_BEAT
+
+STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+OUT_DIR = 'out'
+CACHE_DIR = 'out/cache'

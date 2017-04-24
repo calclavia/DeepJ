@@ -8,7 +8,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_notes):
+    def __init__(self, num_notes=NUM_NOTES):
         super().__init__()
         self.num_notes = num_notes
         self.time_axis = TimeAxis(num_notes)
