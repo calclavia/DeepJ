@@ -17,7 +17,7 @@ def train(model, data_generator):
     step = 1
     # Number of training steps per epoch
     epoch = 1
-    epoch_len = 1000
+    epoch_len = 100
     # Keep tracks of all losses in each epoch
     all_losses = []
     total_loss = 0
@@ -63,9 +63,9 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     optimizer.zero_grad()
 
     loss = 0
-
+    seq_len = note_seq.size()[0]
     # Iterate through the entire sequence
-    for i in range(note_seq.size()[0] - 1):
+    for i in range(seq_len - 1):
         # TODO: We can apply custom input based on mistakes.
         targets = note_seq[:, i + 1]
         output, states = model(note_seq[:, i], targets, states)
@@ -73,7 +73,7 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
 
     loss.backward()
     optimizer.step()
-    return loss.data[0] / input_line_tensor.size()[0]
+    return loss.data[0] / seq_len
 
 def main():
     print('=== Dataset ===')

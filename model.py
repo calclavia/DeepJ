@@ -11,8 +11,8 @@ class DeepJ(nn.Module):
     def __init__(self, num_notes=NUM_NOTES):
         super().__init__()
         self.num_notes = num_notes
-        self.time_axis = TimeAxis(num_notes)
-        self.note_axis = NoteAxis(num_notes, 256)
+        self.time_axis = TimeAxis(num_notes, 256, 2)
+        self.note_axis = NoteAxis(num_notes, 256, 128, 2)
 
     def forward(self, note_input, targets, states):
         out, states = self.time_axis(note_input, states)
@@ -29,7 +29,7 @@ class TimeAxis(nn.Module):
     """
     Time axis module that learns temporal patterns.
     """
-    def __init__(self, num_notes, num_units=256, num_layers=2):
+    def __init__(self, num_notes, num_units, num_layers):
         super().__init__()
         self.num_notes = num_notes
         self.num_units = num_units
@@ -106,7 +106,7 @@ class NoteAxis(nn.Module):
     """
     Note axis module that learns conditional note generation.
     """
-    def __init__(self, num_notes, num_features, num_units=128, num_layers=2):
+    def __init__(self, num_notes, num_features, num_units, num_layers):
         super().__init__()
         self.num_notes = num_notes
         self.num_units = num_units

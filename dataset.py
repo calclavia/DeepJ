@@ -83,7 +83,7 @@ def sampler(style_seqs, seq_len=SEQ_LEN):
     replay_seqs = [clamp_midi(x) for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
 
-    if len(note_seq) == 0:
+    if len(note_seqs) == 0:
         raise 'Insufficient training data.'
 
     while True:
