@@ -41,12 +41,12 @@ class TimeAxis(nn.Module):
 
         ## Constants
         # Position of the note [1 x num_notes]
-        self.pitch_pos = torch.arange(0, num_notes).unsqueeze(0) / num_notes
-        assert self.pitch_pos.size() == (1, num_notes)
+        self.pitch_pos = torch.range(0, num_notes - 1).unsqueeze(0) / num_notes
+        assert self.pitch_pos.size() == (1, num_notes), self.pitch_pos.size()
 
         # Pitch class of the note [1 x num_notes x OCTAVE]
         self.pitch_class = torch.stack([one_hot(i, OCTAVE) for i in range(OCTAVE)]) \
-                            .repeat(NUM_OCTAVE, 1) \
+                            .repeat(NUM_OCTAVES, 1) \
                             .unsqueeze(0)  / OCTAVE
         assert self.pitch_class.size() == (1, num_notes, OCTAVE)
 
@@ -119,7 +119,7 @@ class NoteAxis(nn.Module):
         targets = self.input_dropout(targets)
         # Used for the first target
         # TODO: Variable this?
-        zero_target = Variable(torch.zeros((batch_size, self.num_notes))).cuda()
+        zero_target = torch.zeros((batch_size, self.num_notes)).cuda()
 
         # Note axis hidden state
         state = (Variable(torch.zeros(1, batch_size, self.num_units)).cuda(),
@@ -130,7 +130,7 @@ class NoteAxis(nn.Module):
         for n in range(self.num_notes):
             # Slice out the current note's feature
             feature_in = note_features[:, n, :].view(1, batch_size, -1)
-            condition_in =
+            condition_in = targets[:, n - 1] if n > 0 else zero_target
 
             out, state = self.rnn(rnn_in, state)
 

@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from dataset import *
 from constants import *
+from model import DeepJ
 
 def train(model, data_generator):
     """
@@ -15,6 +16,7 @@ def train(model, data_generator):
     """
     step = 1
     # Number of training steps per epoch
+    epoch = 1
     epoch_len = 1000
     # Keep tracks of all losses in each epoch
     all_losses = []
@@ -26,6 +28,7 @@ def train(model, data_generator):
         loss = train_step(model, *data)
         total_loss += loss
         avg_loss = total_loss / step
+        t.set_description('Epoch {}'.format(epoch))
         t.set_postfix(loss=avg_loss)
 
         if step % epoch_len == 0:
@@ -41,6 +44,7 @@ def train(model, data_generator):
             torch.save(model, 'out/checkpoint.pt')
 
             step = 0
+            epoch += 1
 
         step += 1
 
@@ -79,7 +83,8 @@ def main():
     print('Creating data generator...')
     generator = batcher(sampler(style_seqs))
     print('=== Training ===')
-    train()
+    model = DeepJ().cuda()
+    train(model, generator)
 
 if __name__ == '__main__':
     main()

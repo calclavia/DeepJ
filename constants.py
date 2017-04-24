@@ -23,6 +23,8 @@ MAX_VELOCITY = 127
 BATCH_SIZE = 32
 SEQ_LEN = 4 * NOTES_PER_BEAT
 
-STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+# STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+STYLES = ['data/baroque']
+
 OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
