@@ -22,6 +22,8 @@ MAX_VELOCITY = 127
 # Trainin Parameters
 BATCH_SIZE = 1
 SEQ_LEN = 1 * NOTES_PER_BAR
+TIME_AXIS_UNITS = 50
+NOTE_AXIS_UNITS = 100
 
 # STYLES = ['data/baroque', 'data/classical', 'data/romantic']
 STYLES = ['data/baroque']
