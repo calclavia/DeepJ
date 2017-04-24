@@ -48,7 +48,7 @@ def train(model, data_generator):
 
         step += 1
 
-def train_step(model, note_seq):
+def train_step(model, note_seq, replay_seq, beat_seq, style):
     """
     Trains the model on a single batch of sequence.
     """
@@ -79,11 +79,9 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading...')
-    style_seqs = load_styles()
-    print('Creating data generator...')
-    generator = batcher(sampler(style_seqs))
+    generator = batcher(sampler(load_styles()))
     print('=== Training ===')
-    model = DeepJ().cuda()
+    model = DeepJ()#.cuda()
     train(model, generator)
 
 if __name__ == '__main__':

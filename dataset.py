@@ -1,6 +1,10 @@
 """
 Preprocesses MIDI files
 """
+import numpy as np
+import torch
+from torch.autograd import Variable
+
 import numpy
 import math
 import random
@@ -27,7 +31,13 @@ def random_subseq(sequence, length, division_len=NOTES_PER_BAR):
     """
     # Make random starting position of sequence
     # Will never pick the last element in sequence
-    start = random.randrange(0, len(sequence) - 1 - length, division_len)
+    end = len(sequence) - 1 - length
+
+    if end == 0:
+        # No choice
+        return (0, length)
+
+    start = random.randrange(0, end, division_len)
     return (start, start + length)
 
 def random_comp_subseq(compositions, length, division_len=NOTES_PER_BAR):
@@ -45,22 +55,9 @@ def load_styles(styles=STYLES):
     style_seqs = []
     for style in tqdm(styles):
         # Parallel process all files into a list of music sequences
-        style_seq = [load_midi(f) for f in tqdm(get_all_files([style]))]
+        style_seq = [list(load_midi(f)) for f in tqdm(get_all_files([style]))]
         style_seqs.append(style_seq)
     return style_seqs
-
-def extract_style(style_seqs):
-    """
-    Given a list of styles, where each style contains a list of compositions,
-    flattens the list of styles into just a list of compositions and returns
-    a list of style tags for each time step for all compositions.
-    """
-    style_tags = []
-
-    for style_id, style_seq in enumerate(style_seqs):
-        style_hot = one_hot(style_id, NUM_STYLES)
-        style_tags += [[style_hot for x in s] for s in style_seq]
-    return style_tags
 
 def extract_beat(compositions):
     """
@@ -68,8 +65,8 @@ def extract_beat(compositions):
     """
     beat_tags = []
 
-    for comp in composition:
-        beat_tags.append([compute_beat(i, NOTES_PER_BAR) for t in range(len(comp))])
+    for comp in compositions:
+        beat_tags.append(np.array([compute_beat(t, NOTES_PER_BAR) for t in range(len(comp))]))
     return beat_tags
 
 def sampler(style_seqs, seq_len=SEQ_LEN):
@@ -77,39 +74,36 @@ def sampler(style_seqs, seq_len=SEQ_LEN):
     Generates training samples.
     """
     # Flatten into compositions list
-    compositions = [comp for comps in style_seqs for comp in comps]
-    style_tags = extract_style(style_seqs)
-    beat_tags = extract_beat(compositions)
+    flat_seq = [x for y in style_seqs for x in y]
+    style_tags = torch.stack([torch.from_numpy(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
+
+    note_in, replay_in = zip(*flat_seq)
+
+    note_in = [x for x in note_in if len(x) > seq_len]
+    replay_in = [x for x in replay_in if len(x) > seq_len]
+    beat_tags = extract_beat(note_in)
 
     while True:
-        comp_index, r = random_comp_subseq(compositions, seq_len, 1)
-        # Slice the appropriate index
-        comp = compositions[comp_index][r[0]:r[1]]
-        comp_style = style_tags[comp_index][r[0]:r[1]]
-        comp_beat = beat_tags[comp_index][r[0]:r[1]]
+        comp_index, r = random_comp_subseq(note_in, seq_len, 1)
 
-        note_labels = compositions[comp_index][r[0] + 1:r[1] + 1]
-        yield [comp, comp_style, comp_beat], [note_labels]
+        yield (torch.from_numpy(note_in[comp_index][r[0]:r[1]]), \
+               torch.from_numpy(replay_in[comp_index][r[0]:r[1]]), \
+               torch.from_numpy(beat_tags[comp_index][r[0]:r[1]]), \
+               style_tags[comp_index])
 
 def batcher(sampler, batch_size=BATCH_SIZE):
     """
     Bundles samples into batches
     """
-    input_batch = []
-    target_batch = []
+    batch = []
 
-    for input_sample, target_sample in sampler:
-        input_batch.append(input_sample)
-        target_batch.append(target_sample)
+    for sample in sampler:
+        batch.append(sample)
 
-        if len(input_batch) == batch_size:
+        if len(batch) == batch_size:
             # Convert batch
-            input_zipped = [np.array(x) for x in zip(*input_batch)]
-            target_zipped = [np.array(x) for x in zip(*target_batch)]
-            yield input_zipped, target_zipped
-
-            input_batch = []
-            target_batch = []
+            yield [Variable(torch.stack(x)) for x in zip(*batch)]
+            batch = []
 
 def clamp_midi(sequence):
     """

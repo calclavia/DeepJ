@@ -45,7 +45,7 @@ class TimeAxis(nn.Module):
         assert self.pitch_pos.size() == (1, num_notes), self.pitch_pos.size()
 
         # Pitch class of the note [1 x num_notes x OCTAVE]
-        self.pitch_class = torch.stack([one_hot(i, OCTAVE) for i in range(OCTAVE)]) \
+        self.pitch_class = torch.stack([torch.from_numpy(one_hot(i, OCTAVE)) for i in range(OCTAVE)]) \
                             .repeat(NUM_OCTAVES, 1) \
                             .unsqueeze(0)  / OCTAVE
         assert self.pitch_class.size() == (1, num_notes, OCTAVE)

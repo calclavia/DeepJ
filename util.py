@@ -1,8 +1,8 @@
 import os
-import torch
+import numpy as np
 
 def one_hot(index, size):
-    x = torch.zeros(size)
+    x = np.zeros(size)
     x[index] = 1
     return x
 

@@ -25,6 +25,7 @@ SEQ_LEN = 4 * NOTES_PER_BEAT
 
 # STYLES = ['data/baroque', 'data/classical', 'data/romantic']
 STYLES = ['data/baroque']
+NUM_STYLES = len(STYLES)
 
 OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
