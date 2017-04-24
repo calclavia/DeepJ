@@ -69,7 +69,8 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     optimizer.zero_grad()
 
     loss = 0
-    seq_len = note_seq.size()[0]
+    seq_len = note_seq.size()[1]
+    
     # Iterate through the entire sequence
     for i in range(seq_len - 1):
         # TODO: We can apply custom input based on mistakes.
@@ -88,8 +89,8 @@ def main():
     generator = batcher(sampler(load_styles()))
     print()
     print('=== Training ===')
-    # print('GPU: {}'.format(torch.cuda.is_available()))
-    model = DeepJ()#.cuda()
+    print('GPU: {}'.format(torch.cuda.is_available()))
+    model = DeepJ().cuda()
     train(model, generator)
 
 if __name__ == '__main__':

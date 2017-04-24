@@ -105,7 +105,7 @@ def batcher(sampler, batch_size=BATCH_SIZE):
 
         if len(batch) == batch_size:
             # Convert batch
-            yield [Variable(torch.stack(x)) for x in zip(*batch)]
+            yield [Variable(torch.stack(x)).cuda() for x in zip(*batch)]
             batch = []
 
 def clamp_midi(sequence):

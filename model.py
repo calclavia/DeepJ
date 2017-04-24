@@ -11,8 +11,8 @@ class DeepJ(nn.Module):
     def __init__(self, num_notes=NUM_NOTES):
         super().__init__()
         self.num_notes = num_notes
-        self.time_axis = TimeAxis(num_notes, 256, 2)
-        self.note_axis = NoteAxis(num_notes, 256, 128, 2)
+        self.time_axis = TimeAxis(num_notes, 50, 2)
+        self.note_axis = NoteAxis(num_notes, 50, 100, 2)
 
     def forward(self, note_input, targets, states):
         out, states = self.time_axis(note_input, states)
@@ -36,22 +36,11 @@ class TimeAxis(nn.Module):
         self.num_layers = num_layers
 
         # Position + Pitchclass + Vicinity + Chord Context
-        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE
+        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1)
+        # input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE
 
         self.input_dropout = nn.Dropout(0.2)
         self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
-
-        ## Constants
-        # Position of the note [1 x num_notes]
-        # TODO: How can we enforce constants?
-        self.pitch_pos = Variable(torch.range(0, num_notes - 1).unsqueeze(0) / num_notes)
-        assert self.pitch_pos.size() == (1, num_notes), self.pitch_pos.size()
-
-        # Pitch class of the note [1 x num_notes x OCTAVE]
-        self.pitch_class = Variable(torch.stack([torch.from_numpy(one_hot(i, OCTAVE)) for i in range(OCTAVE)]) \
-                            .repeat(NUM_OCTAVES, 1) \
-                            .unsqueeze(0).float())
-        assert self.pitch_class.size() == (1, num_notes, OCTAVE)
 
     def forward(self, note_in, states):
         """
@@ -64,14 +53,19 @@ class TimeAxis(nn.Module):
         x = note_in
         x = self.input_dropout(x)
 
-        batch_pitch_pos = self.pitch_pos.repeat(batch_size, 1)
-        batch_pitch_class = self.pitch_class.repeat(batch_size, 1, 1)
-        batch_chord_context = x.view(batch_size, OCTAVE, NUM_OCTAVES)
-        chord_context = torch.sum(batch_chord_context, 2).squeeze()
+        ## Constants
+        # Position of the note [batch_size x num_notes]
+        pitch_pos = Variable(torch.range(0, self.num_notes - 1) / self.num_notes).cuda()
+        pitch_pos = pitch_pos.unsqueeze(0).repeat(batch_size, 1).unsqueeze(2)
+        # Pitch class of the note [batch_size x num_notes x OCTAVE]
+        pitch_class = Variable(torch.stack([torch.from_numpy(one_hot(i % OCTAVE, OCTAVE)) for i in range(OCTAVE)])).cuda()
+        pitch_class = pitch_class.unsqueeze(0).repeat(batch_size, NUM_OCTAVES, 1).float()
+
+        chord_context = x.view(batch_size, OCTAVE, NUM_OCTAVES)
+        chord_context = torch.sum(chord_context, 2).squeeze()
 
         # Expand X with zero padding
-        # TODO: CUDA?
-        octave_padding = Variable(torch.zeros((batch_size, OCTAVE)))
+        octave_padding = Variable(torch.zeros((batch_size, OCTAVE))).cuda()
         x = torch.cat((octave_padding, x, octave_padding), 1)
 
         outs = []
@@ -79,11 +73,12 @@ class TimeAxis(nn.Module):
 
         # Every note feeds through the shared RNN
         for n in range(self.num_notes):
-            pitch_pos = batch_pitch_pos[:, n].unsqueeze(1)
-            pitch_class = batch_pitch_class[:, n, :]
+            pitch_pos_in = pitch_pos[:, n, :]
+            pitch_class_in = pitch_class[:, n, :]
             vicinity = x[:, n:n + OCTAVE * 2 + 1]
 
-            rnn_in = torch.cat((pitch_pos, pitch_class, vicinity, chord_context), 1)
+            rnn_in = torch.cat((pitch_pos_in, pitch_class_in, vicinity), 1)
+            # rnn_in = torch.cat((pitch_pos, pitch_class, vicinity, chord_context), 1)
             rnn_in = rnn_in.view(1, batch_size, -1)
             out, state = self.rnn(rnn_in, states[n])
             outs.append(out)
@@ -97,9 +92,8 @@ class TimeAxis(nn.Module):
         """
         Initializes the recurrent states
         """
-        # TODO: CUDA
-        return [(Variable(torch.zeros(self.num_layers, batch_size, self.num_units)),
-                Variable(torch.zeros(self.num_layers, batch_size, self.num_units)))
+        return [(Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda(),
+                Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda())
                 for i in range(self.num_notes)]
 
 class NoteAxis(nn.Module):
@@ -130,13 +124,11 @@ class NoteAxis(nn.Module):
         # TODO: Somehow these numbers are greater than one...
         targets = self.input_dropout(targets)
         # Used for the first target
-        # TODO: CUDA
-        zero_target = Variable(torch.zeros((batch_size, 1)))
+        zero_target = Variable(torch.zeros((batch_size, 1))).cuda()
 
         # Note axis hidden state
-        # TODO: CUDA
-        state = (Variable(torch.zeros(self.num_layers, batch_size, self.num_units)),
-                Variable(torch.zeros(self.num_layers, batch_size, self.num_units)))
+        state = (Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda(),
+                Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda())
 
         outs = []
 
@@ -150,7 +142,7 @@ class NoteAxis(nn.Module):
             out, state = self.rnn(rnn_in, state)
 
             # Make a probability prediction
-            out = out.squeeze()
+            out = out.squeeze(0)
             out = self.output(out)
             out = self.sigmoid(out)
             outs.append(out)
