@@ -14,7 +14,7 @@ class DeepJ(nn.Module):
         self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
         self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
 
-    def forward(self, note_input, targets, states):
+    def forward(self, note_input, states, targets=None):
         out, states = self.time_axis(note_input, states)
         out = self.note_axis(out, targets)
         return out, states
@@ -98,7 +98,7 @@ class NoteAxis(nn.Module):
         self.output = nn.Linear(num_units, 1)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, note_features, targets):
+    def forward(self, note_features, targets=None):
         """
         Args:
             note_features: Features for each note [batch_size, num_notes, features]
@@ -106,43 +106,46 @@ class NoteAxis(nn.Module):
         """
         batch_size = note_features.size()[0]
 
-        targets = self.input_dropout(targets)
+        if targets:
+            targets = self.input_dropout(targets)
 
-        # Used for the first target
-        zero_padding = Variable(torch.zeros((batch_size, 1))).cuda()
-        shifted = torch.cat((zero_padding, targets), 1)[:, :-1]
-        shifted = shifted.unsqueeze(2)
+            # Used for the first target
+            zero_padding = Variable(torch.zeros((batch_size, 1))).cuda()
+            shifted = torch.cat((zero_padding, targets), 1)[:, :-1]
+            shifted = shifted.unsqueeze(2)
 
-        # Create note features
-        note_features = torch.cat((note_features, shifted), 2)
+            # Create note features
+            note_features = torch.cat((note_features, shifted), 2)
 
-        out, states = self.rnn(note_features, None)
+            out, _ = self.rnn(note_features, None)
+        else:
+            raise 'Implement generation logic'
+            """
+            # For generation?
+            # Note axis hidden state
+            state = None
+
+            outs = []
+
+            for n in range(self.num_notes):
+                # Slice out the current note's feature
+                feature_in = note_features[:, n, :]
+                condition_in = targets[:, n - 1].unsqueeze(1) if n > 0 else zero_target
+
+                rnn_in = torch.cat((feature_in, condition_in), 1)
+                rnn_in = rnn_in.view(1, batch_size, -1)
+                out, state = self.rnn(rnn_in, state)
+
+                # Make a probability prediction
+                out = out.squeeze(0)
+                out = self.output(out)
+                out = self.sigmoid(out)
+                outs.append(out)
+
+            out = torch.cat(outs, 1)
+            """
 
         # Apply output
         out = self.output(out.view(-1, out.size(2)))
         out = self.sigmoid(out)
-        """
-        # For generation?
-        # Note axis hidden state
-        state = None
-
-        outs = []
-
-        for n in range(self.num_notes):
-            # Slice out the current note's feature
-            feature_in = note_features[:, n, :]
-            condition_in = targets[:, n - 1].unsqueeze(1) if n > 0 else zero_target
-
-            rnn_in = torch.cat((feature_in, condition_in), 1)
-            rnn_in = rnn_in.view(1, batch_size, -1)
-            out, state = self.rnn(rnn_in, state)
-
-            # Make a probability prediction
-            out = out.squeeze(0)
-            out = self.output(out)
-            out = self.sigmoid(out)
-            outs.append(out)
-
-        out = torch.cat(outs, 1)
-        """
         return out

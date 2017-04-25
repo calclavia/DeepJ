@@ -75,7 +75,7 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     for i in range(seq_len - 1):
         # TODO: We can apply custom input based on mistakes.
         targets = note_seq[:, i + 1]
-        output, states = model(note_seq[:, i], targets, states)
+        output, states = model(note_seq[:, i], states, targets)
         loss += criterion(output, targets)
 
     loss.backward()

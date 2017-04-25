@@ -23,7 +23,7 @@ MAX_VELOCITY = 127
 BATCH_SIZE = 1
 SEQ_LEN = 1 * NOTES_PER_BAR
 TIME_AXIS_UNITS = 100
-NOTE_AXIS_UNITS = 50
+NOTE_AXIS_UNITS = 64
 
 STYLES = ['data/baroque', 'data/classical', 'data/romantic']
 NUM_STYLES = len(STYLES)
