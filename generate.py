@@ -41,7 +41,7 @@ def generate(model, name='output', num_bars=16):
             prob = prob.cpu().data
 
             # Sample note randomly
-            note_on = 1 if np.random.random() <= prob[n, 0] else 0
+            note_on = 1 if np.random.random() <= prob[0, n] else 0
             current_note[0, n] = note_on
 
         prev_note = current_note
@@ -76,11 +76,16 @@ def write_file(name, note_seq, replay_seq):
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
-    parser.add_argument('--bars', default=32, type=int, help='Bars of generation')
+    parser.add_argument('--bars', default=16, type=int, help='Bars of generation')
+    parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
 
     print('=== Loading Model ===')
     model = torch.load(OUT_DIR + '/model.pt')
+
+    if args.debug:
+        print('=== Loading Data ===')
+
 
     print('=== Generating ===')
     print('GPU: {}'.format(torch.cuda.is_available()))

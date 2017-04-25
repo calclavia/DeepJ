@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import numpy as np
 
 from dataset import *
 from constants import *
@@ -17,20 +18,27 @@ def train(model, data_generator):
     """
     model.train()
 
-    step = 1
     # Number of training steps per epoch
+    step = 1
     epoch = 1
     epoch_len = 500
+    total_step = 1
+
     # Keep tracks of all losses in each epoch
     all_losses = []
     total_loss = 0
+
+    # Sampling schedule decay
+    k = 100
+    min_train_prob = 0.5
 
     t = tqdm(total=epoch_len)
 
     for data in data_generator:
         t.set_description('Epoch {}'.format(epoch))
 
-        loss = train_step(model, *data)
+        train_prob = min_train_prob * (k / (k + np.exp(total_step / k)) + 1)
+        loss = train_step(model, train_prob, *data)
 
         total_loss += loss
         avg_loss = total_loss / step
@@ -59,8 +67,9 @@ def train(model, data_generator):
             t = tqdm(total=epoch_len)
 
         step += 1
+        total_step += 1
 
-def train_step(model, note_seq, replay_seq, beat_seq, style):
+def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
     """
     Trains the model on a single batch of sequence.
     """
@@ -80,11 +89,13 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
 
     # Iterate through the entire sequence
     for i in range(seq_len):
-        # TODO: We can apply custom input based on mistakes.
         targets = note_seq[:, i]
         output, states = model(prev_note, beat_seq[:, i], states, targets)
         loss += criterion(output, targets)
-        prev_note = targets
+
+        # TODO: Compare with and without scheduled sampling
+        # Choose note to feed based on coin flip (scheduled sampling)
+        prev_note = targets if np.random.random() <= teach_prob else output
 
     loss.backward()
     optimizer.step()

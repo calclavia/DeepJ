@@ -24,13 +24,13 @@ MIDI_MAX_NOTES = 128
 MAX_VELOCITY = 127
 
 # Trainin Parameters
-BATCH_SIZE = 4
-SEQ_LEN = 2 * NOTES_PER_BAR
+BATCH_SIZE = 2
+SEQ_LEN = 4 * NOTES_PER_BAR
 TIME_AXIS_UNITS = 256
 NOTE_AXIS_UNITS = 128
 
 STYLES = ['data/baroque']
-# STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+# STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/jazz']
 NUM_STYLES = len(STYLES)
 
 OUT_DIR = 'out'

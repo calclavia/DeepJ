@@ -11,7 +11,7 @@ class DeepJ(nn.Module):
     def __init__(self, num_notes=NUM_NOTES):
         super().__init__()
         self.num_notes = num_notes
-        self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 3)
+        self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
         self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
 
     def forward(self, note_input, beat_in, states, condition_notes):
@@ -130,4 +130,5 @@ class NoteAxis(nn.Module):
         out = out.view(-1, out.size(2))
         out = self.output(out) / temperature
         out = self.sigmoid(out)
+        out = out.view(-1, self.num_notes)
         return out

@@ -25,7 +25,7 @@ def compute_beat(beat, notes_in_bar):
 def compute_completion(beat, len_melody):
     return torch.tensor([beat / len_melody])
 
-def random_subseq(sequence, length, division_len=NOTES_PER_BAR):
+def random_subseq(sequence, length, division_len):
     """
     Returns the range of a random subseq
     """
@@ -40,7 +40,7 @@ def random_subseq(sequence, length, division_len=NOTES_PER_BAR):
     start = random.randrange(0, end, division_len)
     return (start, start + length)
 
-def random_comp_subseq(compositions, length, division_len=NOTES_PER_BAR):
+def random_comp_subseq(compositions, length, division_len):
     """
     Returns a random music subsequence from a list of compositions
     """
@@ -66,33 +66,47 @@ def extract_beat(compositions):
     beat_tags = []
 
     for comp in compositions:
-        beat_tags.append(np.array([compute_beat(t, NOTES_PER_BAR) for t in range(len(comp))]))
+        beats = np.array([compute_beat(t, NOTES_PER_BAR) for t in range(len(comp))])
+        beat_tags.append(torch.from_numpy(beats).float())
     return beat_tags
 
-def sampler(style_seqs, seq_len=SEQ_LEN):
+def sampler(style_seqs, seq_len=SEQ_LEN, ordered=False):
     """
     Generates training samples.
     """
     # Flatten into compositions list
     flat_seq = [x for y in style_seqs for x in y]
-    style_tags = torch.stack([torch.from_numpy(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
+    style_tags = torch.stack([torch.from_numpy(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y]).float()
 
     note_seqs, replay_seqs = zip(*flat_seq)
 
-    note_seqs = [clamp_midi(x) for x in note_seqs if len(x) > seq_len]
-    replay_seqs = [clamp_midi(x) for x in replay_seqs if len(x) > seq_len]
+    note_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in note_seqs if len(x) > seq_len]
+    replay_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
 
     if len(note_seqs) == 0:
         raise 'Insufficient training data.'
 
-    while True:
-        comp_index, r = random_comp_subseq(note_seqs, seq_len, 1)
+    if ordered:
+        for c in range(len(note_seqs)):
+            note_seq = note_seqs[c]
+            replay_seq = replay_seqs[c]
+            beat_seq = beat_tags[c]
+            style_tag = style_tags[c]
 
-        yield (torch.from_numpy(note_seqs[comp_index][r[0]:r[1]]).float(), \
-               torch.from_numpy(replay_seqs[comp_index][r[0]:r[1]]).float(), \
-               torch.from_numpy(beat_tags[comp_index][r[0]:r[1]]).float(), \
-               style_tags[comp_index].float())
+            for t in range(0, len(note_seq) - 1 - length, seq_len):
+                yield (note_seq[t:t + seq_len], \
+                       replay_seq[t:t + seq_len], \
+                       beat_seq[t:t + seq_len], \
+                       style_tag)
+    else:
+        while True:
+            comp_index, r = random_comp_subseq(note_seqs, seq_len, 1)
+
+            yield (note_seqs[comp_index][r[0]:r[1]], \
+                   replay_seqs[comp_index][r[0]:r[1]], \
+                   beat_tags[comp_index][r[0]:r[1]], \
+                   style_tags[comp_index])
 
 def batcher(sampler, batch_size=BATCH_SIZE):
     """
