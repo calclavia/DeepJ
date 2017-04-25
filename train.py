@@ -6,6 +6,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
+import argparse
 
 from dataset import *
 from constants import *
@@ -49,7 +50,7 @@ def train(model, data_generator):
             plt.savefig(OUT_DIR + '/loss.png')
 
             # Save model
-            torch.save(model, OUT_DIR + '/model.pt')
+            torch.save(model.state_dict(), OUT_DIR + '/model.pt')
 
             # Generate
             generate(model, name='epoch_' + str(epoch))
@@ -105,14 +106,23 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
     return loss.data[0] / seq_len
 
 def main():
+    parser = argparse.ArgumentParser(description='Trains model')
+    parser.add_argument('--load', default=False, action='store_true', help='Load existing model?')
+    args = parser.parse_args()
+
+    print('=== Loading Model ===')
+    print('GPU: {}'.format(torch.cuda.is_available()))
+    model = DeepJ().cuda()
+
+    if args.load:
+        model.load_state_dict(torch.load(OUT_DIR + '/model.pt'))
+
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading...')
     generator = batcher(sampler(process(load_styles())))
     print()
     print('=== Training ===')
-    print('GPU: {}'.format(torch.cuda.is_available()))
-    model = DeepJ().cuda()
     train(model, generator)
 
 if __name__ == '__main__':
