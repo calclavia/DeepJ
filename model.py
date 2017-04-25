@@ -94,7 +94,7 @@ class NoteAxis(nn.Module):
 
         self.input_dropout = nn.Dropout(0.2)
         self.dropout = nn.Dropout(0.5)
-        self.rnn = nn.LSTM(num_inputs, num_units, num_layers, dropout=0.5)
+        self.rnn = nn.LSTM(num_inputs, num_units, num_layers, dropout=0.5, batch_first=True)
         self.output = nn.Linear(num_units, 1)
         self.sigmoid = nn.Sigmoid()
 
@@ -109,8 +109,20 @@ class NoteAxis(nn.Module):
         targets = self.input_dropout(targets)
 
         # Used for the first target
-        zero_target = Variable(torch.zeros((batch_size, 1))).cuda()
+        zero_padding = Variable(torch.zeros((batch_size, 1))).cuda()
+        shifted = torch.cat((zero_padding, targets), 1)[:, :-1]
+        shifted = shifted.unsqueeze(2)
 
+        # Create note features
+        note_features = torch.cat((note_features, shifted), 2)
+
+        out, states = self.rnn(note_features, None)
+
+        # Apply output
+        out = self.output(out.view(-1, out.size(2)))
+        out = self.sigmoid(out)
+        """
+        # For generation?
         # Note axis hidden state
         state = None
 
@@ -132,4 +144,5 @@ class NoteAxis(nn.Module):
             outs.append(out)
 
         out = torch.cat(outs, 1)
+        """
         return out
