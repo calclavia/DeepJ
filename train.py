@@ -28,16 +28,12 @@ def train(model, data_generator):
     all_losses = []
     total_loss = 0
 
-    # Sampling schedule decay
-    k = 100
-    min_train_prob = 0.5
-
     t = tqdm(total=epoch_len)
 
     for data in data_generator:
         t.set_description('Epoch {}'.format(epoch))
 
-        train_prob = min_train_prob * (k / (k + np.exp(total_step / k)) + 1)
+        train_prob = max(MIN_SCHEDULE_PROB, 1 -SCHEDULE_RATE * total_step)
         loss = train_step(model, train_prob, *data)
 
         total_loss += loss
