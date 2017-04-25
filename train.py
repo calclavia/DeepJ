@@ -62,14 +62,14 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     # TODO: Clip gradient if needed.
     optimizer = optim.Adam(model.parameters())
 
-    # Initialize hidden states
-    states = model.init_states(BATCH_SIZE)
-
     # Zero out the gradient
     optimizer.zero_grad()
 
     loss = 0
     seq_len = note_seq.size()[1]
+
+    # Initialize hidden states
+    states = None
 
     # Iterate through the entire sequence
     for i in range(seq_len - 1):
@@ -90,7 +90,11 @@ def main():
     print()
     print('=== Training ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
-    model = DeepJ().cuda()
+    model = DeepJ()
+
+    if torch.cuda.is_available():
+        model.cuda()
+
     train(model, generator)
 
 if __name__ == '__main__':

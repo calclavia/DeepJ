@@ -19,12 +19,6 @@ class DeepJ(nn.Module):
         out = self.note_axis(out, targets)
         return out, states
 
-    def init_states(self, batch_size):
-        """
-        Initializes the recurrent states
-        """
-        return self.time_axis.init_states(batch_size)
-
 class TimeAxis(nn.Module):
     """
     Time axis module that learns temporal patterns.
@@ -78,21 +72,13 @@ class TimeAxis(nn.Module):
 
             rnn_in = torch.cat((pitch_pos_in, pitch_class_in, vicinity, chord_context), 1)
             rnn_in = rnn_in.view(1, batch_size, -1)
-            out, state = self.rnn(rnn_in, states[n])
+            out, state = self.rnn(rnn_in, states[n] if states else None)
             outs.append(out)
             next_states.append(state)
 
         x = torch.cat(outs)
         x = x.view(batch_size, self.num_notes, -1)
         return x, next_states
-
-    def init_states(self, batch_size):
-        """
-        Initializes the recurrent states
-        """
-        return [(Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda(),
-                Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda())
-                for i in range(self.num_notes)]
 
 class NoteAxis(nn.Module):
     """
@@ -126,8 +112,7 @@ class NoteAxis(nn.Module):
         zero_target = Variable(torch.zeros((batch_size, 1))).cuda()
 
         # Note axis hidden state
-        state = (Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda(),
-                Variable(torch.zeros(self.num_layers, batch_size, self.num_units)).cuda())
+        state = None
 
         outs = []
 
