@@ -34,3 +34,4 @@ NUM_STYLES = len(STYLES)
 
 OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
+SAMPLES_DIR = 'out/samples'

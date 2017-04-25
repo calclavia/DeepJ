@@ -41,10 +41,10 @@ def train(model, data_generator):
             # Draw graph
             plt.clf()
             plt.plot(all_losses)
-            plt.savefig('out/loss.png')
+            plt.savefig(OUT_DIR + '/loss.png')
 
             # Save model
-            torch.save(model, 'out/checkpoint.pt')
+            torch.save(model, OUT_DIR + '/model.pt')
 
             step = 0
             epoch += 1
@@ -90,11 +90,7 @@ def main():
     print()
     print('=== Training ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
-    model = DeepJ()
-
-    if torch.cuda.is_available():
-        model.cuda()
-
+    model = DeepJ().cuda()
     train(model, generator)
 
 if __name__ == '__main__':
