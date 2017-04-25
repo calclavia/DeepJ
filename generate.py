@@ -13,10 +13,15 @@ from model import DeepJ
 def generate(model, name='output', num_bars=16):
     model.eval()
 
+    # Output note sequence
     note_seq = []
 
     # RNN state
     states = None
+
+    # Temperature of generation
+    temperature = 1
+    silent_time = NOTES_PER_BAR
 
     # Last generated note time step
     prev_note = Variable(torch.zeros(NUM_NOTES), volatile=True).cuda().unsqueeze(0)
@@ -31,15 +36,27 @@ def generate(model, name='output', num_bars=16):
         current_note = Variable(torch.zeros(NUM_NOTES), volatile=True).cuda().unsqueeze(0)
 
         for n in range(NUM_NOTES):
-            prob = model.note_axis(note_features, current_note)
+            prob = model.note_axis(note_features, current_note, temperature)
             prob = prob.cpu().data
 
             # Sample note randomly
-            current_note[0, n] = 1 if np.random.random() <= prob[n, 0] else 0
+            note_on = 1 if np.random.random() <= prob[n, 0] else 0
+            current_note[0, n] = note_on
 
         prev_note = current_note
         # Add note to note sequence
-        note_seq.append(current_note.cpu().data[0, :].numpy())
+        current_note = current_note.cpu().data[0, :].numpy()
+        note_seq.append(current_note)
+
+        # Increase temperature if silent
+        if current_note.count_nonzero() == 0:
+            silent_time += 1
+
+            if silent_time >= NOTES_PER_BAR:
+                temperature += 0.1
+        else:
+            silent_time = 0
+            temperature = 1
 
     note_seq = np.array(note_seq)
     # TODO: Implement articulation

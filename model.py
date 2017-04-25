@@ -102,7 +102,7 @@ class NoteAxis(nn.Module):
         self.output = nn.Linear(num_units, 1)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, note_features, condition_notes):
+    def forward(self, note_features, condition_notes, temperature=1):
         """
         Args:
             note_features: Features for each note [batch_size, num_notes, features]
@@ -128,6 +128,6 @@ class NoteAxis(nn.Module):
         # Apply output
         out = out.contiguous()
         out = out.view(-1, out.size(2))
-        out = self.output(out)
+        out = self.output(out) / temperature
         out = self.sigmoid(out)
         return out
