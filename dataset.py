@@ -70,9 +70,9 @@ def extract_beat(compositions):
         beat_tags.append(torch.from_numpy(beats).float())
     return beat_tags
 
-def sampler(style_seqs, seq_len=SEQ_LEN, ordered=False):
+def process(style_seqs, seq_len=SEQ_LEN):
     """
-    Generates training samples.
+    Process data
     """
     # Flatten into compositions list
     flat_seq = [x for y in style_seqs for x in y]
@@ -83,6 +83,13 @@ def sampler(style_seqs, seq_len=SEQ_LEN, ordered=False):
     note_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in note_seqs if len(x) > seq_len]
     replay_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
+    return note_seqs, replay_seqs, beat_tags, style_tags
+
+def sampler(data, seq_len=SEQ_LEN, ordered=False):
+    """
+    Generates training samples.
+    """
+    note_seqs, replay_seqs, beat_tags, style_tags = data
 
     if len(note_seqs) == 0:
         raise 'Insufficient training data.'

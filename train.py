@@ -10,14 +10,12 @@ import numpy as np
 from dataset import *
 from constants import *
 from model import DeepJ
-from generate import generate
+from generate import generate, sample_note
 
 def train(model, data_generator):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
-    model.train()
-
     # Number of training steps per epoch
     step = 1
     epoch = 1
@@ -38,7 +36,7 @@ def train(model, data_generator):
 
         total_loss += loss
         avg_loss = total_loss / step
-        t.set_postfix(loss=avg_loss)
+        t.set_postfix(loss=avg_loss, prob=train_prob)
         t.update()
 
         if step % epoch_len == 0:
@@ -69,6 +67,7 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
     """
     Trains the model on a single batch of sequence.
     """
+    model.train()
     criterion = nn.BCELoss()
     # TODO: Clip gradient if needed.
     optimizer = optim.Adam(model.parameters())
@@ -85,13 +84,21 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
 
     # Iterate through the entire sequence
     for i in range(seq_len):
+        beat = beat_seq[:, i]
         targets = note_seq[:, i]
-        output, states = model(prev_note, beat_seq[:, i], states, targets)
+        output, states = model(prev_note, beat, states, targets)
         loss += criterion(output, targets)
 
         # TODO: Compare with and without scheduled sampling
+        # TODO: Make sure this does not mess up gradients
         # Choose note to feed based on coin flip (scheduled sampling)
-        prev_note = targets if np.random.random() <= teach_prob else output
+        if np.random.random() <= teach_prob:
+            prev_note = targets
+        else:
+            model.eval()
+            prev_note = sample_note(model, prev_note, beat, states, batch_size=BATCH_SIZE)
+            prev_note = Variable(prev_note.data).cuda()
+            model.train()
 
     loss.backward()
     optimizer.step()
@@ -101,7 +108,7 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading...')
-    generator = batcher(sampler(load_styles()))
+    generator = batcher(sampler(process(load_styles())))
     print()
     print('=== Training ===')
     print('GPU: {}'.format(torch.cuda.is_available()))

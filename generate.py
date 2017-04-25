@@ -11,6 +11,26 @@ from dataset import *
 from constants import *
 from model import DeepJ
 
+def sample_note(model, prev_note, beat, states, temperature=1, batch_size=1):
+    """
+    Samples a single note
+    """
+    ## Time Axis
+    note_features, states = model.time_axis(prev_note, beat, states)
+
+    ## Note Axis
+    # The current note being generated
+    current_note = Variable(torch.zeros(batch_size, NUM_NOTES), volatile=True).cuda()
+
+    for n in range(NUM_NOTES):
+        prob = model.note_axis(note_features, current_note, temperature)
+        prob = prob.cpu().data
+
+        # Sample note randomly
+        note_on = 1 if np.random.random() <= prob[0, n] else 0
+        current_note[0, n] = note_on
+    return current_note
+
 def generate(model, name='output', num_bars=16):
     model.eval()
 
@@ -28,21 +48,8 @@ def generate(model, name='output', num_bars=16):
     prev_note = Variable(torch.zeros(NUM_NOTES), volatile=True).cuda().unsqueeze(0)
 
     for t in trange(NOTES_PER_BAR * num_bars):
-        ## Time Axis
         beat = Variable(torch.from_numpy(compute_beat(t, NOTES_PER_BAR)).float(), volatile=True).cuda().unsqueeze(0)
-        note_features, states = model.time_axis(prev_note, beat, states)
-
-        ## Note Axis
-        # The current note being generated
-        current_note = Variable(torch.zeros(NUM_NOTES), volatile=True).cuda().unsqueeze(0)
-
-        for n in range(NUM_NOTES):
-            prob = model.note_axis(note_features, current_note, temperature)
-            prob = prob.cpu().data
-
-            # Sample note randomly
-            note_on = 1 if np.random.random() <= prob[0, n] else 0
-            current_note[0, n] = note_on
+        current_note = sample_note(model, prev_note, beat, states, temperature=temperature)
 
         prev_note = current_note
         # Add note to note sequence
