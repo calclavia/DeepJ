@@ -14,8 +14,8 @@ class DeepJ(nn.Module):
         self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
         self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
 
-    def forward(self, note_input, states, condition_notes):
-        out, states = self.time_axis(note_input, states)
+    def forward(self, note_input, beat_in, states, condition_notes):
+        out, states = self.time_axis(note_input, beat_in, states)
         out = self.note_axis(out, condition_notes)
         return out, states
 
@@ -29,8 +29,8 @@ class TimeAxis(nn.Module):
         self.num_units = num_units
         self.num_layers = num_layers
 
-        # Position + Pitchclass + Vicinity + Chord Context
-        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE
+        # Position + Pitchclass + Vicinity + Chord Context + Beat Context
+        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE + NOTES_PER_BAR
 
         self.input_dropout = nn.Dropout(0.2)
         self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
@@ -39,7 +39,7 @@ class TimeAxis(nn.Module):
         self.pitch_pos = torch.range(0, self.num_notes - 1).unsqueeze(0) / self.num_notes
         self.pitch_class = torch.stack([torch.from_numpy(one_hot(i % OCTAVE, OCTAVE)) for i in range(OCTAVE)]).unsqueeze(0)
 
-    def forward(self, note_in, states):
+    def forward(self, note_in, beat_in, states):
         """
         Args:
             input: batch_size x num_notes
@@ -63,6 +63,10 @@ class TimeAxis(nn.Module):
         octave_padding = Variable(torch.zeros((batch_size, OCTAVE))).cuda()
         pad_notes = torch.cat((octave_padding, notes, octave_padding), 1)
 
+        # Beat context
+        beat = self.input_dropout(beat_in)
+        beat = beat.unsqueeze(1).repeat(1, self.num_notes, 1)
+
         # The notes an octave above and below
         vicinity = []
 
@@ -71,7 +75,7 @@ class TimeAxis(nn.Module):
 
         vicinity = torch.stack(vicinity, 1)
 
-        features = torch.cat((pitch_pos, pitch_class, vicinity, chord_context), 2)
+        features = torch.cat((pitch_pos, pitch_class, vicinity, chord_context, beat), 2)
 
         # Move all notes into batch dimension
         features = features.view(1, -1, features.size(2))

@@ -16,7 +16,7 @@ def train(model, data_generator):
     Trains a model on multiple seq batches by iterating through a generator.
     """
     model.train()
-    
+
     step = 1
     # Number of training steps per epoch
     epoch = 1
@@ -81,7 +81,7 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
     for i in range(seq_len - 1):
         # TODO: We can apply custom input based on mistakes.
         targets = note_seq[:, i + 1]
-        output, states = model(note_seq[:, i], states, targets)
+        output, states = model(note_seq[:, i], beat_seq[:, i], states, targets)
         loss += criterion(output, targets)
 
     loss.backward()

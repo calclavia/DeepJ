@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from tqdm import trange
 
 from midi_util import *
-from dataset import unclamp_midi
+from dataset import *
 from constants import *
 from model import DeepJ
 
@@ -21,9 +21,10 @@ def generate(model, name='output', num_bars=16):
     # Last generated note time step
     prev_note = Variable(torch.zeros(NUM_NOTES), volatile=True).cuda().unsqueeze(0)
 
-    for i in trange(NOTES_PER_BAR * num_bars):
+    for t in trange(NOTES_PER_BAR * num_bars):
         ## Time Axis
-        note_features, states = model.time_axis(prev_note, states)
+        beat = Variable(torch.from_numpy(compute_beat(t, NOTES_PER_BAR)).float(), volatile=True).cuda().unsqueeze(0)
+        note_features, states = model.time_axis(prev_note, beat, states)
 
         ## Note Axis
         # The current note being generated
