@@ -11,7 +11,7 @@ class DeepJ(nn.Module):
     def __init__(self, num_notes=NUM_NOTES):
         super().__init__()
         self.num_notes = num_notes
-        self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
+        self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 3)
         self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
 
     def forward(self, note_input, beat_in, states, condition_notes):

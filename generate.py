@@ -1,4 +1,5 @@
 import numpy as np
+import argparse
 
 import torch
 import torch.nn as nn
@@ -49,7 +50,7 @@ def generate(model, name='output', num_bars=16):
         note_seq.append(current_note)
 
         # Increase temperature if silent
-        if current_note.count_nonzero() == 0:
+        if np.count_nonzero(current_note) == 0:
             silent_time += 1
 
             if silent_time >= NOTES_PER_BAR:
@@ -74,12 +75,16 @@ def write_file(name, note_seq, replay_seq):
     midi.write_midifile(fpath, mf)
 
 def main():
+    parser = argparse.ArgumentParser(description='Generates music.')
+    parser.add_argument('--bars', default=32, type=int, help='Bars of generation')
+    args = parser.parse_args()
+
     print('=== Loading Model ===')
     model = torch.load(OUT_DIR + '/model.pt')
 
     print('=== Generating ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
-    generate(model)
+    generate(model, num_bars=args.bars)
 
 if __name__ == '__main__':
     main()
