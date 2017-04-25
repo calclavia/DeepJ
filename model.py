@@ -146,6 +146,8 @@ class NoteAxis(nn.Module):
             """
 
         # Apply output
-        out = self.output(out.view(-1, out.size(2)))
+        out = out.contiguous()
+        out = out.view(-1, out.size(2))
+        out = self.output(out)
         out = self.sigmoid(out)
         return out
