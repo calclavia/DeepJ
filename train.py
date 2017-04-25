@@ -70,7 +70,7 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
 
     loss = 0
     seq_len = note_seq.size()[1]
-    
+
     # Iterate through the entire sequence
     for i in range(seq_len - 1):
         # TODO: We can apply custom input based on mistakes.

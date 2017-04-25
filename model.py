@@ -36,8 +36,7 @@ class TimeAxis(nn.Module):
         self.num_layers = num_layers
 
         # Position + Pitchclass + Vicinity + Chord Context
-        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1)
-        # input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE
+        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE
 
         self.input_dropout = nn.Dropout(0.2)
         self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
@@ -62,7 +61,7 @@ class TimeAxis(nn.Module):
         pitch_class = pitch_class.unsqueeze(0).repeat(batch_size, NUM_OCTAVES, 1).float()
 
         chord_context = x.view(batch_size, OCTAVE, NUM_OCTAVES)
-        chord_context = torch.sum(chord_context, 2).squeeze()
+        chord_context = torch.sum(chord_context, 2).squeeze(2)
 
         # Expand X with zero padding
         octave_padding = Variable(torch.zeros((batch_size, OCTAVE))).cuda()
@@ -77,8 +76,7 @@ class TimeAxis(nn.Module):
             pitch_class_in = pitch_class[:, n, :]
             vicinity = x[:, n:n + OCTAVE * 2 + 1]
 
-            rnn_in = torch.cat((pitch_pos_in, pitch_class_in, vicinity), 1)
-            # rnn_in = torch.cat((pitch_pos, pitch_class, vicinity, chord_context), 1)
+            rnn_in = torch.cat((pitch_pos_in, pitch_class_in, vicinity, chord_context), 1)
             rnn_in = rnn_in.view(1, batch_size, -1)
             out, state = self.rnn(rnn_in, states[n])
             outs.append(out)
@@ -121,8 +119,9 @@ class NoteAxis(nn.Module):
             targets: Target notes [batch_size, num_notes] (for training)
         """
         batch_size = note_features.size()[0]
-        # TODO: Somehow these numbers are greater than one...
+
         targets = self.input_dropout(targets)
+
         # Used for the first target
         zero_target = Variable(torch.zeros((batch_size, 1))).cuda()
 
