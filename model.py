@@ -35,6 +35,10 @@ class TimeAxis(nn.Module):
         self.input_dropout = nn.Dropout(0.2)
         self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
 
+        # Constants
+        self.pitch_pos = torch.range(0, self.num_notes - 1).unsqueeze(0) / self.num_notes
+        self.pitch_class = torch.stack([torch.from_numpy(one_hot(i % OCTAVE, OCTAVE)) for i in range(OCTAVE)]).unsqueeze(0)
+
     def forward(self, note_in, states):
         """
         Args:
@@ -43,42 +47,38 @@ class TimeAxis(nn.Module):
             ([batch_size, num_notes, features], states)
         """
         batch_size = note_in.size()[0]
-        x = note_in
-        x = self.input_dropout(x)
+        notes = self.input_dropout(note_in)
 
-        ## Constants
         # Position of the note [batch_size x num_notes]
-        pitch_pos = Variable(torch.range(0, self.num_notes - 1) / self.num_notes).cuda()
-        pitch_pos = pitch_pos.unsqueeze(0).repeat(batch_size, 1).unsqueeze(2)
+        pitch_pos = Variable(self.pitch_pos).cuda().repeat(batch_size, 1).unsqueeze(2)
         # Pitch class of the note [batch_size x num_notes x OCTAVE]
-        pitch_class = Variable(torch.stack([torch.from_numpy(one_hot(i % OCTAVE, OCTAVE)) for i in range(OCTAVE)])).cuda()
-        pitch_class = pitch_class.unsqueeze(0).repeat(batch_size, NUM_OCTAVES, 1).float()
+        pitch_class = Variable(self.pitch_class).cuda().repeat(batch_size, NUM_OCTAVES, 1).float()
 
-        chord_context = x.view(batch_size, OCTAVE, NUM_OCTAVES)
-        chord_context = torch.sum(chord_context, 2).squeeze(2)
+        # Provides context of the chord for each note.
+        # TODO: Should this be relative to the note?
+        chord_context = notes.view(batch_size, OCTAVE, NUM_OCTAVES)
+        chord_context = torch.sum(chord_context, 2).view(batch_size, 1, -1).repeat(1, self.num_notes, 1)
 
         # Expand X with zero padding
         octave_padding = Variable(torch.zeros((batch_size, OCTAVE))).cuda()
-        x = torch.cat((octave_padding, x, octave_padding), 1)
+        pad_notes = torch.cat((octave_padding, notes, octave_padding), 1)
 
-        outs = []
-        next_states = []
+        # The notes an octave above and below
+        vicinity = []
 
-        # Every note feeds through the shared RNN
         for n in range(self.num_notes):
-            pitch_pos_in = pitch_pos[:, n, :]
-            pitch_class_in = pitch_class[:, n, :]
-            vicinity = x[:, n:n + OCTAVE * 2 + 1]
+            vicinity.append(pad_notes[:, n:n + OCTAVE * 2 + 1])
 
-            rnn_in = torch.cat((pitch_pos_in, pitch_class_in, vicinity, chord_context), 1)
-            rnn_in = rnn_in.view(1, batch_size, -1)
-            out, state = self.rnn(rnn_in, states[n] if states else None)
-            outs.append(out)
-            next_states.append(state)
+        vicinity = torch.stack(vicinity, 1)
 
-        x = torch.cat(outs)
-        x = x.view(batch_size, self.num_notes, -1)
-        return x, next_states
+        features = torch.cat((pitch_pos, pitch_class, vicinity, chord_context), 2)
+
+        # Move all notes into batch dimension
+        features = features.view(1, -1, features.size(2))
+        out, states = self.rnn(features, states)
+
+        out = out.view(batch_size, self.num_notes, -1)
+        return out, states
 
 class NoteAxis(nn.Module):
     """
