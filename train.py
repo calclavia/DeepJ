@@ -9,15 +9,18 @@ from tqdm import tqdm
 from dataset import *
 from constants import *
 from model import DeepJ
+from generate import generate
 
 def train(model, data_generator):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
+    model.train()
+    
     step = 1
     # Number of training steps per epoch
     epoch = 1
-    epoch_len = 100
+    epoch_len = 500
     # Keep tracks of all losses in each epoch
     all_losses = []
     total_loss = 0
@@ -45,6 +48,9 @@ def train(model, data_generator):
 
             # Save model
             torch.save(model, OUT_DIR + '/model.pt')
+
+            # Generate
+            generate(model, name='epoch_' + str(epoch))
 
             step = 0
             epoch += 1

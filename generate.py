@@ -10,7 +10,7 @@ from dataset import unclamp_midi
 from constants import *
 from model import DeepJ
 
-def generate(model, num_bars=16):
+def generate(model, name='output', num_bars=16):
     model.eval()
 
     note_seq = []
@@ -43,7 +43,7 @@ def generate(model, num_bars=16):
     note_seq = np.array(note_seq)
     # TODO: Implement articulation
     replay_seq = np.zeros_like(note_seq)
-    write_file('output', note_seq, replay_seq)
+    write_file(name, note_seq, replay_seq)
 
 def write_file(name, note_seq, replay_seq):
     """

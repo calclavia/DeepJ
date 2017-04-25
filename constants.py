@@ -29,7 +29,8 @@ SEQ_LEN = 2 * NOTES_PER_BAR
 TIME_AXIS_UNITS = 256
 NOTE_AXIS_UNITS = 128
 
-STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+STYLES = ['data/baroque']
+# STYLES = ['data/baroque', 'data/classical', 'data/romantic']
 NUM_STYLES = len(STYLES)
 
 OUT_DIR = 'out'
