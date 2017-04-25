@@ -14,9 +14,9 @@ class DeepJ(nn.Module):
         self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
         self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
 
-    def forward(self, note_input, states, targets=None):
+    def forward(self, note_input, states, condition_notes):
         out, states = self.time_axis(note_input, states)
-        out = self.note_axis(out, targets)
+        out = self.note_axis(out, condition_notes)
         return out, states
 
 class TimeAxis(nn.Module):
@@ -98,52 +98,25 @@ class NoteAxis(nn.Module):
         self.output = nn.Linear(num_units, 1)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, note_features, targets=None):
+    def forward(self, note_features, condition_notes):
         """
         Args:
             note_features: Features for each note [batch_size, num_notes, features]
-            targets: Target notes [batch_size, num_notes] (for training)
+            condition_notes: Target notes [batch_size, num_notes] (for training)
         """
         batch_size = note_features.size()[0]
 
-        if targets:
-            targets = self.input_dropout(targets)
+        condition_notes = self.input_dropout(condition_notes)
 
-            # Used for the first target
-            zero_padding = Variable(torch.zeros((batch_size, 1))).cuda()
-            shifted = torch.cat((zero_padding, targets), 1)[:, :-1]
-            shifted = shifted.unsqueeze(2)
+        # Used for the first target
+        zero_padding = Variable(torch.zeros((batch_size, 1))).cuda()
+        shifted = torch.cat((zero_padding, condition_notes), 1)[:, :-1]
+        shifted = shifted.unsqueeze(2)
 
-            # Create note features
-            note_features = torch.cat((note_features, shifted), 2)
+        # Create note features
+        note_features = torch.cat((note_features, shifted), 2)
 
-            out, _ = self.rnn(note_features, None)
-        else:
-            raise 'Implement generation logic'
-            """
-            # For generation?
-            # Note axis hidden state
-            state = None
-
-            outs = []
-
-            for n in range(self.num_notes):
-                # Slice out the current note's feature
-                feature_in = note_features[:, n, :]
-                condition_in = targets[:, n - 1].unsqueeze(1) if n > 0 else zero_target
-
-                rnn_in = torch.cat((feature_in, condition_in), 1)
-                rnn_in = rnn_in.view(1, batch_size, -1)
-                out, state = self.rnn(rnn_in, state)
-
-                # Make a probability prediction
-                out = out.squeeze(0)
-                out = self.output(out)
-                out = self.sigmoid(out)
-                outs.append(out)
-
-            out = torch.cat(outs, 1)
-            """
+        out, _ = self.rnn(note_features, None)
 
         # Apply output
         out = out.contiguous()
