@@ -76,13 +76,15 @@ def train_step(model, note_seq, replay_seq, beat_seq, style):
 
     # Initialize hidden states
     states = None
+    prev_note = Variable(torch.zeros(note_seq[:, 0].size())).cuda()
 
     # Iterate through the entire sequence
-    for i in range(seq_len - 1):
+    for i in range(seq_len):
         # TODO: We can apply custom input based on mistakes.
-        targets = note_seq[:, i + 1]
-        output, states = model(note_seq[:, i], beat_seq[:, i], states, targets)
+        targets = note_seq[:, i]
+        output, states = model(prev_note, beat_seq[:, i], states, targets)
         loss += criterion(output, targets)
+        prev_note = targets
 
     loss.backward()
     optimizer.step()

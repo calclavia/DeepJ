@@ -110,6 +110,7 @@ class NoteAxis(nn.Module):
         """
         batch_size = note_features.size()[0]
 
+        note_features = self.dropout(note_features)
         condition_notes = self.input_dropout(condition_notes)
 
         # Used for the first target
@@ -121,6 +122,8 @@ class NoteAxis(nn.Module):
         note_features = torch.cat((note_features, shifted), 2)
 
         out, _ = self.rnn(note_features, None)
+
+        out = self.dropout(out)
 
         # Apply output
         out = out.contiguous()
