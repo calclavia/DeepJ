@@ -50,7 +50,7 @@ def train(model, data_generator):
             plt.savefig(OUT_DIR + '/loss.png')
 
             # Save model
-            torch.save(model.state_dict(), OUT_DIR + '/model.pt')
+            torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
 
             # Generate
             generate(model, name='epoch_' + str(epoch))
@@ -80,7 +80,9 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
     seq_len = note_seq.size()[1]
 
     # Initialize hidden states
+    # TODO: Can we retain state for longer sequences even with truncated backprop?
     states = None
+    # TODO: Dataset should include zero note for beginning of music, not here.
     prev_note = Variable(torch.zeros(note_seq[:, 0].size())).cuda()
 
     # Iterate through the entire sequence

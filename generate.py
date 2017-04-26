@@ -88,9 +88,11 @@ def main():
     args = parser.parse_args()
 
     print('=== Loading Model ===')
+    model_path = OUT_DIR + '/model.pt'
+    print('Path: {}'.format(model_path))
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ().cuda()
-    model.load_state_dict(torch.load(OUT_DIR + '/model.pt'))
+    model.load_state_dict(torch.load(model_path))
 
     print('=== Generating ===')
     generate(model, num_bars=args.bars)
