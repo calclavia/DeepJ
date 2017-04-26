@@ -13,7 +13,7 @@ from constants import *
 from model import DeepJ
 from generate import generate, sample_note
 
-def train(model, train_generator, epoch_len, val_generator):
+def train(model, train_generator, train_len, val_generator, val_len):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -32,7 +32,7 @@ def train(model, train_generator, epoch_len, val_generator):
         total_loss = 0
 
         t_gen = train_generator()
-        t = tqdm(total=epoch_len)
+        t = tqdm(total=train_len)
         t.set_description('Epoch {}'.format(epoch))
 
         for data in t_gen:
@@ -54,14 +54,14 @@ def train(model, train_generator, epoch_len, val_generator):
         total_loss = 0
 
         v_gen = val_generator()
-        t = tqdm(total=epoch_len)
+        t = tqdm(total=val_len)
         t.set_description('Validation {}'.format(epoch))
 
         for data in t_gen:
             loss = val_step(model, data)
             total_loss += loss
             avg_loss = total_loss / step
-            t.set_postfix(loss=avg_loss, prob=train_prob)
+            t.set_postfix(loss=avg_loss)
             t.update()
 
             step += 1
@@ -149,7 +149,7 @@ def main():
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()
     if torch.cuda.is_available():
-        model.cuda()
+        model
 
     if args.path:
         model.load_state_dict(torch.load(args.path))
@@ -157,14 +157,18 @@ def main():
 
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
-    print('Loading...')
+    print('Loading data...')
     processed_data = process(load_styles())
+    print()
+    print('Creating data generators...')
     train_data, val_data = validation_split(processed_data)
-    train_generator = lambda: batcher(sampler(train_data))
-    val_generator = lambda: batcher(sampler(val_data))
+    train_it_ind = iteration_indices(train_data)
+    val_it_ind = iteration_indices(val_data)
+    train_generator = lambda: batcher(sampler(train_data, train_it_ind))
+    val_generator = lambda: batcher(sampler(val_data, val_it_ind))
     print()
     print('=== Training ===')
-    train(model, train_generator, len(train_data[0]), val_generator)
+    train(model, train_generator, len(train_it_ind), val_generator, len(val_it_ind))
 
 if __name__ == '__main__':
     main()

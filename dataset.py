@@ -108,14 +108,11 @@ def validation_split(data, split=0.1):
     assert len(val_data[0]) == num_val
     return train_data, val_data
 
-def sampler(data, seq_len=SEQ_LEN):
+def iteration_indices(data, seq_len=SEQ_LEN):
     """
-    Generates sequences of data.
+    Returns a list of tuple, which are the iteration indices.
     """
     note_seqs, replay_seqs, beat_tags, style_tags = data
-
-    if len(note_seqs) == 0:
-        raise 'Insufficient training data.'
 
     # List of composition and their sequence start indices
     it_list = []
@@ -123,6 +120,17 @@ def sampler(data, seq_len=SEQ_LEN):
     for c, seq in enumerate(note_seqs):
         for t in range(len(seq) - 1 - seq_len):
             it_list.append((c, t))
+
+    return it_list
+
+def sampler(data, it_list, seq_len=SEQ_LEN):
+    """
+    Generates sequences of data.
+    """
+    note_seqs, replay_seqs, beat_tags, style_tags = data
+
+    if len(note_seqs) == 0:
+        raise 'Insufficient training data.'
 
     # A list of iteration indices that specify the iteration order
     it_order = random.sample(it_list, len(it_list))
