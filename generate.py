@@ -31,7 +31,10 @@ def sample_note(model, prev_note, beat, states, temperature=1, batch_size=1):
         current_note[0, n] = note_on
     return current_note, states
 
-def generate(model, name='output', num_bars=16):
+def generate(model, name='output', num_bars=16, prime=None):
+    if prime:
+        print('Priming melody')
+
     model.eval()
 
     # Output note sequence
@@ -51,10 +54,14 @@ def generate(model, name='output', num_bars=16):
         beat = Variable(torch.from_numpy(compute_beat(t, NOTES_PER_BAR)).float(), volatile=True).cuda().unsqueeze(0)
         current_note, states = sample_note(model, prev_note, beat, states, temperature=temperature)
 
-        prev_note = current_note
         # Add note to note sequence
-        current_note = current_note.cpu().data[0, :].numpy()
-        note_seq.append(current_note)
+        note_seq.append(current_note.cpu().data[0, :].numpy())
+
+        if prime:
+            prev_note, *_ = next(prime)
+            prev_note = Variable(prev_note, volatile=True).cuda().unsqueeze(0)
+        else:
+            prev_note = current_note
 
         # Increase temperature if silent
         if np.count_nonzero(current_note) == 0:
@@ -83,19 +90,24 @@ def write_file(name, note_seq, replay_seq):
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
+    parser.add_argument('path', help='Path to model file')
     parser.add_argument('--bars', default=16, type=int, help='Bars of generation')
     parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
 
+    primer = None
+    if args.debug:
+        print('=== Loading Data ===')
+        primer = data_it(process(load_styles()))
+
     print('=== Loading Model ===')
-    model_path = OUT_DIR + '/model.pt'
-    print('Path: {}'.format(model_path))
+    print('Path: {}'.format(args.path))
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ().cuda()
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(args.path))
 
     print('=== Generating ===')
-    generate(model, num_bars=args.bars)
+    generate(model, num_bars=args.bars, prime=primer)
 
 if __name__ == '__main__':
     main()

@@ -26,7 +26,7 @@ TIME_AXIS_UNITS = 256
 NOTE_AXIS_UNITS = 128
 
 # Sampling schedule decay
-SCHEDULE_RATE = 2e-5
+SCHEDULE_RATE = 0#2e-5
 MIN_SCHEDULE_PROB = 0.6
 
 # Style

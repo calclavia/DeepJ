@@ -85,7 +85,7 @@ def process(style_seqs, seq_len=SEQ_LEN):
     beat_tags = extract_beat(note_seqs)
     return note_seqs, replay_seqs, beat_tags, style_tags
 
-def sampler(data, seq_len=SEQ_LEN, ordered=False):
+def sampler(data, seq_len=SEQ_LEN):
     """
     Generates training samples.
     """
@@ -94,26 +94,28 @@ def sampler(data, seq_len=SEQ_LEN, ordered=False):
     if len(note_seqs) == 0:
         raise 'Insufficient training data.'
 
-    if ordered:
-        for c in range(len(note_seqs)):
-            note_seq = note_seqs[c]
-            replay_seq = replay_seqs[c]
-            beat_seq = beat_tags[c]
-            style_tag = style_tags[c]
+    while True:
+        comp_index, r = random_comp_subseq(note_seqs, seq_len, 1)
 
-            for t in range(0, len(note_seq) - 1 - length, seq_len):
-                yield (note_seq[t:t + seq_len], \
-                       replay_seq[t:t + seq_len], \
-                       beat_seq[t:t + seq_len], \
-                       style_tag)
-    else:
-        while True:
-            comp_index, r = random_comp_subseq(note_seqs, seq_len, 1)
+        yield (note_seqs[comp_index][r[0]:r[1]], \
+               replay_seqs[comp_index][r[0]:r[1]], \
+               beat_tags[comp_index][r[0]:r[1]], \
+               style_tags[comp_index])
 
-            yield (note_seqs[comp_index][r[0]:r[1]], \
-                   replay_seqs[comp_index][r[0]:r[1]], \
-                   beat_tags[comp_index][r[0]:r[1]], \
-                   style_tags[comp_index])
+def data_it(data, seq_len=SEQ_LEN):
+    """
+    Iterates through each note in all songs.
+    """
+    note_seqs, replay_seqs, beat_tags, style_tags = data
+
+    for c in range(len(note_seqs)):
+        note_seq = note_seqs[c]
+        replay_seq = replay_seqs[c]
+        beat_seq = beat_tags[c]
+        style_tag = style_tags[c]
+
+        for t in range(0, len(note_seq)):
+            yield (note_seq[t], replay_seq[t], beat_seq[t], style_tag)
 
 def batcher(sampler, batch_size=BATCH_SIZE):
     """

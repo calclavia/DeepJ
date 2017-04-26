@@ -109,15 +109,16 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
-    parser.add_argument('--load', default=False, action='store_true', help='Load existing model?')
+    parser.add_argument('--path', help='Load existing model?')
     args = parser.parse_args()
 
     print('=== Loading Model ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ().cuda()
 
-    if args.load:
-        model.load_state_dict(torch.load(OUT_DIR + '/model.pt'))
+    if args.path:
+        model.load_state_dict(torch.load(args.path))
+        print('Restored model from checkpoint.')
 
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
