@@ -1,6 +1,7 @@
 """
 Preprocesses MIDI files
 """
+import math
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -84,6 +85,28 @@ def process(style_seqs, seq_len=SEQ_LEN):
     replay_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
     return note_seqs, replay_seqs, beat_tags, style_tags
+
+def validation_split(data, split=0.1):
+    """
+    Splits the sequences into training and validation sets
+    """
+    note_seqs, replay_seqs, beat_tags, style_tags = data
+    num_val = int(math.ceil(len(data[0]) * split))
+    validation_indicies = list(np.random.choice(len(data[0]), size=num_val, replace=True))
+
+    train_data = [[] for _ in data]
+    val_data = [[] for _ in data]
+
+    for i in range(len(note_seqs)):
+        for dtype in range(len(data)):
+            if i in validation_indicies:
+                val_data[dtype].append(data[dtype][i])
+            else:
+                train_data[dtype].append(data[dtype][i])
+
+    assert len(train_data[0]) == len(data[0]) - num_val
+    assert len(val_data[0]) == num_val
+    return train_data, val_data
 
 def sampler(data, seq_len=SEQ_LEN):
     """

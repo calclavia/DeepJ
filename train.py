@@ -114,7 +114,9 @@ def main():
 
     print('=== Loading Model ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
-    model = DeepJ().cuda()
+    model = DeepJ()
+    if torch.cuda.is_available():
+        model.cuda()
 
     if args.path:
         model.load_state_dict(torch.load(args.path))
@@ -123,7 +125,9 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading...')
-    generator = batcher(sampler(process(load_styles())))
+    processed_data = process(load_styles())
+    train_data, val_data = validation_split(processed_data)
+    generator = batcher(sampler(train_data))
     print()
     print('=== Training ===')
     train(model, generator)
