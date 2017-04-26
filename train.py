@@ -90,9 +90,9 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
         output, states = model(prev_note, beat, states, targets)
         loss += criterion(output, targets)
 
+        # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
         # TODO: Make sure this does not mess up gradients
-        # Choose note to feed based on coin flip (scheduled sampling)
         if np.random.random() <= teach_prob:
             prev_note = targets
         else:
