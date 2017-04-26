@@ -29,7 +29,7 @@ def sample_note(model, prev_note, beat, states, temperature=1, batch_size=1):
         # Sample note randomly
         note_on = 1 if np.random.random() <= prob[0, n] else 0
         current_note[0, n] = note_on
-    return current_note
+    return current_note, states
 
 def generate(model, name='output', num_bars=16):
     model.eval()
@@ -49,7 +49,7 @@ def generate(model, name='output', num_bars=16):
 
     for t in trange(NOTES_PER_BAR * num_bars):
         beat = Variable(torch.from_numpy(compute_beat(t, NOTES_PER_BAR)).float(), volatile=True).cuda().unsqueeze(0)
-        current_note = sample_note(model, prev_note, beat, states, temperature=temperature)
+        current_note, states = sample_note(model, prev_note, beat, states, temperature=temperature)
 
         prev_note = current_note
         # Add note to note sequence
@@ -90,9 +90,7 @@ def main():
     print('=== Loading Model ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ().cuda()
-
-    if args.load:
-        model.load_state_dict(torch.load(OUT_DIR + '/model.pt'))
+    model.load_state_dict(torch.load(OUT_DIR + '/model.pt'))
 
     print('=== Generating ===')
     generate(model, num_bars=args.bars)

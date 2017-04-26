@@ -97,7 +97,7 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
             prev_note = targets
         else:
             model.eval()
-            prev_note = sample_note(model, prev_note, beat, states, batch_size=BATCH_SIZE)
+            prev_note, _ = sample_note(model, prev_note, beat, states, batch_size=BATCH_SIZE)
             prev_note = Variable(prev_note.data).cuda()
             model.train()
 

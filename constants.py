@@ -30,7 +30,7 @@ TIME_AXIS_UNITS = 256
 NOTE_AXIS_UNITS = 128
 
 # Sampling schedule decay
-SCHEDULE_RATE = 0#1e-4
+SCHEDULE_RATE = 1e-4
 MIN_SCHEDULE_PROB = 0.5
 
 # Style
