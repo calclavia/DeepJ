@@ -13,80 +13,115 @@ from constants import *
 from model import DeepJ
 from generate import generate, sample_note
 
-def train(model, data_generator):
+def train(model, train_generator, epoch_len, val_generator):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
     # Number of training steps per epoch
-    step = 1
     epoch = 1
-    epoch_len = 500
     total_step = 1
 
     # Keep tracks of all losses in each epoch
-    all_losses = []
-    total_loss = 0
+    train_losses = []
+    val_losses = []
 
-    t = tqdm(total=epoch_len)
+    # Epoch loop
+    while True:
+        # Training
+        step = 1
+        total_loss = 0
 
-    for data in data_generator:
+        t_gen = train_generator()
+        t = tqdm(total=epoch_len)
         t.set_description('Epoch {}'.format(epoch))
 
-        train_prob = max(MIN_SCHEDULE_PROB, 1 -SCHEDULE_RATE * total_step)
-        loss = train_step(model, train_prob, *data)
+        for data in t_gen:
+            train_prob = max(MIN_SCHEDULE_PROB, 1 -SCHEDULE_RATE * total_step)
+            loss = train_step(model, data, train_prob)
 
-        total_loss += loss
-        avg_loss = total_loss / step
-        t.set_postfix(loss=avg_loss, prob=train_prob)
-        t.update()
+            total_loss += loss
+            avg_loss = total_loss / step
+            t.set_postfix(loss=avg_loss, prob=train_prob)
+            t.update()
 
-        if step % epoch_len == 0:
-            all_losses.append(avg_loss)
-            total_loss = 0
+            step += 1
+            total_step += 1
 
-            # Draw graph
-            plt.clf()
-            plt.plot(all_losses)
-            plt.savefig(OUT_DIR + '/loss.png')
+        train_losses.append(avg_loss)
 
-            # Save model
-            torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
+        # Validation
+        step = 1
+        total_loss = 0
 
-            # Generate
-            generate(model, name='epoch_' + str(epoch))
+        v_gen = val_generator()
+        t = tqdm(total=epoch_len)
+        t.set_description('Validation {}'.format(epoch))
 
-            step = 0
-            epoch += 1
+        for data in t_gen:
+            loss = val_step(model, data)
+            total_loss += loss
+            avg_loss = total_loss / step
+            t.set_postfix(loss=avg_loss, prob=train_prob)
+            t.update()
 
-            t.close()
-            t = tqdm(total=epoch_len)
+            step += 1
 
-        step += 1
-        total_step += 1
+        val_losses.append(avg_loss)
 
-def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
+        # Draw graph
+        plt.clf()
+        plt.plot(train_losses)
+        plt.savefig(OUT_DIR + '/training_loss.png')
+
+        plt.clf()
+        plt.plot(val_losses)
+        plt.savefig(OUT_DIR + '/validation_loss.png')
+
+        # Save model
+        torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
+
+        # Generate
+        generate(model, name='epoch_' + str(epoch))
+        epoch += 1
+
+def train_step(model, data, teach_prob):
     """
     Trains the model on a single batch of sequence.
     """
     model.train()
     criterion = nn.BCELoss()
-    # TODO: Clip gradient if needed.
     optimizer = optim.Adam(model.parameters())
 
     # Zero out the gradient
     optimizer.zero_grad()
 
+    loss, avg_loss = compute_loss(model, data, teach_prob)
+
+    loss.backward()
+    optimizer.step()
+
+    return avg_loss
+
+def val_step(model, data):
+    model.eval()
+    return compute_loss(model, data, 1)[1]
+
+def compute_loss(model, data, teach_prob):
+    """
+    Trains the model on a single batch of sequence.
+    """
+    note_seq, replay_seq, beat_seq, style = data
+    criterion = nn.BCELoss()
+
     loss = 0
     seq_len = note_seq.size()[1]
 
     # Initialize hidden states
-    # TODO: Can we retain state for longer sequences even with truncated backprop?
     states = None
-    # TODO: Dataset should include zero note for beginning of music, not here.
-    prev_note = Variable(torch.zeros(note_seq[:, 0].size())).cuda()
+    prev_note = note_seq[:, 0]
 
     # Iterate through the entire sequence
-    for i in range(seq_len):
+    for i in range(1, seq_len):
         beat = beat_seq[:, i]
         targets = note_seq[:, i]
         output, states = model(prev_note, beat, states, targets)
@@ -103,9 +138,7 @@ def train_step(model, teach_prob, note_seq, replay_seq, beat_seq, style):
             prev_note = Variable(prev_note.data).cuda()
             model.train()
 
-    loss.backward()
-    optimizer.step()
-    return loss.data[0] / seq_len
+    return loss, loss.data[0] / seq_len
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
@@ -127,10 +160,11 @@ def main():
     print('Loading...')
     processed_data = process(load_styles())
     train_data, val_data = validation_split(processed_data)
-    generator = batcher(sampler(train_data))
+    train_generator = lambda: batcher(sampler(train_data))
+    val_generator = lambda: batcher(sampler(val_data))
     print()
     print('=== Training ===')
-    train(model, generator)
+    train(model, train_generator, len(train_data[0]), val_generator)
 
 if __name__ == '__main__':
     main()

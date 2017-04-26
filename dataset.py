@@ -80,7 +80,7 @@ def process(style_seqs, seq_len=SEQ_LEN):
     style_tags = torch.stack([torch.from_numpy(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y]).float()
 
     note_seqs, replay_seqs = zip(*flat_seq)
-
+    # TODO: Prepend 0 data.
     note_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in note_seqs if len(x) > seq_len]
     replay_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
@@ -110,20 +110,28 @@ def validation_split(data, split=0.1):
 
 def sampler(data, seq_len=SEQ_LEN):
     """
-    Generates training samples.
+    Generates sequences of data.
     """
     note_seqs, replay_seqs, beat_tags, style_tags = data
 
     if len(note_seqs) == 0:
         raise 'Insufficient training data.'
 
-    while True:
-        comp_index, r = random_comp_subseq(note_seqs, seq_len, 1)
+    # List of composition and their sequence start indices
+    it_list = []
 
-        yield (note_seqs[comp_index][r[0]:r[1]], \
-               replay_seqs[comp_index][r[0]:r[1]], \
-               beat_tags[comp_index][r[0]:r[1]], \
-               style_tags[comp_index])
+    for c, seq in enumerate(note_seqs):
+        for t in range(len(seq) - 1 - seq_len):
+            it_list.append((c, t))
+
+    # A list of iteration indices that specify the iteration order
+    it_order = random.sample(it_list, len(it_list))
+
+    for c, t in it_order:
+        yield (note_seqs[c][t:t+seq_len], \
+               replay_seqs[c][t:t+seq_len], \
+               beat_tags[c][t:t+seq_len], \
+               style_tags[c])
 
 def data_it(data, seq_len=SEQ_LEN):
     """
