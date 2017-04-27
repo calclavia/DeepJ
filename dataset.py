@@ -25,29 +25,6 @@ def compute_beat(beat, notes_in_bar):
 def compute_completion(beat, len_melody):
     return torch.tensor([beat / len_melody])
 
-def random_subseq(sequence, length, division_len):
-    """
-    Returns the range of a random subseq
-    """
-    # Make random starting position of sequence
-    # Will never pick the last element in sequence
-    end = len(sequence) - 1 - length
-
-    if end == 0:
-        # No choice
-        return (0, length)
-
-    start = random.randrange(0, end, division_len)
-    return (start, start + length)
-
-def random_comp_subseq(compositions, length, division_len):
-    """
-    Returns a random music subsequence from a list of compositions
-    """
-    comp_index = random.randint(0, len(compositions) - 1)
-    subseq_range = random_subseq(compositions[comp_index], length, division_len)
-    return comp_index, subseq_range
-
 def load_styles(styles=STYLES):
     """
     Loads all music styles into a list of compositions
