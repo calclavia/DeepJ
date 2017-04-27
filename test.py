@@ -19,6 +19,14 @@ class TestModel(unittest.TestCase):
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ]])
 
+    def test_chord_context(self):
+        model = DeepJ(3)
+        test_input = torch.FloatTensor([1, 1, 0])
+        context = model.time_axis.compute_chord_context(test_input)
+
+        self.assertEqual(context.size(), (1, 3, OCTAVE))
+
+
 class TestMIDIUtil(unittest.TestCase):
 
     def test_encode(self):

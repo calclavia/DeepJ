@@ -83,7 +83,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
 
         # Generate
-        if epoch % gen_rate:
+        if epoch % gen_rate == 0:
             print('Generating...')
             generate(model, name='epoch_' + str(epoch))
 
@@ -182,7 +182,7 @@ def main():
 
     print('=== Training ===')
     train(model, train_generator, len(train_ind), val_generator, \
-         len(val_ind), plot=not args.noplot, gen=args.gen)
+         len(val_ind), plot=not args.noplot, gen_rate=args.gen)
 
 if __name__ == '__main__':
     main()
