@@ -37,7 +37,10 @@ class TimeAxis(nn.Module):
 
         # Constants
         self.pitch_pos = torch.range(0, self.num_notes - 1).unsqueeze(0) / self.num_notes
-        self.pitch_class = torch.stack([torch.from_numpy(one_hot(i % OCTAVE, OCTAVE)) for i in range(OCTAVE)]).unsqueeze(0)
+
+        stack_vecs = [one_hot(i % OCTAVE, OCTAVE) for i in range(self.num_notes)]
+        stack_vecs = np.array(stack_vecs)
+        self.pitch_class = torch.from_numpy(stack_vecs).float().unsqueeze(0)
 
     def forward(self, note_in, beat_in, states):
         """
@@ -52,7 +55,7 @@ class TimeAxis(nn.Module):
         # Position of the note [batch_size x num_notes]
         pitch_pos = Variable(self.pitch_pos).cuda().repeat(batch_size, 1).unsqueeze(2)
         # Pitch class of the note [batch_size x num_notes x OCTAVE]
-        pitch_class = Variable(self.pitch_class).cuda().repeat(batch_size, NUM_OCTAVES, 1).float()
+        pitch_class = Variable(self.pitch_class).cuda().repeat(batch_size, 1, 1)
 
         # Provides context of the chord for each note.
         # TODO: Should this be relative to the note?

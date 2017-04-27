@@ -1,5 +1,23 @@
 from midi_util import *
+from model import DeepJ
 import unittest
+
+class TestModel(unittest.TestCase):
+    def test_pitch_pos(self):
+        model = DeepJ(3)
+        pitch_pos = model.time_axis.pitch_pos
+        self.assertEqual(pitch_pos.size(), (1, 3))
+        np.testing.assert_allclose(pitch_pos.numpy(), [[0, 1/3, 2/3]])
+
+    def test_pitch_class(self):
+        model = DeepJ(3)
+        pitch_class = model.time_axis.pitch_class
+        self.assertEqual(pitch_class.size(), (1, 3, OCTAVE))
+        np.testing.assert_allclose(pitch_class.numpy(), [[
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ]])
 
 class TestMIDIUtil(unittest.TestCase):
 
