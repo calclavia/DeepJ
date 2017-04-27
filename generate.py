@@ -9,6 +9,7 @@ from tqdm import trange
 from midi_util import *
 from dataset import *
 from constants import *
+from util import *
 from model import DeepJ
 
 def sample_note(model, prev_note, beat, states, temperature=1, batch_size=1):
@@ -51,7 +52,7 @@ def generate(model, name='output', num_bars=16, prime=None):
     prev_note = Variable(torch.zeros(NUM_NOTES), volatile=True).cuda().unsqueeze(0)
 
     for t in trange(NOTES_PER_BAR * num_bars):
-        beat = Variable(torch.from_numpy(compute_beat(t, NOTES_PER_BAR)).float(), volatile=True).cuda().unsqueeze(0)
+        beat = Variable(to_torch(compute_beat(t, NOTES_PER_BAR)), volatile=True).cuda().unsqueeze(0)
         current_note, states = sample_note(model, prev_note, beat, states, temperature=temperature)
 
         # Add note to note sequence

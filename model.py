@@ -125,7 +125,7 @@ class NoteAxis(nn.Module):
         condition_notes = self.input_dropout(condition_notes)
 
         # Used for the first target
-        zero_padding = Variable(torch.zeros((batch_size, 1))).cuda()
+        zero_padding = var(torch.zeros((batch_size, 1)))
         shifted = torch.cat((zero_padding, condition_notes), 1)[:, :-1]
         shifted = shifted.unsqueeze(2)
 
