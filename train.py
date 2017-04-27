@@ -14,13 +14,14 @@ from util import *
 from model import DeepJ
 from generate import generate, sample_note
 
-def plot_loss(data, name):
+def plot_loss(training_loss, validation_loss, name):
     # Draw graph
     plt.clf()
-    plt.plot(data)
+    plt.plot(training_loss)
+    plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(model, train_generator, train_len, val_generator, val_len, plot=True):
+def train(model, train_generator, train_len, val_generator, val_len, plot=True, patience=5):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -76,8 +77,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
         val_losses.append(avg_loss)
 
         if plot:
-            plot_loss(train_losses, 'training_loss.png')
-            plot_loss(val_losses, 'validation_loss.png')
+            plot_loss(train_losses, val_losses, 'loss.png')
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
@@ -87,6 +87,12 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
         generate(model, name='epoch_' + str(epoch))
 
         epoch += 1
+
+        # Early stopping
+        if epoch > patience:
+            min_loss = min(validation_loss)
+            if min(validation_loss[-patience:]) > min_loss:
+                break
 
 def train_step(model, data, teach_prob):
     """
