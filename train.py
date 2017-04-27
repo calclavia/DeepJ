@@ -90,8 +90,8 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
 
         # Early stopping
         if epoch > patience:
-            min_loss = min(validation_loss)
-            if min(validation_loss[-patience:]) > min_loss:
+            min_loss = min(val_losses)
+            if min(val_losses[-patience:]) > min_loss:
                 break
 
 def train_step(model, data, teach_prob):
