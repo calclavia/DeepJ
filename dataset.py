@@ -4,7 +4,6 @@ Preprocesses MIDI files
 import math
 import numpy as np
 import torch
-from torch.autograd import Variable
 
 import numpy
 import math
@@ -14,7 +13,7 @@ import multiprocessing
 
 from constants import *
 from midi_util import load_midi
-from util import get_all_files, one_hot
+from util import *
 
 def compute_beat(beat, notes_in_bar):
     # TODO: Compare methods
@@ -68,7 +67,7 @@ def extract_beat(compositions):
 
     for comp in compositions:
         beats = np.array([compute_beat(t, NOTES_PER_BAR) for t in range(len(comp))])
-        beat_tags.append(torch.from_numpy(beats).float())
+        beat_tags.append(to_torch(beats))
     return beat_tags
 
 def process(style_seqs, seq_len=SEQ_LEN):
@@ -77,12 +76,12 @@ def process(style_seqs, seq_len=SEQ_LEN):
     """
     # Flatten into compositions list
     flat_seq = [x for y in style_seqs for x in y]
-    style_tags = torch.stack([torch.from_numpy(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y]).float()
+    style_tags = torch.stack([to_torch(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
 
     note_seqs, replay_seqs = zip(*flat_seq)
     # TODO: Prepend 0 data.
-    note_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in note_seqs if len(x) > seq_len]
-    replay_seqs = [torch.from_numpy(clamp_midi(x)).float() for x in replay_seqs if len(x) > seq_len]
+    note_seqs = [to_torch(clamp_midi(x)) for x in note_seqs if len(x) > seq_len]
+    replay_seqs = [to_torch(clamp_midi(x)) for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
     return note_seqs, replay_seqs, beat_tags, style_tags
 
@@ -110,7 +109,7 @@ def iteration_indices(data, seq_len=SEQ_LEN):
     it_list = []
 
     for c, seq in enumerate(note_seqs):
-        for t in range(len(seq) - 1 - seq_len):
+        for t in range(0, len(seq) - 1 - seq_len, NOTES_PER_BAR):
             it_list.append((c, t))
 
     return it_list
@@ -159,7 +158,7 @@ def batcher(sampler, batch_size=BATCH_SIZE):
 
         if len(batch) == batch_size:
             # Convert batch
-            yield [Variable(torch.stack(x)).cuda() for x in zip(*batch)]
+            yield [var(torch.stack(x)) for x in zip(*batch)]
             batch = []
 
 def clamp_midi(sequence):

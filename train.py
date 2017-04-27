@@ -10,6 +10,7 @@ import argparse
 
 from dataset import *
 from constants import *
+from util import *
 from model import DeepJ
 from generate import generate, sample_note
 
@@ -46,7 +47,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
 
             step += 1
             total_step += 1
-
+        t.close()
         train_losses.append(avg_loss)
 
         # Validation
@@ -57,7 +58,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
         t = tqdm(total=val_len)
         t.set_description('Validation {}'.format(epoch))
 
-        for data in t_gen:
+        for data in v_gen:
             loss = val_step(model, data)
             total_loss += loss
             avg_loss = total_loss / step
@@ -65,7 +66,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
             t.update()
 
             step += 1
-
+        t.close()
         val_losses.append(avg_loss)
 
         if plot:
@@ -80,7 +81,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
-
+        print()
         # Generate
         generate(model, name='epoch_' + str(epoch))
         epoch += 1
@@ -136,7 +137,7 @@ def compute_loss(model, data, teach_prob):
         else:
             model.eval()
             prev_note, _ = sample_note(model, prev_note, beat, states, batch_size=BATCH_SIZE)
-            prev_note = Variable(prev_note.data).cuda()
+            prev_note = var(prev_note.data)
             model.train()
 
     return loss, loss.data[0] / seq_len
@@ -156,6 +157,7 @@ def main():
     if args.path:
         model.load_state_dict(torch.load(args.path))
         print('Restored model from checkpoint.')
+    print()
 
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -167,6 +169,7 @@ def main():
     train_generator = lambda: batcher(sampler(data, train_ind))
     val_generator = lambda: batcher(sampler(data, val_ind))
     print()
+
     print('=== Training ===')
     train(model, train_generator, len(train_ind), val_generator, len(val_ind), not args.noplot)
 

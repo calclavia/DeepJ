@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import torch
+from torch.autograd import Variable
 
 def one_hot(index, size):
     x = np.zeros(size)
@@ -15,3 +17,15 @@ def get_all_files(paths, ext='.mid'):
                 if os.path.isfile(fname) and fname.endswith(ext):
                     potential_files.append(fname)
     return potential_files
+
+def to_torch(np_arr):
+    return torch.from_numpy(np_arr).float()
+
+def var(tensor):
+    """
+    Creates a Torch variable based on CUDA settings.
+    """
+    if torch.cuda.is_available():
+        return Variable(tensor).cuda()
+    else:
+        return Variable(tensor)
