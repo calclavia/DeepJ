@@ -21,7 +21,7 @@ def plot_loss(training_loss, validation_loss, name):
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(model, train_generator, train_len, val_generator, val_len, plot=True, patience=5):
+def train(model, train_generator, train_len, val_generator, val_len, plot=True, gen_rate=1, patience=5):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -83,8 +83,9 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
 
         # Generate
-        print('Generating...')
-        generate(model, name='epoch_' + str(epoch))
+        if epoch % gen_rate:
+            print('Generating...')
+            generate(model, name='epoch_' + str(epoch))
 
         epoch += 1
 
@@ -153,6 +154,7 @@ def compute_loss(model, data, teach_prob):
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--path', help='Load existing model?')
+    parser.add_argument('--gen', default=1, type=int, help='Generate per how many epochs?')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     args = parser.parse_args()
 
@@ -179,7 +181,8 @@ def main():
     print()
 
     print('=== Training ===')
-    train(model, train_generator, len(train_ind), val_generator, len(val_ind), not args.noplot)
+    train(model, train_generator, len(train_ind), val_generator, \
+         len(val_ind), plot=not args.noplot, gen=args.gen)
 
 if __name__ == '__main__':
     main()
