@@ -1,5 +1,8 @@
+import torch
+from torch.autograd import Variable
 from midi_util import *
 from model import DeepJ
+from util import *
 import unittest
 
 class TestModel(unittest.TestCase):
@@ -18,14 +21,33 @@ class TestModel(unittest.TestCase):
             [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ]])
-
+    """
     def test_chord_context(self):
         model = DeepJ(3)
-        test_input = torch.FloatTensor([1, 1, 0])
+        test_input = torch.FloatTensor([[1, 1, 0]])
         context = model.time_axis.compute_chord_context(test_input)
 
         self.assertEqual(context.size(), (1, 3, OCTAVE))
+        np.testing.assert_allclose(context.numpy(), [[
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ]])
+    """
 
+    def test_vicinity(self):
+        model = DeepJ(3)
+        test_input = var(torch.FloatTensor([[1, 1, 0]]))
+        vicinity = model.time_axis.compute_vicinity(test_input)
+        self.assertEqual(vicinity.size(), (1, 3, OCTAVE * 2 + 1))
+
+        empty_octave = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+        np.testing.assert_allclose(vicinity.cpu().data.numpy(), [[
+            empty_octave + [1] + [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1] + [1] + empty_octave,
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1] + [0] + empty_octave
+        ]])
 
 class TestMIDIUtil(unittest.TestCase):
 

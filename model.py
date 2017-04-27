@@ -42,13 +42,27 @@ class TimeAxis(nn.Module):
         stack_vecs = np.array(stack_vecs)
         self.pitch_class = torch.from_numpy(stack_vecs).float().unsqueeze(0)
 
-    def compute_chord_context(note_in):
+    def compute_chord_context(self, note_in):
         # TODO: Convolution might make this obsolete.
         # Provides context of the chord for each note.
         # TODO: Should this be relative to the note?
         chord_context = notes.view(batch_size, OCTAVE, NUM_OCTAVES)
         chord_context = torch.sum(chord_context, 2).view(batch_size, 1, -1).repeat(1, self.num_notes, 1)
         return chord_context
+
+    def compute_vicinity(self, notes):
+        batch_size = notes.size(0)
+        # Expand X with zero padding
+        octave_padding = var(torch.zeros((batch_size, OCTAVE)))
+        pad_notes = torch.cat((octave_padding, notes, octave_padding), 1)
+
+        # The notes an octave above and below
+        vicinity = []
+
+        for n in range(self.num_notes):
+            vicinity.append(pad_notes[:, n:n + OCTAVE * 2 + 1])
+
+        return torch.stack(vicinity, 1)
 
     def forward(self, note_in, beat_in, states):
         """
@@ -65,21 +79,12 @@ class TimeAxis(nn.Module):
         # Pitch class of the note [batch_size x num_notes x OCTAVE]
         pitch_class = var(self.pitch_class).repeat(batch_size, 1, 1)
 
-        # Expand X with zero padding
-        octave_padding = Variable(torch.zeros((batch_size, OCTAVE))).cuda()
-        pad_notes = torch.cat((octave_padding, notes, octave_padding), 1)
-
         # Beat context
         beat = self.input_dropout(beat_in)
         beat = beat.unsqueeze(1).repeat(1, self.num_notes, 1)
 
-        # The notes an octave above and below
-        vicinity = []
-
-        for n in range(self.num_notes):
-            vicinity.append(pad_notes[:, n:n + OCTAVE * 2 + 1])
-
-        vicinity = torch.stack(vicinity, 1)
+        # Vicinity
+        vicinity = self.compute_vicinity(notes)
 
         features = torch.cat((pitch_pos, pitch_class, vicinity, beat), 2)
 
