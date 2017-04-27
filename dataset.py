@@ -104,8 +104,8 @@ def validation_split(data, split=0.1):
             else:
                 train_data[dtype].append(data[dtype][i])
 
-    assert len(train_data[0]) == len(data[0]) - num_val
-    assert len(val_data[0]) == num_val
+    assert len(train_data[0]) == len(data[0]) - num_val, len(train_data[0])
+    assert len(val_data[0]) == num_val, len(val_data[0])
     return train_data, val_data
 
 def iteration_indices(data, seq_len=SEQ_LEN):
