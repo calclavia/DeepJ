@@ -30,7 +30,7 @@ class TimeAxis(nn.Module):
         self.num_layers = num_layers
 
         # Position + Pitchclass + Vicinity + Chord Context + Beat Context
-        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + BEAT_UNITS
+        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + OCTAVE + BEAT_UNITS
 
         self.input_dropout = nn.Dropout(0.2)
         self.dropout = nn.Dropout(0.5)
@@ -44,10 +44,11 @@ class TimeAxis(nn.Module):
         stack_vecs = np.array(stack_vecs)
         self.pitch_class = torch.from_numpy(stack_vecs).float().unsqueeze(0)
 
-    def compute_chord_context(self, note_in):
+    def compute_chord_context(self, notes):
         # TODO: Convolution might make this obsolete.
-        # Provides context of the chord for each note.
         # TODO: Should this be relative to the note?
+        # Provides context of the chord for each note.
+        batch_size = notes.size(0)
         chord_context = notes.view(batch_size, OCTAVE, NUM_OCTAVES)
         chord_context = torch.sum(chord_context, 2).view(batch_size, 1, -1).repeat(1, self.num_notes, 1)
         return chord_context
@@ -73,6 +74,10 @@ class TimeAxis(nn.Module):
         Return:
             ([batch_size, num_notes, features], states)
         """
+        # Normalize
+        note_in = (note_in - 0.5) * 2
+        beat_in = (beat_in - 0.5) * 2
+
         batch_size = note_in.size()[0]
         notes = self.input_dropout(note_in)
 
@@ -90,7 +95,9 @@ class TimeAxis(nn.Module):
         # Vicinity
         vicinity = self.compute_vicinity(notes)
 
-        features = torch.cat((pitch_pos, pitch_class, vicinity, beat), 2)
+        chord_context = self.compute_chord_context(notes)
+
+        features = torch.cat((pitch_pos, pitch_class, vicinity, chord_context, beat), 2)
 
         # Move all notes into batch dimension
         features = features.view(1, -1, features.size(2))
@@ -123,6 +130,8 @@ class NoteAxis(nn.Module):
             note_features: Features for each note [batch_size, num_notes, features]
             condition_notes: Target notes [batch_size, num_notes] (for training)
         """
+        # Normalize
+        condition_notes = (condition_notes - 0.5) * 2
         batch_size = note_features.size()[0]
 
         note_features = self.dropout(note_features)
