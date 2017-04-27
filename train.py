@@ -13,7 +13,7 @@ from constants import *
 from model import DeepJ
 from generate import generate, sample_note
 
-def train(model, train_generator, train_len, val_generator, val_len):
+def train(model, train_generator, train_len, val_generator, val_len, plot=True):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -68,14 +68,15 @@ def train(model, train_generator, train_len, val_generator, val_len):
 
         val_losses.append(avg_loss)
 
-        # Draw graph
-        plt.clf()
-        plt.plot(train_losses)
-        plt.savefig(OUT_DIR + '/training_loss.png')
+        if plot:
+            # Draw graph
+            plt.clf()
+            plt.plot(train_losses)
+            plt.savefig(OUT_DIR + '/training_loss.png')
 
-        plt.clf()
-        plt.plot(val_losses)
-        plt.savefig(OUT_DIR + '/validation_loss.png')
+            plt.clf()
+            plt.plot(val_losses)
+            plt.savefig(OUT_DIR + '/validation_loss.png')
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
@@ -143,13 +144,14 @@ def compute_loss(model, data, teach_prob):
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--path', help='Load existing model?')
+    parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     args = parser.parse_args()
 
     print('=== Loading Model ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()
     if torch.cuda.is_available():
-        model
+        model.cuda()
 
     if args.path:
         model.load_state_dict(torch.load(args.path))
@@ -158,17 +160,15 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading data...')
-    processed_data = process(load_styles())
+    data = process(load_styles())
     print()
     print('Creating data generators...')
-    train_data, val_data = validation_split(processed_data)
-    train_it_ind = iteration_indices(train_data)
-    val_it_ind = iteration_indices(val_data)
-    train_generator = lambda: batcher(sampler(train_data, train_it_ind))
-    val_generator = lambda: batcher(sampler(val_data, val_it_ind))
+    train_ind, val_ind = validation_split(iteration_indices(data))
+    train_generator = lambda: batcher(sampler(data, train_ind))
+    val_generator = lambda: batcher(sampler(data, val_ind))
     print()
     print('=== Training ===')
-    train(model, train_generator, len(train_it_ind), val_generator, len(val_it_ind))
+    train(model, train_generator, len(train_ind), val_generator, len(val_ind), not args.noplot)
 
 if __name__ == '__main__':
     main()

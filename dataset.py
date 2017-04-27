@@ -86,27 +86,19 @@ def process(style_seqs, seq_len=SEQ_LEN):
     beat_tags = extract_beat(note_seqs)
     return note_seqs, replay_seqs, beat_tags, style_tags
 
-def validation_split(data, split=0.1):
+def validation_split(it_list, split=0.1):
     """
-    Splits the sequences into training and validation sets
+    Splits the data iteration list into training and validation indices
     """
-    note_seqs, replay_seqs, beat_tags, style_tags = data
-    num_val = int(math.ceil(len(data[0]) * split))
-    validation_indicies = list(np.random.choice(len(data[0]), size=num_val, replace=True))
+    # Shuffle data
+    random.shuffle(it_list)
 
-    train_data = [[] for _ in data]
-    val_data = [[] for _ in data]
-
-    for i in range(len(note_seqs)):
-        for dtype in range(len(data)):
-            if i in validation_indicies:
-                val_data[dtype].append(data[dtype][i])
-            else:
-                train_data[dtype].append(data[dtype][i])
-
-    assert len(train_data[0]) == len(data[0]) - num_val, len(train_data[0])
-    assert len(val_data[0]) == num_val, len(val_data[0])
-    return train_data, val_data
+    num_val = int(math.ceil(len(it_list) * split))
+    training_indicies = it_list[:-num_val]
+    validation_indicies = it_list[-num_val:]
+    assert len(validation_indicies) == num_val
+    assert len(training_indicies) == len(it_list) - num_val
+    return training_indicies, validation_indicies
 
 def iteration_indices(data, seq_len=SEQ_LEN):
     """
@@ -133,9 +125,9 @@ def sampler(data, it_list, seq_len=SEQ_LEN):
         raise 'Insufficient training data.'
 
     # A list of iteration indices that specify the iteration order
-    it_order = random.sample(it_list, len(it_list))
+    it_shuffled = random.sample(it_list, len(it_list))
 
-    for c, t in it_order:
+    for c, t in it_shuffled:
         yield (note_seqs[c][t:t+seq_len], \
                replay_seqs[c][t:t+seq_len], \
                beat_tags[c][t:t+seq_len], \
