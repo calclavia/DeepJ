@@ -30,10 +30,12 @@ class TimeAxis(nn.Module):
         self.num_layers = num_layers
 
         # Position + Pitchclass + Vicinity + Chord Context + Beat Context
-        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + NOTES_PER_BAR
+        input_features = 1 + OCTAVE + (OCTAVE * 2 + 1) + BEAT_UNITS
 
         self.input_dropout = nn.Dropout(0.2)
+        self.dropout = nn.Dropout(0.5)
         self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
+        self.beat_proj = nn.Linear(NOTES_PER_BAR, BEAT_UNITS)
 
         # Constants
         self.pitch_pos = torch.range(0, self.num_notes - 1).unsqueeze(0) / self.num_notes
@@ -81,6 +83,8 @@ class TimeAxis(nn.Module):
 
         # Beat context
         beat = self.input_dropout(beat_in)
+        beat = self.beat_proj(beat)
+        beat = self.dropout(beat)
         beat = beat.unsqueeze(1).repeat(1, self.num_notes, 1)
 
         # Vicinity

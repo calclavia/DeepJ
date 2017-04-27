@@ -32,7 +32,7 @@ def sample_note(model, prev_note, beat, states, temperature=1, batch_size=1):
         current_note[0, n] = note_on
     return current_note, states
 
-def generate(model, name='output', num_bars=16, prime=None):
+def generate(model, name='output', num_bars=8, prime=None):
     if prime:
         print('Priming melody')
 
