@@ -162,6 +162,8 @@ def main():
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()
     if torch.cuda.is_available():
+        # TODO: Pytorch Cudnn bug
+        torch.backends.cudnn.enabled = False
         model.cuda()
 
     if args.path:

@@ -44,11 +44,12 @@ class TimeAxis(nn.Module):
         stack_vecs = np.array(stack_vecs)
         self.pitch_class = torch.from_numpy(stack_vecs).float().unsqueeze(0)
 
-    def compute_chord_context(self, notes):
+    def compute_chord_context(self, notes_in):
         # TODO: Convolution might make this obsolete.
-        # TODO: Should this be relative to the note?
         # Provides context of the chord for each note.
-        batch_size = notes.size(0)
+        batch_size = notes_in.size(0)
+        # Normalize
+        notes = notes_in / NUM_OCTAVES
         chord_context = notes.view(batch_size, OCTAVE, NUM_OCTAVES)
         chord_context = torch.sum(chord_context, 2).view(batch_size, 1, -1).repeat(1, self.num_notes, 1)
         return chord_context
@@ -95,7 +96,8 @@ class TimeAxis(nn.Module):
         # Vicinity
         vicinity = self.compute_vicinity(notes)
 
-        chord_context = self.compute_chord_context(notes)
+        chord_context = self.compute_chord_context(note_in)
+        chord_context = self.input_dropout(chord_context)
 
         features = torch.cat((pitch_pos, pitch_class, vicinity, chord_context, beat), 2)
 
