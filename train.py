@@ -14,7 +14,7 @@ from util import *
 from model import DeepJ
 from generate import generate, sample_note
 
-def plot(data, name):
+def plot_loss(data, name):
     # Draw graph
     plt.clf()
     plt.plot(data)
@@ -76,8 +76,8 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
         val_losses.append(avg_loss)
 
         if plot:
-            plot(train_losses, 'training_loss.png')
-            plot(val_losses, 'validation_loss.png')
+            plot_loss(train_losses, 'training_loss.png')
+            plot_loss(val_losses, 'validation_loss.png')
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')

@@ -56,9 +56,8 @@ def process(style_seqs, seq_len=SEQ_LEN):
     style_tags = torch.stack([to_torch(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
 
     note_seqs, replay_seqs = zip(*flat_seq)
-    # TODO: Prepend 0 data.
-    note_seqs = [to_torch(clamp_midi(x)) for x in note_seqs if len(x) > seq_len]
-    replay_seqs = [to_torch(clamp_midi(x)) for x in replay_seqs if len(x) > seq_len]
+    note_seqs = [to_torch(pad_before(clamp_midi(x))) for x in note_seqs if len(x) > seq_len]
+    replay_seqs = [to_torch(pad_before(clamp_midi(x))) for x in replay_seqs if len(x) > seq_len]
     beat_tags = extract_beat(note_seqs)
     return note_seqs, replay_seqs, beat_tags, style_tags
 
@@ -72,7 +71,7 @@ def validation_split(it_list, split=0.1):
     num_val = int(math.ceil(len(it_list) * split))
     training_indicies = it_list[:-num_val]
     validation_indicies = it_list[-num_val:]
-    
+
     assert len(validation_indicies) == num_val
     assert len(training_indicies) == len(it_list) - num_val
     return training_indicies, validation_indicies
