@@ -101,19 +101,35 @@ def midi_decode(pattern,
         step = pattern.resolution // NOTES_PER_BEAT
 
     # Extract all tracks at highest resolution
-    final_track = None
-    final_articulation = None
-    max_len = 0
+    merged_notes = None
+    merged_replay = None
 
     for track in pattern:
-        composition = [np.zeros((classes,))]
-        articulation = [np.zeros((classes,))]
+        # The downsampled sequences
+        note_sequence = []
+        replay_sequence = []
+
+        # Raw sequences
+        notes_buffer = [np.zeros((classes,))]
+        replay_buffer = [np.zeros((classes,))]
 
         for event in track:
             # Duplicate the last note pattern to wait for next event
             for _ in range(event.tick):
-                composition.append(np.copy(composition[-1]))
-                articulation.append(np.zeros(classes))
+                notes_buffer.append(np.copy(notes_buffer[-1]))
+                replay_buffer.append(np.zeros(classes))
+
+                # Buffer & downscale sequence
+                if len(notes_buffer) > step:
+                    # Grab the fist one
+                    note_sequence.append(notes_buffer[0])
+                    # Take the max
+                    replay_any = np.minimum(np.sum(replay_buffer[:-1], axis=0), 1)
+                    replay_sequence.append(replay_any)
+
+                    # Keep the last one (discard things in the middle)
+                    notes_buffer = notes_buffer[-1:]
+                    replay_buffer = replay_buffer[-1:]
 
             if isinstance(event, midi.EndOfTrackEvent):
                 break
@@ -121,39 +137,49 @@ def midi_decode(pattern,
             # Modify the last note pattern
             if isinstance(event, midi.NoteOnEvent):
                 pitch, velocity = event.data
-                composition[-1][pitch] = min(velocity / MAX_VELOCITY, 1)
-                # Check for articulation, which is true if the current note was previously played and needs to be replayed
-                if len(composition) > 1 and composition[-2][pitch] > 0:
-                    articulation[-1][pitch] = 1
+                notes_buffer[-1][pitch] = min(velocity / MAX_VELOCITY, 1)
+                # Check for replay_buffer, which is true if the current note was previously played and needs to be replayed
+                if len(notes_buffer) > 1 and notes_buffer[-2][pitch] > 0:
+                    replay_buffer[-1][pitch] = 1
                     # Override current volume with previous volume
-                    composition[-1][pitch] = composition[-2][pitch]
+                    notes_buffer[-1][pitch] = notes_buffer[-2][pitch]
 
             if isinstance(event, midi.NoteOffEvent):
                 pitch, velocity = event.data
-                composition[-1][pitch] = 0
+                notes_buffer[-1][pitch] = 0
 
-        composition = np.array(composition)
-        articulation = np.array(articulation)
-        max_len = max(max_len, len(composition))
+        # Add the remaining
+        note_sequence.append(notes_buffer[0])
+        replay_any = np.minimum(np.sum(replay_buffer, axis=0), 1)
+        replay_sequence.append(replay_any)
 
-        if final_track is None:
-            final_track = composition
-            final_articulation = articulation
+        note_sequence = np.array(note_sequence)
+        replay_sequence = np.array(replay_sequence)
+        assert len(note_sequence) == len(replay_sequence)
+
+        if merged_notes is None:
+            merged_notes = note_sequence
+            merged_replay = replay_sequence
         else:
-            # Rescale arrays based on max size.
-            if max_len - final_track.shape[0] > 0:
-                final_track = np.concatenate((final_track, np.zeros((max_len - final_track.shape[0], classes))))
-                final_articulation = np.concatenate((final_articulation, np.zeros((max_len - final_articulation.shape[0], classes))))
-            if max_len - composition.shape[0] > 0:
-                composition = np.concatenate((composition, np.zeros((max_len - composition.shape[0], classes))))
-                articulation = np.concatenate((articulation, np.zeros((max_len - articulation.shape[0], classes))))
-            final_track += composition
-            final_articulation += articulation
+            # Merge into a single track, padding with zeros of needed
+            if len(note_sequence) > len(merged_notes):
+                # Swap variables such that merged_notes is always at least
+                # as large as note_sequence
+                tmp = note_sequence
+                note_sequence = merged_notes
+                merged_notes = tmp
 
-    # Downscale resolution
-    downscaled_articulation = [np.sum(final_articulation[x:x+step], axis=0) for x in range(0, len(final_articulation), step)]
-    final_articulation = np.minimum(downscaled_articulation, 1)
-    return final_track[::step], final_articulation
+                tmp = replay_sequence
+                replay_sequence = merged_replay
+                merged_replay = tmp
+
+            assert len(merged_notes) >= len(note_sequence)
+
+            diff = len(merged_notes) - len(note_sequence)
+            merged_notes += np.pad(note_sequence, ((0, diff), (0, 0)), 'constant')
+            merged_replay += np.pad(replay_sequence, ((0, diff), (0, 0)), 'constant')
+
+    return merged_notes, merged_replay
 
 def load_midi(fname):
     p = midi.read_midifile(fname)
