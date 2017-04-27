@@ -49,7 +49,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
             total_loss += loss
             avg_loss = total_loss / step
             t.set_postfix(loss=avg_loss, prob=train_prob)
-            t.update()
+            t.update(BATCH_SIZE)
 
             step += 1
             total_step += 1
@@ -69,7 +69,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
             total_loss += loss
             avg_loss = total_loss / step
             t.set_postfix(loss=avg_loss)
-            t.update()
+            t.update(BATCH_SIZE)
 
             step += 1
         t.close()
@@ -81,9 +81,11 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True):
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
-        print()
+
         # Generate
+        print('Generating...')
         generate(model, name='epoch_' + str(epoch))
+
         epoch += 1
 
 def train_step(model, data, teach_prob):

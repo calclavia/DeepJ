@@ -72,6 +72,7 @@ def validation_split(it_list, split=0.1):
     num_val = int(math.ceil(len(it_list) * split))
     training_indicies = it_list[:-num_val]
     validation_indicies = it_list[-num_val:]
+    
     assert len(validation_indicies) == num_val
     assert len(training_indicies) == len(it_list) - num_val
     return training_indicies, validation_indicies
