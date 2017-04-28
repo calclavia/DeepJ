@@ -21,7 +21,7 @@ MAX_VELOCITY = 127
 
 # Trainin Parameters
 BATCH_SIZE = 16
-SEQ_LEN = 4 * NOTES_PER_BAR
+SEQ_LEN = 2 * NOTES_PER_BAR
 TIME_AXIS_UNITS = 256
 NOTE_AXIS_UNITS = 128
 BEAT_UNITS = 32
@@ -32,6 +32,7 @@ MIN_SCHEDULE_PROB = 0.6
 
 # Style
 STYLES = ['data/baroque']
+# STYLES = ['data/classical/mozart']
 # STYLES = ['data/baroque', 'data/classical', 'data/romantic']
 NUM_STYLES = len(STYLES)
 

@@ -133,7 +133,7 @@ def compute_loss(model, data, teach_prob):
 
     # Iterate through the entire sequence
     for i in range(1, seq_len):
-        beat = beat_seq[:, i]
+        beat = beat_seq[:, i - 1]
         targets = note_seq[:, i]
         output, states = model(prev_note, beat, states, targets)
         loss += criterion(output, targets)
