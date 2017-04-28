@@ -7,7 +7,7 @@ import os
 from constants import *
 
 def midi_encode(composition,
-                articulation,
+                replay,
                 resolution=NOTES_PER_BEAT,
                 step=1):
     """
@@ -31,7 +31,7 @@ def midi_encode(composition,
     for tick, data in enumerate(composition):
         data = np.array(data)
 
-        if not np.array_equal(current, data) or np.any(articulation[tick]):
+        if not np.array_equal(current, data):# or np.any(replay[tick]):
             noop_ticks = 0
 
             for index, next_volume in np.ndenumerate(data):
@@ -52,8 +52,9 @@ def midi_encode(composition,
                     )
                     track.append(evt)
                     last_event_tick = tick
-                elif current[index] > 0 and next_volume > 0 and articulation[tick][index[0]] > 0:
-                    # Handle articulation
+                """
+                elif current[index] > 0 and next_volume > 0 and replay[tick][index[0]] > 0:
+                    # Handle replay
                     evt_off = midi.NoteOffEvent(
                         tick=(tick- last_event_tick) * step,
                         pitch=index[0]
@@ -66,6 +67,7 @@ def midi_encode(composition,
                     )
                     track.append(evt_on)
                     last_event_tick = tick
+                """
         else:
             noop_ticks += 1
 
@@ -121,8 +123,10 @@ def midi_decode(pattern,
 
                 # Buffer & downscale sequence
                 if len(notes_buffer) > step:
-                    # Grab the fist one
+                    # Determine based on majority
+                    notes_sum = np.round(np.sum(notes_buffer[:-1], axis=0) / step)
                     note_sequence.append(notes_buffer[0])
+
                     # Take the max
                     replay_any = np.minimum(np.sum(replay_buffer[:-1], axis=0), 1)
                     replay_sequence.append(replay_any)
@@ -138,11 +142,13 @@ def midi_decode(pattern,
             if isinstance(event, midi.NoteOnEvent):
                 pitch, velocity = event.data
                 notes_buffer[-1][pitch] = min(velocity / MAX_VELOCITY, 1)
+                """
                 # Check for replay_buffer, which is true if the current note was previously played and needs to be replayed
                 if len(notes_buffer) > 1 and notes_buffer[-2][pitch] > 0:
                     replay_buffer[-1][pitch] = 1
                     # Override current volume with previous volume
                     notes_buffer[-1][pitch] = notes_buffer[-2][pitch]
+                """
 
             if isinstance(event, midi.NoteOffEvent):
                 pitch, velocity = event.data
