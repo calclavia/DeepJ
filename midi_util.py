@@ -202,9 +202,7 @@ def load_midi(fname):
 
 if __name__ == '__main__':
     # Test
-    """
-    p = midi.read_midifile("out/test_articulation.mid")
+    p = midi.read_midifile("out/test_in.mid")
     comp, artic = midi_decode(p)
     p = midi_encode(comp, artic)
-    midi.write_midifile("out/test_output.mid", p)
-    """
+    midi.write_midifile("out/test_out.mid", p)
