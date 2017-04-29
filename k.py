@@ -87,7 +87,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
     out = Lambda(lambda x: tf.stack(x, axis=1))(note_axis_outs)
 
     model = Model([notes_in, chosen_in, beat_in], out)
-    model.compile(optimizer='adam', loss='binary_crossentropy')
+    model.compile(optimizer='nadam', loss='binary_crossentropy')
     return model
 
 def main():
