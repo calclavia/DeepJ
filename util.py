@@ -3,7 +3,6 @@ import tensorflow as tf
 import math
 
 from music import *
-from rl import A3CAgent
 from midi_util import *
 
 def one_hot(i, nb_classes):

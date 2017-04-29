@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape
+from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
 from keras.models import Model, load_model
 from keras.callbacks import ModelCheckpoint, LambdaCallback, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.layers.merge import Concatenate, Add
@@ -21,14 +21,14 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
 
     """ Time axis """
     # Pad note by one octave
-    out = Dropout(input_dropout)(notes_in)
-    padded_notes = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')(out)
-    pitch_class_bins = Lambda(lambda x: tf.reduce_sum([x[:, :, i*OCTAVE:i*OCTAVE+OCTAVE] for i in range(NUM_OCTAVES)], axis=0), name='pitch_class_bins')(out)
+    notes = Dropout(input_dropout)(notes_in)
+    padded_notes = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE]]), name='padded_note_in')(notes)
+    pitch_class_bins = Lambda(lambda x: tf.reduce_sum([x[:, :, i*OCTAVE:i*OCTAVE+OCTAVE] for i in range(NUM_OCTAVES)], axis=0), name='pitch_class_bins')(notes)
 
-    time_axis_rnn_1 = LSTM(time_axis_units, return_sequences=True, activation='tanh', name='time_axis_rnn_1')
-    time_axis_rnn_2 = LSTM(time_axis_units, return_sequences=True, activation='tanh', name='time_axis_rnn_2')
-    time_axis_outs = []
+    time_axis_ins = []
 
+    num_features = OCTAVE * 2 + 1 + 1 + OCTAVE + NOTES_PER_BAR
+    # For every note...
     for n in range(OCTAVE, NUM_NOTES + OCTAVE):
         # Input one octave of notes
         octave_in = Lambda(lambda x: x[:, :, n - OCTAVE:n + OCTAVE + 1], name='note_' + str(n))(padded_notes)
@@ -37,14 +37,26 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
         # Pitch class of current note
         pitch_class_in = Lambda(lambda x: tf.reshape(tf.tile(tf.constant(one_hot(n % OCTAVE, OCTAVE), dtype=tf.float32), [tf.shape(x)[0] * time_steps]), [tf.shape(x)[0], time_steps, OCTAVE]))(notes_in)
 
-        time_axis_out = Concatenate()([octave_in, pitch_pos_in, pitch_class_in, beat_in])
-        first_layer_out = time_axis_out = Dropout(dropout)(time_axis_rnn_1(time_axis_out))
-        time_axis_out = Dropout(dropout)(time_axis_rnn_2(time_axis_out))
-        # Skip connection
-        time_axis_out = Add()([first_layer_out, time_axis_out])
-        time_axis_outs.append(time_axis_out)
+        time_axis_in = Concatenate()([octave_in, pitch_pos_in, pitch_class_in, beat_in])
+        time_axis_ins.append(time_axis_in)
 
-    out = Concatenate()(time_axis_outs)
+    # [batch, note, time, features]
+    x = Lambda(lambda x: tf.stack(x, axis=1))(time_axis_ins)
+
+    # Merge note and batch dimension [batch x note, time, features]
+    x = Lambda(lambda x: tf.reshape(x, (-1, time_steps, num_features)))(x)
+
+    # Apply LSTMs
+    x = LSTM(time_axis_units, return_sequences=True, activation='tanh')(x)
+    x = Dropout(dropout)(x)
+
+    x = LSTM(time_axis_units, return_sequences=True, activation='tanh')(x)
+    x = Dropout(dropout)(x)
+
+    # Reshape inputs
+    x = Lambda(lambda x: tf.reshape(x, (-1, NUM_NOTES, time_steps, time_axis_units)))(x)
+    # [batch, time, notes, features]
+    out = Permute((2, 1, 3))(x)
 
     """ Note Axis & Prediction Layer """
     # Shift target one note to the left. []
@@ -56,9 +68,6 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
     prediction_layer = Dense(1, activation='sigmoid')
     note_axis_outs = []
 
-    # Reshape inputs
-    # [batch, time, notes, features]
-    out = Reshape((time_steps, NUM_NOTES, -1))(out)
     # [batch, time, notes, 1]
     shift_chosen = Reshape((time_steps, NUM_NOTES, -1))(shift_chosen)
     # [batch, time, notes, features + 1]
