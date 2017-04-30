@@ -10,14 +10,14 @@ NUM_STYLES = len(styles)
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 
 # Training parameters
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 SEQUENCE_LENGTH = NOTES_PER_BAR
 TIME_STEPS = 16
 
 # Hyper Parameters
 STYLE_UNITS = 32
-TIME_AXIS_UNITS = [256, 256]
-NOTE_AXIS_UNITS = [128, 128, 128, 128, 128, 128]
+TIME_AXIS_UNITS = 300
+NOTE_AXIS_UNITS = 150
 
 # Move file save location
 model_file = 'out/saves/model'
