@@ -5,6 +5,7 @@ from collections import deque
 from tqdm import tqdm
 import argparse
 import midi
+import os
 
 from constants import *
 from dataset import *
@@ -22,7 +23,7 @@ def main():
     if args.train:
         train(model, args.gen)
     else:
-        write_file(SAMPLES_DIR + '/result.mid', generate(model))
+        write_file(os.path.join(SAMPLES_DIR, 'output.mid'), generate(model))
 
 def build_or_load(allow_load=True):
     model = build_model()
@@ -41,7 +42,7 @@ def train(model, gen):
 
     def epoch_cb(epoch, _):
         if epoch % 10 == 0:
-            write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model))
+            write_file(os.path.join(SAMPLES_DIR, 'epoch_{}.mid'.format(epoch)), generate(model))
 
     cbs = [
         ModelCheckpoint(MODEL_FILE, monitor='loss', save_best_only=True),
@@ -96,10 +97,10 @@ def generate(model, num_bars=16, default_temp=1):
         # Consistent with dataset representation
         beat_memory.append(compute_beat(t, NOTES_PER_BAR))
         results.append(next_note)
-
     return results
 
 def write_file(name, results):
+    os.makedirs(os.path.dirname(name), exist_ok=True)
     mf = midi_encode(unclamp_midi(results))
     midi.write_midifile(name, mf)
 

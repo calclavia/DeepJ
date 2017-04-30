@@ -67,10 +67,10 @@ def clamp_midi(sequence):
     """
     Clamps the midi base on the MIN and MAX notes
     """
-    return  sequence[:, MIN_NOTE:MAX_NOTE, :]
+    return sequence[:, MIN_NOTE:MAX_NOTE, :]
 
 def unclamp_midi(sequence):
     """
     Restore clamped MIDI sequence back to MIDI note values
     """
-    return np.concatenate((np.zeros((len(sequence), MIN_NOTE)), sequence), axis=1)
+    return np.pad(sequence, ((0, 0), (MIN_NOTE, 0), (0, 0)), 'constant')
