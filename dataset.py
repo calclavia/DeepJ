@@ -67,9 +67,6 @@ def clamp_midi(sequence):
     """
     Clamps the midi base on the MIN and MAX notes
     """
-    assert len(sequence.shape) == 3, sequence.shape
-    assert (sequence >= 0).all()
-    assert (sequence <= 1).all()
     return  sequence[:, MIN_NOTE:MAX_NOTE, :]
 
 def unclamp_midi(sequence):

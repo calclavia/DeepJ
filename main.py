@@ -1,8 +1,6 @@
 import tensorflow as tf
-from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute, TimeDistributed, RepeatVector, Conv1D
-from keras.models import Model, load_model
-from keras.callbacks import ModelCheckpoint, LambdaCallback, ReduceLROnPlateau, EarlyStopping, TensorBoard
-from keras.layers.merge import Concatenate, Add
+from keras.callbacks import ModelCheckpoint, LambdaCallback, ReduceLROnPlateau
+from keras.callbacks import EarlyStopping, TensorBoard
 from collections import deque
 from tqdm import tqdm
 import argparse
@@ -30,7 +28,7 @@ def build_or_load(allow_load=True):
     model = build_model()
     if allow_load:
         try:
-            model.load_weights('out/model.h5')
+            model.load_weights(MODEL_FILE)
             print('Loaded model from file.')
         except:
             print('Unable to load model from file.')
@@ -46,7 +44,7 @@ def train(model, gen):
             write_file(SAMPLES_DIR + '/result_epoch_{}.mid'.format(epoch), generate(model))
 
     cbs = [
-        ModelCheckpoint('out/model.h5', monitor='loss', save_best_only=True),
+        ModelCheckpoint(MODEL_FILE, monitor='loss', save_best_only=True),
         ReduceLROnPlateau(monitor='loss', patience=3),
         EarlyStopping(monitor='loss', patience=9),
         TensorBoard(log_dir='out/logs', histogram_freq=1)

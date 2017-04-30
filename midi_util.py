@@ -190,14 +190,20 @@ def load_midi(fname):
     p = midi.read_midifile(fname)
     cache_path = os.path.join(CACHE_DIR, fname + '.npy')
     try:
-        return np.load(cache_path)
+        note_seq = np.load(cache_path)
     except Exception as e:
         # Perform caching
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
 
         note_seq = midi_decode(p)
         np.save(cache_path, note_seq)
-        return note_seq
+
+    assert len(note_seq.shape) == 3, note_seq.shape
+    assert note_seq.shape[1] == MIDI_MAX_NOTES, note_seq.shape
+    assert note_seq.shape[2] == 2, note_seq.shape
+    assert (note_seq >= 0).all()
+    assert (note_seq <= 1).all()
+    return note_seq
 
 if __name__ == '__main__':
     # Test

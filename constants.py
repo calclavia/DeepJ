@@ -1,7 +1,8 @@
 import os
 
 # Define the musical styles
-styles = ['data/baroque', 'data/classical', 'data/romantic']
+# styles = ['data/baroque', 'data/classical', 'data/romantic']
+styles = ['data/jazz']
 NUM_STYLES = len(styles)
 
 # MIDI Resolution
@@ -42,6 +43,8 @@ TIME_AXIS_LAYERS = 2
 NOTE_AXIS_LAYERS = 2
 
 # Move file save location
-model_file = 'out/saves/model'
-model_dir = os.path.dirname(model_file)
-SAMPLES_DIR = 'out'
+OUT_DIR = 'out'
+MODEL_DIR = os.path.join(OUT_DIR, 'models')
+MODEL_FILE = os.path.join(OUT_DIR, 'model.h5')
+SAMPLES_DIR = os.path.join(OUT_DIR, 'samples')
+CACHE_DIR = os.path.join(OUT_DIR, 'cache')
