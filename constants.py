@@ -8,7 +8,7 @@ NUM_STYLES = len(styles)
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 
 # Training parameters
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 SEQUENCE_LENGTH = 8 * NOTES_PER_BAR
 
 # Hyper Parameters
