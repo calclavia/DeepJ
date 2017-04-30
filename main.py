@@ -74,11 +74,9 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
     x = Permute((2, 1, 3))(x)
 
     # Apply LSTMs
-    x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
-    x = Dropout(dropout)(x)
-
-    x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
-    x = Dropout(dropout)(x)
+    for l in range(TIME_AXIS_LAYERS):
+        x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
+        x = Dropout(dropout)(x)
 
     # [batch, time, notes, features]
     x = Permute((2, 1, 3))(x)
@@ -92,11 +90,9 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
     # [batch, time, notes, features + 1]
     x = Concatenate(axis=3)([x, shift_chosen])
 
-    x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
-    x = Dropout(dropout)(x)
-
-    x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
-    x = Dropout(dropout)(x)
+    for l in range(NOTE_AXIS_LAYERS):
+        x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
+        x = Dropout(dropout)(x)
 
     x = TimeDistributed(Dense(1, activation='sigmoid'))(x)
     x = Reshape((time_steps, NUM_NOTES))(x)
