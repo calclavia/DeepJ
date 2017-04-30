@@ -62,7 +62,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
     note_features = Concatenate()([
         Lambda(pitch_pos_in_f(time_steps))(notes),
         Lambda(pitch_class_in_f(time_steps))(notes),
-        Lambda(pitch_bins_f(time_steps))(notes),
+        # Lambda(pitch_bins_f(time_steps))(notes),
         # TODO: Don't hardcode
         TimeDistributed(Conv1D(32, 2 * OCTAVE, padding='same'))(notes),
         TimeDistributed(RepeatVector(NUM_NOTES))(beat)

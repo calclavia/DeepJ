@@ -3,24 +3,21 @@ import os
 
 # Define the musical styles
 styles = ['data/baroque', 'data/classical', 'data/romantic']
-#styles = ['data/edm', 'data/southern_rock', 'data/hard_rock']
-# styles = ['data/baroque', 'data/classical']
 NUM_STYLES = len(styles)
 
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 
 # Training parameters
-BATCH_SIZE = 128
-SEQUENCE_LENGTH = NOTES_PER_BAR
-TIME_STEPS = 16
+BATCH_SIZE = 64
+SEQUENCE_LENGTH = 8 * NOTES_PER_BAR
 
 # Hyper Parameters
 STYLE_UNITS = 32
-TIME_AXIS_UNITS = 128
+TIME_AXIS_UNITS = 256
 NOTE_AXIS_UNITS = 128
 
-TIME_AXIS_LAYERS = 4
-NOTE_AXIS_LAYERS = 4
+TIME_AXIS_LAYERS = 2
+NOTE_AXIS_LAYERS = 2
 
 # Move file save location
 model_file = 'out/saves/model'
