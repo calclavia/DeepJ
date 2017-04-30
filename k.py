@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
+from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute, TimeDistributed
 from keras.models import Model, load_model
 from keras.callbacks import ModelCheckpoint, LambdaCallback, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.layers.merge import Concatenate, Add
@@ -63,28 +63,21 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
     shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1], [[0, 0], [0, 0], [1, 0]]))(chosen_in)
     shift_chosen = Dropout(input_dropout)(shift_chosen)
     shift_chosen = Lambda(lambda x: tf.expand_dims(x, -1))(shift_chosen)
-    note_axis_rnn_1 = LSTM(note_axis_units, return_sequences=True, activation='tanh', name='note_axis_rnn_1')
-    note_axis_rnn_2 = LSTM(note_axis_units, return_sequences=True, activation='tanh', name='note_axis_rnn_2')
-    prediction_layer = Dense(1, activation='sigmoid')
-    note_axis_outs = []
 
     # [batch, time, notes, 1]
     shift_chosen = Reshape((time_steps, NUM_NOTES, -1))(shift_chosen)
     # [batch, time, notes, features + 1]
-    note_axis_input = Concatenate(axis=3)([out, shift_chosen])
+    note_axis_out = Concatenate(axis=3)([out, shift_chosen])
 
-    for t in range(time_steps):
-        # [batch, notes, features + 1]
-        note_axis_out = Lambda(lambda x: x[:, t, :, :], name='time_' + str(t))(note_axis_input)
-        first_layer_out = note_axis_out = Dropout(dropout)(note_axis_rnn_1(note_axis_out))
-        note_axis_out = Dropout(dropout)(note_axis_rnn_2(note_axis_out))
-        # Skip connection
-        note_axis_out = Add()([first_layer_out, note_axis_out])
+    note_axis_out = TimeDistributed(LSTM(note_axis_units, return_sequences=True, activation='tanh'))(note_axis_out)
+    note_axis_out = Dropout(dropout)(note_axis_out)
 
-        note_axis_out = prediction_layer(note_axis_out)
-        note_axis_out = Reshape((NUM_NOTES,))(note_axis_out)
-        note_axis_outs.append(note_axis_out)
-    out = Lambda(lambda x: tf.stack(x, axis=1))(note_axis_outs)
+    note_axis_out = TimeDistributed(LSTM(note_axis_units, return_sequences=True, activation='tanh'))(note_axis_out)
+    note_axis_out = Dropout(dropout)(note_axis_out)
+
+    note_axis_out = TimeDistributed(Dense(1, activation='sigmoid'))(note_axis_out)
+    note_axis_out = Reshape((time_steps, NUM_NOTES))(note_axis_out)
+    out = note_axis_out
 
     model = Model([notes_in, chosen_in, beat_in], out)
     model.compile(optimizer='nadam', loss='binary_crossentropy')
