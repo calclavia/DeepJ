@@ -36,8 +36,8 @@ def build_or_load(allow_load=True):
     return model
 
 def train(model, gen):
-    print('Training')
-    train_data, train_labels = load_all(styles, BATCH_SIZE, SEQUENCE_LENGTH)
+    print('Loading data')
+    train_data, train_labels = load_all(styles, BATCH_SIZE, SEQ_LEN)
 
     def epoch_cb(epoch, _):
         if epoch % 10 == 0:
@@ -53,36 +53,38 @@ def train(model, gen):
     if gen:
         cbs += [LambdaCallback(on_epoch_end=epoch_cb)]
 
+    print('Training')
     model.fit(train_data, train_labels, epochs=1000, callbacks=cbs)
 
-def generate(model, default_temp=1):
+def generate(model, num_bars=16, default_temp=1):
     print('Generating')
-    notes_memory = deque([np.zeros(NUM_NOTES) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
-    beat_memory = deque([np.zeros(NOTES_PER_BAR) for _ in range(SEQUENCE_LENGTH)], maxlen=SEQUENCE_LENGTH)
+    notes_memory = deque([np.zeros((NUM_NOTES, 2)) for _ in range(SEQ_LEN)], maxlen=SEQ_LEN)
+    beat_memory = deque([np.zeros(NOTES_PER_BAR) for _ in range(SEQ_LEN)], maxlen=SEQ_LEN)
 
     results = []
     temperature = default_temp
 
-    for t in tqdm(range(NOTES_PER_BAR * 32)):
-
+    for t in tqdm(range(NOTES_PER_BAR * num_bars)):
         # The next note being built.
-        next_note = np.zeros(NUM_NOTES)
+        next_note = np.zeros((NUM_NOTES, 2))
 
         # Generate each note individually
         for n in range(NUM_NOTES):
-            predictions = model.predict([np.array([notes_memory]), np.array([list(notes_memory)[1:] + [next_note]]), np.array([beat_memory])])
+            inputs = [np.array([notes_memory]), np.array([list(notes_memory)[1:] + [next_note]]), np.array([beat_memory])]
+            pred = np.array(model.predict(inputs))
             # We only care about the last time step
-            prob_dist = predictions[0][-1]
+            pred = pred[0, -1, :]
 
             # Apply temperature
             if temperature != 1:
                 # Inverse sigmoid
-                x = -np.log(1 / np.array(prob_dist) - 1)
+                x = -np.log(1 / np.array(pred) - 1)
                 # Apply temperature to sigmoid function
-                prob_dist = 1 / (1 + np.exp(-x / temperature))
+                pred = 1 / (1 + np.exp(-x / temperature))
 
             # Flip on randomly
-            next_note[n] = 1 if np.random.random() <= prob_dist[n] else 0
+            next_note[n, 0] = 1 if np.random.random() <= pred[n, 0] else 0
+            next_note[n, 1] = 1 if next_note[n, 0] == 1 and np.random.random() <= pred[n, 1] else 0
 
         # Increase temperature while silent.
         if np.count_nonzero(next_note) == 0:

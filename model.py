@@ -37,20 +37,16 @@ def pitch_bins_f(time_steps):
         return bins
     return f
 
-def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
-    notes_in = Input((time_steps, NUM_NOTES))
+def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
+    notes_in = Input((time_steps, NUM_NOTES, 2))
     beat_in = Input((time_steps, NOTES_PER_BAR))
     # Target input for conditioning
-    chosen_in = Input((time_steps, NUM_NOTES))
+    chosen_in = Input((time_steps, NUM_NOTES, 2))
 
     # Dropout inputs
     notes = Dropout(input_dropout)(notes_in)
     beat = Dropout(input_dropout)(beat_in)
     chosen = Dropout(input_dropout)(chosen_in)
-
-    # Reshape some inputs
-    notes = Reshape((time_steps, NUM_NOTES, 1))(notes)
-    chosen = Reshape((time_steps, NUM_NOTES, 1))(chosen)
 
     """ Time axis """
     # Create features for every single note.
@@ -89,8 +85,7 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
         x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
 
-    x = TimeDistributed(Dense(1, activation='sigmoid'))(x)
-    x = Reshape((time_steps, NUM_NOTES))(x)
+    x = TimeDistributed(Dense(2, activation='sigmoid'))(x)
 
     model = Model([notes_in, chosen_in, beat_in], x)
     model.compile(optimizer='nadam', loss='binary_crossentropy')
