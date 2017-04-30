@@ -27,13 +27,13 @@ def main():
 
 def build_or_load(allow_load=True):
     model = build_model()
+    model.summary()
     if allow_load:
         try:
             model.load_weights(MODEL_FILE)
             print('Loaded model from file.')
         except:
             print('Unable to load model from file.')
-    model.summary()
     return model
 
 def train(model, gen):

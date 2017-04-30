@@ -18,17 +18,17 @@ def midi_encode(note_seq, resolution=NOTES_PER_BEAT, step=1):
     # Append the track to the pattern
     pattern.append(track)
 
-    composition = note_seq[:, :, 0]
+    play = note_seq[:, :, 0]
     replay = note_seq[:, :, 1]
 
     # The current pattern being played
-    current = np.zeros_like(composition[0])
+    current = np.zeros_like(play[0])
     # Absolute tick of last event
     last_event_tick = 0
     # Amount of NOOP ticks
     noop_ticks = 0
 
-    for tick, data in enumerate(composition):
+    for tick, data in enumerate(play):
         data = np.array(data)
 
         if not np.array_equal(current, data):# or np.any(replay[tick]):
@@ -108,31 +108,31 @@ def midi_decode(pattern,
 
     for track in pattern:
         # The downsampled sequences
-        note_sequence = []
+        play_sequence = []
         replay_sequence = []
 
         # Raw sequences
-        notes_buffer = [np.zeros((classes,))]
+        play_buffer = [np.zeros((classes,))]
         replay_buffer = [np.zeros((classes,))]
 
         for i, event in enumerate(track):
             # Duplicate the last note pattern to wait for next event
             for _ in range(event.tick):
-                notes_buffer.append(np.copy(notes_buffer[-1]))
+                play_buffer.append(np.copy(play_buffer[-1]))
                 replay_buffer.append(np.zeros(classes))
 
                 # Buffer & downscale sequence
-                if len(notes_buffer) > step:
+                if len(play_buffer) > step:
                     # Determine based on majority
-                    notes_sum = np.round(np.sum(notes_buffer[:-1], axis=0) / step)
-                    note_sequence.append(notes_buffer[0])
+                    notes_sum = np.round(np.sum(play_buffer[:-1], axis=0) / step)
+                    play_sequence.append(play_buffer[0])
 
                     # Take the max
                     replay_any = np.minimum(np.sum(replay_buffer[:-1], axis=0), 1)
                     replay_sequence.append(replay_any)
 
                     # Keep the last one (discard things in the middle)
-                    notes_buffer = notes_buffer[-1:]
+                    play_buffer = play_buffer[-1:]
                     replay_buffer = replay_buffer[-1:]
 
             if isinstance(event, midi.EndOfTrackEvent):
@@ -141,50 +141,53 @@ def midi_decode(pattern,
             # Modify the last note pattern
             if isinstance(event, midi.NoteOnEvent):
                 pitch, velocity = event.data
-                notes_buffer[-1][pitch] = min(velocity / MAX_VELOCITY, 1)
+                play_buffer[-1][pitch] = 1 if velocity > 0 else 0
 
                 # Check for replay_buffer, which is true if the current note was previously played and needs to be replayed
-                if len(notes_buffer) > 1 and notes_buffer[-2][pitch] > 0 and notes_buffer[-1][pitch] > 0:
+                if len(play_buffer) > 1 and play_buffer[-2][pitch] > 0 and play_buffer[-1][pitch] > 0:
                     replay_buffer[-1][pitch] = 1
                     # Override current volume with previous volume
-                    notes_buffer[-1][pitch] = notes_buffer[-2][pitch]
+                    play_buffer[-1][pitch] = play_buffer[-2][pitch]
 
             if isinstance(event, midi.NoteOffEvent):
                 pitch, velocity = event.data
-                notes_buffer[-1][pitch] = 0
+                play_buffer[-1][pitch] = 0
 
         # Add the remaining
-        note_sequence.append(notes_buffer[0])
+        play_sequence.append(play_buffer[0])
         replay_any = np.minimum(np.sum(replay_buffer, axis=0), 1)
         replay_sequence.append(replay_any)
 
-        note_sequence = np.array(note_sequence)
+        play_sequence = np.array(play_sequence)
         replay_sequence = np.array(replay_sequence)
-        assert len(note_sequence) == len(replay_sequence)
+        assert len(play_sequence) == len(replay_sequence)
 
         if merged_notes is None:
-            merged_notes = note_sequence
+            merged_notes = play_sequence
             merged_replay = replay_sequence
         else:
             # Merge into a single track, padding with zeros of needed
-            if len(note_sequence) > len(merged_notes):
+            if len(play_sequence) > len(merged_notes):
                 # Swap variables such that merged_notes is always at least
-                # as large as note_sequence
-                tmp = note_sequence
-                note_sequence = merged_notes
+                # as large as play_sequence
+                tmp = play_sequence
+                play_sequence = merged_notes
                 merged_notes = tmp
 
                 tmp = replay_sequence
                 replay_sequence = merged_replay
                 merged_replay = tmp
 
-            assert len(merged_notes) >= len(note_sequence)
+            assert len(merged_notes) >= len(play_sequence)
 
-            diff = len(merged_notes) - len(note_sequence)
-            merged_notes += np.pad(note_sequence, ((0, diff), (0, 0)), 'constant')
+            diff = len(merged_notes) - len(play_sequence)
+            merged_notes += np.pad(play_sequence, ((0, diff), (0, 0)), 'constant')
             merged_replay += np.pad(replay_sequence, ((0, diff), (0, 0)), 'constant')
 
-    return np.stack([merged_notes, merged_replay], axis=2)
+    merged = np.stack([merged_notes, merged_replay], axis=2)
+    # Prevent stacking duplicate notes to exceed one.
+    merged = np.minimum(merged, 1)
+    return merged
 
 def load_midi(fname):
     p = midi.read_midifile(fname)

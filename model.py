@@ -4,9 +4,16 @@ from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
 from keras.layers import TimeDistributed, RepeatVector, Conv1D
 from keras.layers.merge import Concatenate, Add
 from keras.models import Model
+import keras.backend as K
 
 from util import *
 from constants import *
+
+def loss(y_true, y_pred):
+    # Flatten inputs
+    y_pred = K.reshape(y_pred, (K.shape(y_pred)[0], -1))
+    y_true = K.reshape(y_true, (K.shape(y_true)[0], -1))
+    return K.mean(K.binary_crossentropy(y_pred, y_true), axis=-1)
 
 def pitch_pos_in_f(time_steps):
     """
@@ -73,7 +80,7 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     x = Permute((2, 1, 3))(x)
 
     """ Note Axis & Prediction Layer """
-    # Shift target one note to the left. []
+    # Shift target one note to the left.
     shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1, :], [[0, 0], [0, 0], [1, 0], [0, 0]]))(chosen)
 
     # [batch, time, notes, 1]
@@ -88,5 +95,5 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     x = TimeDistributed(Dense(2, activation='sigmoid'))(x)
 
     model = Model([notes_in, chosen_in, beat_in], x)
-    model.compile(optimizer='nadam', loss='binary_crossentropy')
+    model.compile(optimizer='nadam', loss=loss)
     return model
