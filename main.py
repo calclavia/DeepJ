@@ -7,9 +7,8 @@ from collections import deque
 from tqdm import tqdm
 import argparse
 
-from constants import SEQUENCE_LENGTH
+from constants import *
 from dataset import *
-from music import OCTAVE, NUM_OCTAVES
 from midi_util import midi_encode
 import midi
 

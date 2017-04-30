@@ -4,12 +4,7 @@ Handles MIDI file loading
 import midi
 import numpy as np
 import os
-from music import NUM_CLASSES, MIN_CLASS, NOTES_PER_BEAT, NOTE_OFF, NO_EVENT, MIN_NOTE
-
-# MIDI Resolution
-DEFAULT_RES = 96
-MIDI_MAX_NOTES = 128
-MAX_VELOCITY = 127
+from constants import *
 
 def midi_encode(composition,
                 resolution=NOTES_PER_BEAT,

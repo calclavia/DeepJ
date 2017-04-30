@@ -1,6 +1,4 @@
-pretty_midi
 keras
-gym
 tensorflow-gpu
 joblib
 tqdm

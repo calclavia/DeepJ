@@ -1,15 +1,37 @@
-from music import NOTES_PER_BAR, MAX_NOTE, MIN_NOTE
 import os
 
 # Define the musical styles
 styles = ['data/baroque', 'data/classical', 'data/romantic']
 NUM_STYLES = len(styles)
 
+# MIDI Resolution
+DEFAULT_RES = 96
+MIDI_MAX_NOTES = 128
+MAX_VELOCITY = 127
+
+# Number of octaves supported
+NUM_OCTAVES = 4
+OCTAVE = 12
+
+# Min and max note (in MIDI note number)
+MIN_NOTE = 36
+MAX_NOTE = MIN_NOTE + NUM_OCTAVES * OCTAVE
 NUM_NOTES = MAX_NOTE - MIN_NOTE
 
+# Number of output note classes.
+MIN_CLASS = 2  # First note class
+NUM_CLASSES = MIN_CLASS + (MAX_NOTE - MIN_NOTE)
+
+# Number of beats in a bar
+BEATS_PER_BAR = 4
+# Notes per quarter note
+NOTES_PER_BEAT = 4
+# The quickest note is a half-note
+NOTES_PER_BAR = NOTES_PER_BEAT * BEATS_PER_BAR
+
 # Training parameters
-BATCH_SIZE = 32
-SEQUENCE_LENGTH = 8 * NOTES_PER_BAR
+BATCH_SIZE = 64
+SEQUENCE_LENGTH = 2 * NOTES_PER_BAR
 
 # Hyper Parameters
 STYLE_UNITS = 32

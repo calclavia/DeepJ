@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import math
 
-from music import *
+from constants import *
 from midi_util import *
 
 def one_hot(i, nb_classes):
@@ -29,29 +29,3 @@ def get_all_files(paths):
                 if os.path.isfile(fname) and fname.endswith('.mid'):
                     potential_files.append(fname)
     return potential_files
-
-def reset_graph():
-    if 'sess' in globals() and sess:
-        sess.close()
-    tf.reset_default_graph()
-
-def count_number_trainable_params():
-    """
-    Counts the number of trainable variables.
-    """
-    tot_nb_params = 0
-    for trainable_variable in tf.trainable_variables():
-        shape = trainable_variable.get_shape() # e.g [D,F] or [W,H,C]
-        current_nb_params = get_nb_params_shape(shape)
-        tot_nb_params = tot_nb_params + current_nb_params
-    return tot_nb_params
-
-def get_nb_params_shape(shape):
-    """
-    Computes the total number of params for a given shap.
-    Works for any number of shapes etc [D,F] or [W,H,C] computes D*F and W*H*C.
-    """
-    nb_params = 1
-    for dim in shape:
-        nb_params = nb_params*int(dim)
-    return nb_params

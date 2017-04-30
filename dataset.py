@@ -8,7 +8,6 @@ from joblib import Parallel, delayed
 import multiprocessing
 
 from constants import *
-from music import MIN_NOTE, MAX_NOTE, NOTES_PER_BAR
 from midi_util import load_midi
 from util import chunk, get_all_files, one_hot
 
