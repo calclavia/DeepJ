@@ -43,18 +43,13 @@ def build_model(time_steps=SEQUENCE_LENGTH, time_axis_units=256, note_axis_units
     # [batch, note, time, features]
     x = Lambda(lambda x: tf.stack(x, axis=1))(time_axis_ins)
 
-    # Merge note and batch dimension [batch x note, time, features]
-    x = Lambda(lambda x: tf.reshape(x, (-1, time_steps, num_features)))(x)
-
     # Apply LSTMs
-    x = LSTM(time_axis_units, return_sequences=True, activation='tanh')(x)
+    x = TimeDistributed(LSTM(time_axis_units, return_sequences=True, activation='tanh'))(x)
     x = Dropout(dropout)(x)
 
-    x = LSTM(time_axis_units, return_sequences=True, activation='tanh')(x)
+    x = TimeDistributed(LSTM(time_axis_units, return_sequences=True, activation='tanh'))(x)
     x = Dropout(dropout)(x)
 
-    # Reshape inputs
-    x = Lambda(lambda x: tf.reshape(x, (-1, NUM_NOTES, time_steps, time_axis_units)))(x)
     # [batch, time, notes, features]
     out = Permute((2, 1, 3))(x)
 
@@ -135,7 +130,7 @@ def generate(model, default_temp=1):
     results = []
     temperature = default_temp
 
-    for t in tqdm(range(NOTES_PER_BAR * 8)):
+    for t in tqdm(range(NOTES_PER_BAR * 16)):
 
         # The next note being built.
         next_note = np.zeros(NUM_NOTES)
