@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute, TimeDistributed, RepeatVector
+from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute, TimeDistributed, RepeatVector, Conv1D
 from keras.models import Model, load_model
 from keras.callbacks import ModelCheckpoint, LambdaCallback, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.layers.merge import Concatenate, Add
@@ -42,19 +42,6 @@ def pitch_bins_f(time_steps):
         return bins
     return f
 
-def reach_octave():
-    def f(x):
-        padded_notes = Lambda(lambda x: tf.pad(x, [[0, 0], [0, 0], [OCTAVE, OCTAVE], [0, 0]]))(x)
-        adjacents = []
-
-        for n in range(NUM_NOTES):
-            adj = Lambda(lambda x: x[:, :, n:n+2*OCTAVE, 0])(padded_notes)
-            adjacents.append(adj)
-
-        x = Lambda(lambda x: tf.stack(x, axis=2))(adjacents)
-        return x
-    return f
-
 def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
     notes_in = Input((time_steps, NUM_NOTES))
     beat_in = Input((time_steps, NOTES_PER_BAR))
@@ -66,19 +53,20 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
     beat = Dropout(input_dropout)(beat_in)
     chosen = Dropout(input_dropout)(chosen_in)
 
-    """ Time axis """
+    # Reshape some inputs
     notes = Reshape((time_steps, NUM_NOTES, 1))(notes)
+    chosen = Reshape((time_steps, NUM_NOTES, 1))(chosen)
 
+    """ Time axis """
+    # Create features for every single note.
     note_features = Concatenate()([
         Lambda(pitch_pos_in_f(time_steps))(notes),
         Lambda(pitch_class_in_f(time_steps))(notes),
         Lambda(pitch_bins_f(time_steps))(notes),
-        # TODO: Compare with convolution
-        reach_octave()(notes),
+        # TODO: Don't hardcode
+        TimeDistributed(Conv1D(32, 2 * OCTAVE, padding='same'))(notes),
         TimeDistributed(RepeatVector(NUM_NOTES))(beat)
     ])
-
-    num_features = OCTAVE * 2 + 1 + 1 + OCTAVE + NOTES_PER_BAR
 
     x = note_features
 
@@ -86,10 +74,10 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
     x = Permute((2, 1, 3))(x)
 
     # Apply LSTMs
-    x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True, activation='tanh'))(x)
+    x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
     x = Dropout(dropout)(x)
 
-    x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True, activation='tanh'))(x)
+    x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
     x = Dropout(dropout)(x)
 
     # [batch, time, notes, features]
@@ -97,18 +85,17 @@ def build_model(time_steps=SEQUENCE_LENGTH, input_dropout=0.2, dropout=0.5):
 
     """ Note Axis & Prediction Layer """
     # Shift target one note to the left. []
-    shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1], [[0, 0], [0, 0], [1, 0]]))(chosen)
-    shift_chosen = Lambda(lambda x: tf.expand_dims(x, -1))(shift_chosen)
+    shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1, :], [[0, 0], [0, 0], [1, 0], [0, 0]]))(chosen)
 
     # [batch, time, notes, 1]
     shift_chosen = Reshape((time_steps, NUM_NOTES, -1))(shift_chosen)
     # [batch, time, notes, features + 1]
     x = Concatenate(axis=3)([x, shift_chosen])
 
-    x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True, activation='tanh'))(x)
+    x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
     x = Dropout(dropout)(x)
 
-    x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True, activation='tanh'))(x)
+    x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
     x = Dropout(dropout)(x)
 
     x = TimeDistributed(Dense(1, activation='sigmoid'))(x)
