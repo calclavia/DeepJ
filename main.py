@@ -57,10 +57,11 @@ def train(model, gen):
     print('Training')
     model.fit(train_data, train_labels, epochs=1000, callbacks=cbs)
 
-def generate(model, num_bars=16, default_temp=1):
+def generate(model, style=[0.25, 0.25, 0.25, 0.25], num_bars=16, default_temp=1):
     print('Generating')
     notes_memory = deque([np.zeros((NUM_NOTES, 2)) for _ in range(SEQ_LEN)], maxlen=SEQ_LEN)
     beat_memory = deque([np.zeros(NOTES_PER_BAR) for _ in range(SEQ_LEN)], maxlen=SEQ_LEN)
+    style_memory = deque([style for _ in range(SEQ_LEN)], maxlen=SEQ_LEN)
 
     results = []
     temperature = default_temp
@@ -71,7 +72,13 @@ def generate(model, num_bars=16, default_temp=1):
 
         # Generate each note individually
         for n in range(NUM_NOTES):
-            inputs = [np.array([notes_memory]), np.array([list(notes_memory)[1:] + [next_note]]), np.array([beat_memory])]
+            inputs = [
+                np.array([notes_memory]),
+                np.array([list(notes_memory)[1:] + [next_note]]),
+                np.array([beat_memory]),
+                np.array([style_memory])
+            ]
+
             pred = np.array(model.predict(inputs))
             # We only care about the last time step
             pred = pred[0, -1, :]
