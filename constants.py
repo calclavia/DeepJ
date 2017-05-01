@@ -2,7 +2,7 @@ import os
 
 # Define the musical styles
 styles = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']
-# styles = ['data/baroque']
+# styles = ['data/jazz']
 NUM_STYLES = len(styles)
 
 # MIDI Resolution

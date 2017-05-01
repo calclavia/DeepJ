@@ -10,9 +10,6 @@ from util import *
 from constants import *
 
 def loss(y_true, y_pred):
-    # Flatten inputs
-    y_pred = K.reshape(y_pred, (K.shape(y_pred)[0], -1))
-    y_true = K.reshape(y_true, (K.shape(y_true)[0], -1))
     return K.mean(K.binary_crossentropy(y_pred, y_true), axis=-1)
 
 def pitch_pos_in_f(time_steps):

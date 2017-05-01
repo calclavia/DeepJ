@@ -83,9 +83,12 @@ def generate(model, num_bars=16, default_temp=1):
                 # Apply temperature to sigmoid function
                 pred = 1 / (1 + np.exp(-x / temperature))
 
-            # Flip on randomly
-            next_note[n, 0] = 1 if np.random.random() <= pred[n, 0] else 0
-            next_note[n, 1] = 1 if next_note[n, 0] == 1 and np.random.random() <= pred[n, 1] else 0
+            # Flip notes randomly
+            if np.random.random() <= pred[n, 0]:
+                next_note[n, 0] = 1
+
+                if np.random.random() <= pred[n, 1]:
+                    next_note[n, 1] = 1
 
         # Increase temperature while silent.
         if np.count_nonzero(next_note) == 0:
