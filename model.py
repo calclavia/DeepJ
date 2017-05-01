@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
-from keras.layers import TimeDistributed, RepeatVector, Conv1D
+from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation
 from keras.layers.merge import Concatenate, Add
 from keras.models import Model
 import keras.backend as K
@@ -55,15 +55,19 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     style = Dropout(input_dropout)(style_in)
 
     """ Time axis """
-    # TODO: Don't hardcode
-    note_octave = TimeDistributed(Conv1D(32, 2 * OCTAVE, padding='same'))(notes)
-    note_octave = Dropout(dropout)(note_octave)
+    note_octave = notes
+
+    # Note data
+    for i in range(6):
+        note_octave = TimeDistributed(Conv1D(128, 3, padding='same', dilation_rate=2 ** i))(note_octave)
+        note_octave = Activation('relu')(note_octave)
+        note_octave = Dropout(dropout)(note_octave)
 
     # Create features for every single note.
     note_features = Concatenate()([
         Lambda(pitch_pos_in_f(time_steps))(notes),
         Lambda(pitch_class_in_f(time_steps))(notes),
-        Lambda(pitch_bins_f(time_steps))(notes),
+        # Lambda(pitch_bins_f(time_steps))(notes),
         note_octave,
         TimeDistributed(RepeatVector(NUM_NOTES))(beat),
         TimeDistributed(RepeatVector(NUM_NOTES))(style)
