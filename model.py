@@ -44,6 +44,7 @@ def pitch_bins_f(time_steps):
 def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     notes_in = Input((time_steps, NUM_NOTES, 2))
     beat_in = Input((time_steps, NOTES_PER_BAR))
+    style_in = Input((time_steps, NUM_STYLES))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES, 2))
 
@@ -51,16 +52,21 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     notes = Dropout(input_dropout)(notes_in)
     beat = Dropout(input_dropout)(beat_in)
     chosen = Dropout(input_dropout)(chosen_in)
+    style = Dropout(input_dropout)(style_in)
 
     """ Time axis """
+    # TODO: Don't hardcode
+    note_octave = TimeDistributed(Conv1D(32, 2 * OCTAVE, padding='same'))(notes)
+    note_octave = Dropout(dropout)(note_octave)
+
     # Create features for every single note.
     note_features = Concatenate()([
         Lambda(pitch_pos_in_f(time_steps))(notes),
         Lambda(pitch_class_in_f(time_steps))(notes),
         Lambda(pitch_bins_f(time_steps))(notes),
-        # TODO: Don't hardcode
-        TimeDistributed(Conv1D(32, 2 * OCTAVE, padding='same'))(notes),
-        TimeDistributed(RepeatVector(NUM_NOTES))(beat)
+        note_octave,
+        TimeDistributed(RepeatVector(NUM_NOTES))(beat),
+        TimeDistributed(RepeatVector(NUM_NOTES))(style)
     ])
 
     x = note_features
@@ -91,6 +97,6 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     x = TimeDistributed(Dense(2, activation='sigmoid'))(x)
 
-    model = Model([notes_in, chosen_in, beat_in], x)
+    model = Model([notes_in, chosen_in, beat_in, style_in], x)
     model.compile(optimizer='nadam', loss=loss)
     return model
