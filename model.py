@@ -54,9 +54,12 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     chosen = Dropout(input_dropout)(chosen_in)
     style = Dropout(input_dropout)(style_in)
 
-    # Distributed style representation
+    # Distributed representations
     style = TimeDistributed(Dense(STYLE_UNITS))(style)
     style = Dropout(input_dropout)(style)
+
+    beat = TimeDistributed(Dense(BEAT_UNITS))(beat)
+    beat = Dropout(input_dropout)(beat)
 
     """ Time axis """
     note_octave = TimeDistributed(Conv1D(OCTAVE_UNITS, 2 * OCTAVE, padding='same'))(notes)
