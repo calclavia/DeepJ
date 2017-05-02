@@ -122,6 +122,7 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     # Secondary task
     styles_out = Dense(STYLE_UNITS, activation='tanh')(x)
+    styles_out = Dropout(dropout)(styles_out)
     styles_out = TimeDistributed(Flatten())(styles_out)
     styles_out = Dense(NUM_STYLES, activation='softmax', name='style_out')(styles_out)
 
