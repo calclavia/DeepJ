@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
-from keras.layers import TimeDistributed, RepeatVector, Conv1D
+from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation
 from keras.layers.merge import Concatenate, Add
 from keras.models import Model
 import keras.backend as K
@@ -56,13 +56,15 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     # Distributed representations
     style = TimeDistributed(Dense(STYLE_UNITS))(style)
-    style = Dropout(input_dropout)(style)
+    style = Dropout(dropout)(style)
 
     beat = TimeDistributed(Dense(BEAT_UNITS))(beat)
-    beat = Dropout(input_dropout)(beat)
+    beat = Activation('tanh')(beat)
+    beat = Dropout(dropout)(beat)
 
     """ Time axis """
     note_octave = TimeDistributed(Conv1D(OCTAVE_UNITS, 2 * OCTAVE, padding='same'))(notes)
+    note_octave = Activation('tanh')(note_octave)
     note_octave = Dropout(dropout)(note_octave)
 
     # Create features for every single note.
@@ -71,8 +73,7 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
         Lambda(pitch_class_in_f(time_steps))(notes),
         Lambda(pitch_bins_f(time_steps))(notes),
         note_octave,
-        TimeDistributed(RepeatVector(NUM_NOTES))(beat),
-        TimeDistributed(RepeatVector(NUM_NOTES))(style)
+        TimeDistributed(RepeatVector(NUM_NOTES))(beat)
     ])
 
     x = note_features
@@ -82,12 +83,11 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     # Apply LSTMs
     for l in range(TIME_AXIS_LAYERS):
-        if l > 0:
-            # Integrate style
-            style_proj = TimeDistributed(Dense(int(x.get_shape()[3])))(style)
-            style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
-            style_proj = Permute((2, 1, 3))(style_proj)
-            x = Add()([x, style_proj])
+        # Integrate style
+        style_proj = TimeDistributed(Dense(int(x.get_shape()[3])))(style)
+        style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+        style_proj = Permute((2, 1, 3))(style_proj)
+        x = Add()([x, style_proj])
 
         x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
