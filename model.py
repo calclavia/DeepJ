@@ -43,7 +43,7 @@ def pitch_bins_f(time_steps):
 
 def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     notes_in = Input((time_steps, NUM_NOTES, 2))
-    beat_in = Input((time_steps, NOTES_PER_BAR))
+    beat_in = Input((time_steps, 2))
     style_in = Input((time_steps, NUM_STYLES))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES, 2))

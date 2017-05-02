@@ -14,12 +14,12 @@ from util import chunk, get_all_files, one_hot
 def compute_beat(beat, notes_in_bar):
     # TODO: Compare methods
     # Angle method
-    # angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
-    # return np.array([math.cos(angle), math.sin(angle)])
-    return one_hot(beat % notes_in_bar, notes_in_bar)
+    angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
+    return np.array([math.cos(angle), math.sin(angle)])
+    # return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def compute_completion(beat, len_melody):
-    return np.array([beat / (len_melody - 1)])
+    return np.array([beat / len_melody])
 
 def stagger(data, time_steps):
     dataX, dataY = [], []
