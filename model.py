@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
-from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation
+from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation, Flatten
 from keras.layers.merge import Concatenate, Add
 from keras.models import Model
 import keras.backend as K
@@ -55,10 +55,10 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     style = Dropout(input_dropout)(style_in)
 
     # Distributed representations
-    style = TimeDistributed(Dense(STYLE_UNITS))(style)
+    style = Dense(STYLE_UNITS)(style)
     style = Dropout(dropout)(style)
 
-    beat = TimeDistributed(Dense(BEAT_UNITS))(beat)
+    beat = Dense(BEAT_UNITS)(beat)
     beat = Activation('tanh')(beat)
     beat = Dropout(dropout)(beat)
 
@@ -84,7 +84,7 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     # Apply LSTMs
     for l in range(TIME_AXIS_LAYERS):
         # Integrate style
-        style_proj = TimeDistributed(Dense(int(x.get_shape()[3])))(style)
+        style_proj = Dense(int(x.get_shape()[3]))(style)
         style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
         style_proj = Permute((2, 1, 3))(style_proj)
         x = Add()([x, style_proj])
@@ -106,15 +106,21 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     for l in range(NOTE_AXIS_LAYERS):
         # Integrate style
-        style_proj = TimeDistributed(Dense(int(x.get_shape()[3])))(style)
+        style_proj = Dense(int(x.get_shape()[3]))(style)
         style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
         x = Add()([x, style_proj])
 
         x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
 
-    x = TimeDistributed(Dense(2, activation='sigmoid'))(x)
+    # Primary task
+    notes_out = Dense(2, activation='sigmoid')(x)
 
-    model = Model([notes_in, chosen_in, beat_in, style_in], x)
-    model.compile(optimizer='nadam', loss=loss)
+    # Secondary task
+    styles_out = Dense(STYLE_UNITS, activation='tanh')(x)
+    styles_out = TimeDistributed(Flatten())(styles_out)
+    styles_out = Dense(NUM_STYLES, activation='softmax')(styles_out)
+
+    model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out, styles_out])
+    model.compile(optimizer='nadam', loss=[loss, 'categorical_crossentropy'])
     return model

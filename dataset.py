@@ -66,7 +66,7 @@ def load_all(styles, batch_size, time_steps):
     beat_data = np.array(beat_data)
     style_data = np.array(style_data)
     note_target = np.array(note_target)
-    return [note_data, note_target, beat_data, style_data], [note_target]
+    return [note_data, note_target, beat_data, style_data], [note_target, style_data]
 
 def clamp_midi(sequence):
     """
