@@ -87,13 +87,15 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     # Apply LSTMs
     for l in range(TIME_AXIS_LAYERS):
+        x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True, activation=None))(x)
+
         # Integrate style
         style_proj = Dense(int(x.get_shape()[3]))(style)
         style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
         style_proj = Permute((2, 1, 3))(style_proj)
         x = Add()([x, style_proj])
 
-        x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
+        x = Activation('tanh')(x)
         x = Dropout(dropout)(x)
 
     # [batch, time, notes, features]
@@ -109,23 +111,28 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     x = Concatenate(axis=3)([x, shift_chosen])
 
     for l in range(NOTE_AXIS_LAYERS):
+        x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True, activation=None))(x)
+
         # Integrate style
         style_proj = Dense(int(x.get_shape()[3]))(style)
         style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
         x = Add()([x, style_proj])
 
-        x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
+        x = Activation('tanh')(x)
         x = Dropout(dropout)(x)
 
     # Primary task
     notes_out = Dense(2, activation='sigmoid', name='note_out')(x)
 
     # Secondary task
-    styles_out = Dense(STYLE_UNITS, activation='tanh')(x)
-    styles_out = Dropout(dropout)(styles_out)
-    styles_out = TimeDistributed(Flatten())(styles_out)
-    styles_out = Dense(NUM_STYLES, activation='softmax', name='style_out')(styles_out)
+    # styles_out = Dense(STYLE_UNITS, activation='tanh')(styles_out)
+    # styles_out = Dropout(dropout)(styles_out)
+    # styles_out = TimeDistributed(Flatten())(styles_out)
+    # styles_out = Dense(NUM_STYLES, activation='softmax', name='style_out')(styles_out)
 
-    model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out, styles_out])
-    model.compile(optimizer='nadam', loss=[primary_loss, style_loss])
+    model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out])
+    model.compile(optimizer='nadam', loss=[primary_loss])
+
+    # model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out, styles_out])
+    # model.compile(optimizer='nadam', loss=[primary_loss, style_loss])
     return model
