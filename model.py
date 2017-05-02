@@ -67,6 +67,7 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     beat = Dropout(dropout)(beat)
 
     """ Time axis """
+    # TODO: Experiment with when to apply conv
     note_octave = TimeDistributed(Conv1D(OCTAVE_UNITS, 2 * OCTAVE, padding='same'))(notes)
     note_octave = Activation('tanh')(note_octave)
     note_octave = Dropout(dropout)(note_octave)
@@ -87,15 +88,14 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     # Apply LSTMs
     for l in range(TIME_AXIS_LAYERS):
-        x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True, activation=None))(x)
-
         # Integrate style
         style_proj = Dense(int(x.get_shape()[3]))(style)
+        style_proj = Activation('tanh')(style_proj)
         style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
         style_proj = Permute((2, 1, 3))(style_proj)
         x = Add()([x, style_proj])
 
-        x = Activation('tanh')(x)
+        x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
 
     # [batch, time, notes, features]
@@ -111,14 +111,13 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     x = Concatenate(axis=3)([x, shift_chosen])
 
     for l in range(NOTE_AXIS_LAYERS):
-        x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True, activation=None))(x)
-
         # Integrate style
         style_proj = Dense(int(x.get_shape()[3]))(style)
+        style_proj = Activation('tanh')(style_proj)
         style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
         x = Add()([x, style_proj])
 
-        x = Activation('tanh')(x)
+        x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
 
     # Primary task
