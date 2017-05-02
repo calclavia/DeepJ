@@ -5,12 +5,16 @@ from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation, Flat
 from keras.layers.merge import Concatenate, Add
 from keras.models import Model
 import keras.backend as K
+from keras import losses
 
 from util import *
 from constants import *
 
-def loss(y_true, y_pred):
-    return K.mean(K.binary_crossentropy(y_pred, y_true), axis=-1)
+def primary_loss(y_true, y_pred):
+    return losses.binary_crossentropy(y_true, y_pred)
+
+def style_loss(y_true, y_pred):
+    return 0.5 * losses.categorical_crossentropy(y_true, y_pred)
 
 def pitch_pos_in_f(time_steps):
     """
@@ -114,13 +118,13 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
         x = Dropout(dropout)(x)
 
     # Primary task
-    notes_out = Dense(2, activation='sigmoid')(x)
+    notes_out = Dense(2, activation='sigmoid', name='note_out')(x)
 
     # Secondary task
     styles_out = Dense(STYLE_UNITS, activation='tanh')(x)
     styles_out = TimeDistributed(Flatten())(styles_out)
-    styles_out = Dense(NUM_STYLES, activation='softmax')(styles_out)
+    styles_out = Dense(NUM_STYLES, activation='softmax', name='style_out')(styles_out)
 
     model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out, styles_out])
-    model.compile(optimizer='nadam', loss=[loss, 'categorical_crossentropy'])
+    model.compile(optimizer='nadam', loss=[primary_loss, style_loss])
     return model
