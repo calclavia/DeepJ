@@ -47,7 +47,7 @@ def pitch_bins_f(time_steps):
 
 def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     notes_in = Input((time_steps, NUM_NOTES, 2))
-    beat_in = Input((time_steps, 2))
+    beat_in = Input((time_steps, NOTES_PER_BAR))
     style_in = Input((time_steps, NUM_STYLES))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES, 2))
@@ -61,10 +61,6 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     # Distributed representations
     style = Dense(STYLE_UNITS)(style)
     style = Dropout(dropout)(style)
-
-    beat = Dense(BEAT_UNITS)(beat)
-    beat = Activation('tanh')(beat)
-    beat = Dropout(dropout)(beat)
 
     """ Time axis """
     # TODO: Experiment with when to apply conv
@@ -125,15 +121,6 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     # Primary task
     notes_out = Dense(2, activation='sigmoid', name='note_out')(x)
 
-    # Secondary task
-    # styles_out = Dense(STYLE_UNITS, activation='tanh')(styles_out)
-    # styles_out = Dropout(dropout)(styles_out)
-    # styles_out = TimeDistributed(Flatten())(styles_out)
-    # styles_out = Dense(NUM_STYLES, activation='softmax', name='style_out')(styles_out)
-
     model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out])
     model.compile(optimizer='nadam', loss=[primary_loss])
-
-    # model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out, styles_out])
-    # model.compile(optimizer='nadam', loss=[primary_loss, style_loss])
     return model

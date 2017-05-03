@@ -29,7 +29,7 @@ def generate(model, style=[0.25, 0.25, 0.25, 0.25], num_bars=16, default_temp=1)
                 np.array([style_memory])
             ]
 
-            pred, *_ = model.predict(inputs)
+            pred = model.predict(inputs)
             pred = np.array(pred)
             # We only care about the last time step
             pred = pred[0, -1, :]
