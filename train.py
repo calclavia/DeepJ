@@ -13,27 +13,11 @@ from model import *
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
-    parser.add_argument('--train', default=False, action='store_true', help='Train model?')
     parser.add_argument('--gen', default=False, action='store_true', help='Generate after each epoch?')
     args = parser.parse_args()
 
     models = build_or_load()
-
-    if args.train:
-        train(models, args.gen)
-    else:
-        write_file(os.path.join(SAMPLES_DIR, 'output.mid'), generate(models))
-
-def build_or_load(allow_load=True):
-    models = build_models()
-    models[0].summary()
-    if allow_load:
-        try:
-            models[0].load_weights(MODEL_FILE)
-            print('Loaded model from file.')
-        except:
-            print('Unable to load model from file.')
-    return models
+    train(models, args.gen)
 
 def train(models, gen):
     print('Loading data')

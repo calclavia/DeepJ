@@ -1,8 +1,11 @@
 import numpy as np
+import tensorflow as tf
 from collections import deque
 import midi
+import argparse
 
 from constants import *
+from util import *
 from dataset import *
 from tqdm import tqdm
 from midi_util import midi_encode
@@ -90,7 +93,7 @@ def process_inputs(ins):
     ins = [np.array(i) for i in ins]
     return ins
 
-def generate(models, num_bars=16, styles=[0, 4, 12, 20]):
+def generate(models, num_bars=16, styles=[[1,0,0,0]]):
     print('Generating with styles:', styles)
 
     _, time_model, note_model = models
@@ -115,14 +118,26 @@ def generate(models, num_bars=16, styles=[0, 4, 12, 20]):
         # Move one time step
         yield [g.end_time(t) for g in generations]
 
-def write_file(name, results):
+def write_file(fpath, results):
     """
     Takes a list of all notes generated per track and writes it to file
     """
     results = zip(*list(results))
 
     for i, result in enumerate(results):
-        fpath = SAMPLES_DIR + '/' + name + '_' + str(i) + '.mid'
         print('Writing file', fpath)
+        os.makedirs(os.path.dirname(fpath), exist_ok=True)
         mf = midi_encode(unclamp_midi(result))
         midi.write_midifile(fpath, mf)
+
+def main():
+    # parser = argparse.ArgumentParser(description='Generates music.')
+    # parser.add_argument('--gen', default=None, nargs='+', help='Style to generate')
+    # args = parser.parse_args()
+
+    with tf.device('cpu:0'):
+        models = build_or_load()
+        write_file(os.path.join(SAMPLES_DIR, 'output.mid'), generate(models))
+
+if __name__ == '__main__':
+    main()

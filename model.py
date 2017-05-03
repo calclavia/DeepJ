@@ -46,6 +46,46 @@ def pitch_bins_f(time_steps):
         return bins
     return f
 
+def time_axis(dropout):
+    def f(notes, beat, style):
+        time_steps = int(notes.get_shape()[1])
+        
+        # TODO: Experiment with when to apply conv
+        note_octave = TimeDistributed(Conv1D(OCTAVE_UNITS, 2 * OCTAVE, padding='same'))(notes)
+        note_octave = Activation('tanh')(note_octave)
+        note_octave = Dropout(dropout)(note_octave)
+
+        # Create features for every single note.
+        note_features = Concatenate()([
+            Lambda(pitch_pos_in_f(time_steps))(notes),
+            Lambda(pitch_class_in_f(time_steps))(notes),
+            Lambda(pitch_bins_f(time_steps))(notes),
+            note_octave,
+            TimeDistributed(RepeatVector(NUM_NOTES))(beat)
+        ])
+
+        x = note_features
+
+        # [batch, notes, time, features]
+        x = Permute((2, 1, 3))(x)
+
+        # Apply LSTMs
+        for l in range(TIME_AXIS_LAYERS):
+            # Integrate style
+            style_proj = Dense(int(x.get_shape()[3]))(style)
+            style_proj = Activation('tanh')(style_proj)
+            style_proj = Dropout(dropout)(style_proj)
+            style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+            style_proj = Permute((2, 1, 3))(style_proj)
+            x = Add()([x, style_proj])
+
+            x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
+            x = Dropout(dropout)(x)
+
+        # [batch, time, notes, features]
+        return Permute((2, 1, 3))(x)
+    return f
+
 def note_axis(dropout):
     def f(x, chosen, style):
         time_steps = int(x.get_shape()[1])
@@ -74,7 +114,7 @@ def note_axis(dropout):
     return f
 
 def style_layer(input_dropout):
-    emb = Embedding(NUM_STYLES, STYLE_UNITS)
+    emb = Dense(STYLE_UNITS)
     def f(style_in):
         style = emb(style_in)
         return Dropout(input_dropout)(style)
@@ -83,7 +123,7 @@ def style_layer(input_dropout):
 def build_models(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     notes_in = Input((time_steps, NUM_NOTES, NOTE_UNITS))
     beat_in = Input((time_steps, NOTES_PER_BAR))
-    style_in = Input((time_steps,))
+    style_in = Input((time_steps, NUM_STYLES))
     # Target input for conditioning
     chosen_in = Input((time_steps, NUM_NOTES, NOTE_UNITS))
 
@@ -97,40 +137,7 @@ def build_models(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     style = style_l(style_in)
 
     """ Time axis """
-    # TODO: Experiment with when to apply conv
-    note_octave = TimeDistributed(Conv1D(OCTAVE_UNITS, 2 * OCTAVE, padding='same'))(notes)
-    note_octave = Activation('tanh')(note_octave)
-    note_octave = Dropout(dropout)(note_octave)
-
-    # Create features for every single note.
-    note_features = Concatenate()([
-        Lambda(pitch_pos_in_f(time_steps))(notes),
-        Lambda(pitch_class_in_f(time_steps))(notes),
-        Lambda(pitch_bins_f(time_steps))(notes),
-        note_octave,
-        TimeDistributed(RepeatVector(NUM_NOTES))(beat)
-    ])
-
-    x = note_features
-
-    # [batch, notes, time, features]
-    x = Permute((2, 1, 3))(x)
-
-    # Apply LSTMs
-    for l in range(TIME_AXIS_LAYERS):
-        # Integrate style
-        style_proj = Dense(int(x.get_shape()[3]))(style)
-        style_proj = Activation('tanh')(style_proj)
-        style_proj = Dropout(dropout)(style_proj)
-        style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
-        style_proj = Permute((2, 1, 3))(style_proj)
-        x = Add()([x, style_proj])
-
-        x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
-        x = Dropout(dropout)(x)
-
-    # [batch, time, notes, features]
-    time_out = Permute((2, 1, 3))(x)
+    time_out = time_axis(dropout)(notes, beat, style)
 
     """ Note Axis & Prediction Layer """
     naxis = note_axis(dropout)
@@ -144,7 +151,7 @@ def build_models(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     note_features = Input((1, NUM_NOTES, TIME_AXIS_UNITS), name='note_features')
     chosen_gen_in = Input((1, NUM_NOTES, NOTE_UNITS), name='chosen_gen_in')
-    style_gen_in = Input((1,), name='style_in')
+    style_gen_in = Input((1, NUM_STYLES), name='style_in')
 
     # Dropout inputs
     chosen_gen = Dropout(input_dropout)(chosen_gen_in)
