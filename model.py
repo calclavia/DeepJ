@@ -84,6 +84,8 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
     # Apply LSTMs
     for l in range(TIME_AXIS_LAYERS):
+        prev = x
+
         # Integrate style
         style_proj = Dense(int(x.get_shape()[3]))(style)
         style_proj = Activation('tanh')(style_proj)
@@ -94,6 +96,10 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
 
         x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
+
+        # Residual connection
+        if l > 0:
+            x = Add()([x, prev])
 
     # [batch, time, notes, features]
     x = Permute((2, 1, 3))(x)
@@ -108,6 +114,8 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     x = Concatenate(axis=3)([x, shift_chosen])
 
     for l in range(NOTE_AXIS_LAYERS):
+        prev = x
+
         # Integrate style
         style_proj = Dense(int(x.get_shape()[3]))(style)
         style_proj = Activation('tanh')(style_proj)
@@ -118,6 +126,9 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
         x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
         x = Dropout(dropout)(x)
 
+        # Residual connection
+        if l > 0:
+            x = Add()([x, prev])
     # Primary task
     notes_out = Dense(2, activation='sigmoid', name='note_out')(x)
 
