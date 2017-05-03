@@ -49,7 +49,7 @@ def pitch_bins_f(time_steps):
 def time_axis(dropout):
     def f(notes, beat, style):
         time_steps = int(notes.get_shape()[1])
-        
+
         # TODO: Experiment with when to apply conv
         note_octave = TimeDistributed(Conv1D(OCTAVE_UNITS, 2 * OCTAVE, padding='same'))(notes)
         note_octave = Activation('tanh')(note_octave)
@@ -87,6 +87,10 @@ def time_axis(dropout):
     return f
 
 def note_axis(dropout):
+    dense_layer_cache = {}
+    lstm_layer_cache = {}
+    final_dense = Dense(2, activation='sigmoid', name='note_out')
+
     def f(x, chosen, style):
         time_steps = int(x.get_shape()[1])
 
@@ -100,17 +104,23 @@ def note_axis(dropout):
 
         for l in range(NOTE_AXIS_LAYERS):
             # Integrate style
-            style_proj = Dense(int(x.get_shape()[3]))(style)
+            if l not in dense_layer_cache:
+                dense_layer_cache[l] = Dense(int(x.get_shape()[3]))
+
+            style_proj = dense_layer_cache[l](style)
             style_proj = Activation('tanh')(style_proj)
             style_proj = Dropout(dropout)(style_proj)
             style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
             x = Add()([x, style_proj])
 
-            x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
+            if l not in lstm_layer_cache:
+                lstm_layer_cache[l] = LSTM(NOTE_AXIS_UNITS, return_sequences=True)
+
+            x = TimeDistributed(lstm_layer_cache[l])(x)
             x = Dropout(dropout)(x)
 
         # Primary task
-        return Dense(2, activation='sigmoid', name='note_out')(x)
+        return final_dense(x)
     return f
 
 def style_layer(input_dropout):
