@@ -1,8 +1,11 @@
 import numpy as np
 from collections import deque
+import midi
+
 from constants import *
 from dataset import *
 from tqdm import tqdm
+from midi_util import midi_encode
 
 def generate(model, style=[0.25, 0.25, 0.25, 0.25], num_bars=16, default_temp=1):
     print('Generating')
