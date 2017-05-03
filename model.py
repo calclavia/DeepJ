@@ -1,7 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from keras.layers import Input, LSTM, Dense, Dropout, Lambda, Reshape, Permute
-from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation, Flatten
+from keras.layers import TimeDistributed, RepeatVector, Conv1D, Activation
+from keras.layers import Embedding, Flatten
 from keras.layers.merge import Concatenate, Add
 from keras.models import Model
 import keras.backend as K
@@ -45,22 +46,55 @@ def pitch_bins_f(time_steps):
         return bins
     return f
 
-def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
-    notes_in = Input((time_steps, NUM_NOTES, 2))
+def note_axis(dropout):
+    def f(x, chosen, style):
+        time_steps = int(x.get_shape()[1])
+
+        # Shift target one note to the left.
+        shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1, :], [[0, 0], [0, 0], [1, 0], [0, 0]]))(chosen)
+
+        # [batch, time, notes, 1]
+        shift_chosen = Reshape((time_steps, NUM_NOTES, -1))(shift_chosen)
+        # [batch, time, notes, features + 1]
+        x = Concatenate(axis=3)([x, shift_chosen])
+
+        for l in range(NOTE_AXIS_LAYERS):
+            # Integrate style
+            style_proj = Dense(int(x.get_shape()[3]))(style)
+            style_proj = Activation('tanh')(style_proj)
+            style_proj = Dropout(dropout)(style_proj)
+            style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+            x = Add()([x, style_proj])
+
+            x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
+            x = Dropout(dropout)(x)
+
+        # Primary task
+        return Dense(2, activation='sigmoid', name='note_out')(x)
+    return f
+
+def style_layer(input_dropout):
+    emb = Embedding(NUM_STYLES, STYLE_UNITS)
+    def f(style_in):
+        style = emb(style_in)
+        return Dropout(input_dropout)(style)
+    return f
+
+def build_models(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
+    notes_in = Input((time_steps, NUM_NOTES, NOTE_UNITS))
     beat_in = Input((time_steps, NOTES_PER_BAR))
-    style_in = Input((time_steps, NUM_STYLES))
+    style_in = Input((time_steps,))
     # Target input for conditioning
-    chosen_in = Input((time_steps, NUM_NOTES, 2))
+    chosen_in = Input((time_steps, NUM_NOTES, NOTE_UNITS))
 
     # Dropout inputs
     notes = Dropout(input_dropout)(notes_in)
     beat = Dropout(input_dropout)(beat_in)
     chosen = Dropout(input_dropout)(chosen_in)
-    style = Dropout(input_dropout)(style_in)
 
     # Distributed representations
-    style = Dense(STYLE_UNITS)(style)
-    style = Dropout(dropout)(style)
+    style_l = style_layer(input_dropout)
+    style = style_l(style_in)
 
     """ Time axis """
     # TODO: Experiment with when to apply conv
@@ -96,31 +130,28 @@ def build_model(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
         x = Dropout(dropout)(x)
 
     # [batch, time, notes, features]
-    x = Permute((2, 1, 3))(x)
+    time_out = Permute((2, 1, 3))(x)
 
     """ Note Axis & Prediction Layer """
-    # Shift target one note to the left.
-    shift_chosen = Lambda(lambda x: tf.pad(x[:, :, :-1, :], [[0, 0], [0, 0], [1, 0], [0, 0]]))(chosen)
-
-    # [batch, time, notes, 1]
-    shift_chosen = Reshape((time_steps, NUM_NOTES, -1))(shift_chosen)
-    # [batch, time, notes, features + 1]
-    x = Concatenate(axis=3)([x, shift_chosen])
-
-    for l in range(NOTE_AXIS_LAYERS):
-        # Integrate style
-        style_proj = Dense(int(x.get_shape()[3]))(style)
-        style_proj = Activation('tanh')(style_proj)
-        style_proj = Dropout(dropout)(style_proj)
-        style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
-        x = Add()([x, style_proj])
-
-        x = TimeDistributed(LSTM(NOTE_AXIS_UNITS, return_sequences=True))(x)
-        x = Dropout(dropout)(x)
-
-    # Primary task
-    notes_out = Dense(2, activation='sigmoid', name='note_out')(x)
+    naxis = note_axis(dropout)
+    notes_out = naxis(time_out, chosen, style)
 
     model = Model([notes_in, chosen_in, beat_in, style_in], [notes_out])
     model.compile(optimizer='nadam', loss=[primary_loss])
-    return model
+
+    """ Generation Models """
+    time_model = Model([notes_in, beat_in, style_in], [time_out])
+
+    note_features = Input((1, NUM_NOTES, TIME_AXIS_UNITS), name='note_features')
+    chosen_gen_in = Input((1, NUM_NOTES, NOTE_UNITS), name='chosen_gen_in')
+    style_gen_in = Input((1,), name='style_in')
+
+    # Dropout inputs
+    chosen_gen = Dropout(input_dropout)(chosen_gen_in)
+    style_gen = style_l(style_gen_in)
+
+    note_gen_out = naxis(note_features, chosen_gen, style_gen)
+
+    note_model = Model([note_features, chosen_gen_in, style_gen_in], note_gen_out)
+
+    return model, time_model, note_model
