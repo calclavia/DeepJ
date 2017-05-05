@@ -37,7 +37,7 @@ def train(models, gen):
         cbs += [LambdaCallback(on_epoch_end=epoch_cb)]
 
     print('Training')
-    models[0].fit(train_data, train_labels, epochs=1000, callbacks=cbs)
+    models[0].fit(train_data, train_labels, epochs=1000, callbacks=cbs, batch_size=BATCH_SIZE)
 
 if __name__ == '__main__':
     main()
