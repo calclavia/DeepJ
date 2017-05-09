@@ -1,7 +1,7 @@
 import os
 
 # Define the musical styles
-styles = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']
+styles = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
 # styles = ['data/jazz']
 NUM_STYLES = len(styles)
 
@@ -34,7 +34,7 @@ SEQ_LEN = 4 * NOTES_PER_BAR
 OCTAVE_UNITS = 32
 STYLE_UNITS = 32
 BEAT_UNITS = 32
-NOTE_UNITS = 2
+NOTE_UNITS = 3
 TIME_AXIS_UNITS = 300
 NOTE_AXIS_UNITS = 150
 
