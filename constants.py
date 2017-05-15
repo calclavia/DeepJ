@@ -1,12 +1,58 @@
 import os
 
 # Define the musical styles
+genre = [
+    'baroque',
+    'classical',
+    'romantic',
+    'modern',
+    'jazz'
+]
+
 styles = [
-    'data/baroque',
-    'data/classical',
-    'data/romantic',
-    'data/modern',
-    'data/jazz'
+    [
+        'data/baroque/bach',
+        'data/baroque/handel',
+        'data/baroque/pachelbel'
+    ],
+    [
+        'data/classical/burgmueller',
+        'data/classical/clementi',
+        'data/classical/haydn',
+        'data/classical/beethoven',
+        'data/classical/mozart'
+    ],
+    [
+        'data/romantic/balakirew',
+        'data/romantic/borodin',
+        'data/romantic/brahms',
+        'data/romantic/chopin',
+        'data/romantic/debussy',
+        'data/romantic/liszt',
+        'data/romantic/mendelssohn',
+        'data/romantic/moszkowski',
+        'data/romantic/mussorgsky',
+        'data/romantic/rachmaninov',
+        'data/romantic/schubert',
+        'data/romantic/schumann',
+        'data/romantic/tchaikovsky',
+        'data/romantic/tschai'
+    ],
+    [
+        'data/modern/albeniz',
+        'data/modern/godowsky',
+        'data/modern/granados',
+        'data/modern/grieg',
+        'data/modern/ravel',
+        'data/modern/copland',
+        'data/modern/hindesmith',
+        'data/modern/stravinsky',
+        'data/modern/sinding'
+    ],
+    [
+        'data/jazz/billevans',
+        'data/jazz/other'
+    ]
 ]
 
 NUM_STYLES = len(styles)
