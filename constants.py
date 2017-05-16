@@ -55,7 +55,7 @@ styles = [
     ]
 ]
 
-NUM_STYLES = len(styles)
+NUM_STYLES = sum(len(s) for s in styles)
 
 # MIDI Resolution
 DEFAULT_RES = 96
