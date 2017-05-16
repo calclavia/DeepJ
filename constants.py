@@ -5,7 +5,7 @@ styles = [
     'data/baroque',
     'data/classical',
     'data/romantic',
-    'data/modern',
+    # 'data/modern',
     'data/jazz'
 ]
 
