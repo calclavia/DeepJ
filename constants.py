@@ -5,8 +5,7 @@ genre = [
     'baroque',
     'classical',
     'romantic',
-    'modern',
-    'jazz'
+    'modern'
 ]
 
 styles = [
@@ -48,10 +47,6 @@ styles = [
         'data/modern/hindesmith',
         'data/modern/stravinsky',
         'data/modern/sinding'
-    ],
-    [
-        'data/jazz/billevans',
-        'data/jazz/other'
     ]
 ]
 
