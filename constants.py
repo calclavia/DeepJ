@@ -19,6 +19,7 @@ styles = [
         'data/classical/clementi',
         'data/classical/haydn',
         'data/classical/beethoven',
+        'data/classical/brahms',
         'data/classical/mozart'
     ],
     [
