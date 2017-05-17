@@ -78,6 +78,7 @@ def time_axis(dropout):
             # Integrate style
             style_proj = Dense(int(x.get_shape()[3]))(style)
             style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+            style_proj = Dropout(dropout)(style_proj)
             style_proj = Permute((2, 1, 3))(style_proj)
             x = Add()([x, style_proj])
 
@@ -117,6 +118,7 @@ def note_axis(dropout):
 
             style_proj = dense_layer_cache[l](style)
             style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+            style_proj = Dropout(dropout)(style_proj)
             x = Add()([x, style_proj])
 
             if l not in lstm_layer_cache:
