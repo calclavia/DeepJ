@@ -73,8 +73,6 @@ def time_axis(dropout):
 
         # Apply LSTMs
         for l in range(TIME_AXIS_LAYERS):
-            prev = x
-
             # Integrate style
             style_proj = Dense(int(x.get_shape()[3]))(style)
             style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
@@ -84,9 +82,6 @@ def time_axis(dropout):
 
             x = TimeDistributed(LSTM(TIME_AXIS_UNITS, return_sequences=True))(x)
             x = Dropout(dropout)(x)
-
-            if l > 0:
-                x = Add()([x, prev])
 
         # [batch, time, notes, features]
         return Permute((2, 1, 3))(x)
@@ -110,8 +105,6 @@ def note_axis(dropout):
         x = Concatenate(axis=3)([x, shift_chosen])
 
         for l in range(NOTE_AXIS_LAYERS):
-            prev = x
-
             # Integrate style
             if l not in dense_layer_cache:
                 dense_layer_cache[l] = Dense(int(x.get_shape()[3]))
@@ -126,9 +119,6 @@ def note_axis(dropout):
 
             x = TimeDistributed(lstm_layer_cache[l])(x)
             x = Dropout(dropout)(x)
-
-            if l > 0:
-                x = Add()([x, prev])
 
         return Concatenate()([note_dense(x), volume_dense(x)])
     return f
