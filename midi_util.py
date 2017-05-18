@@ -128,7 +128,7 @@ def midi_decode(pattern,
                     replay_any = np.minimum(np.sum(replay_buffer[:-1], axis=0), 1)
                     replay_sequence.append(replay_any)
 
-                    # Determine volume on rounded sum
+                    # Determine volume by max
                     volume_sum = np.amax(volume_buffer[:-1], axis=0)
                     volume_sequence.append(volume_sum)
 

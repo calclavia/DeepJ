@@ -1,15 +1,45 @@
 import os
 
 # Define the musical styles
-styles = [
-    'data/baroque',
-    'data/classical',
-    'data/romantic',
-    'data/modern',
-    'data/jazz'
+genre = [
+    'baroque',
+    'classical',
+    'romantic'
 ]
 
-NUM_STYLES = len(styles)
+styles = [
+    [
+        'data/baroque/bach',
+        'data/baroque/handel',
+        'data/baroque/pachelbel'
+    ],
+    [
+        'data/classical/burgmueller',
+        'data/classical/clementi',
+        'data/classical/haydn',
+        'data/classical/beethoven',
+        'data/classical/brahms',
+        'data/classical/mozart'
+    ],
+    [
+        'data/romantic/balakirew',
+        'data/romantic/borodin',
+        'data/romantic/brahms',
+        'data/romantic/chopin',
+        'data/romantic/debussy',
+        'data/romantic/liszt',
+        'data/romantic/mendelssohn',
+        'data/romantic/moszkowski',
+        'data/romantic/mussorgsky',
+        'data/romantic/rachmaninov',
+        'data/romantic/schubert',
+        'data/romantic/schumann',
+        'data/romantic/tchaikovsky',
+        'data/romantic/tschai'
+    ]
+]
+
+NUM_STYLES = sum(len(s) for s in styles)
 
 # MIDI Resolution
 DEFAULT_RES = 96
@@ -33,16 +63,15 @@ NOTES_PER_BEAT = 4
 NOTES_PER_BAR = NOTES_PER_BEAT * BEATS_PER_BAR
 
 # Training parameters
-BATCH_SIZE = 32
-SEQ_LEN = 4 * NOTES_PER_BAR
+BATCH_SIZE = 16
+SEQ_LEN = 8 * NOTES_PER_BAR
 
 # Hyper Parameters
-OCTAVE_UNITS = 32
-STYLE_UNITS = 32
-BEAT_UNITS = 32
+OCTAVE_UNITS = 64
+STYLE_UNITS = 64
 NOTE_UNITS = 3
-TIME_AXIS_UNITS = 300
-NOTE_AXIS_UNITS = 150
+TIME_AXIS_UNITS = 256
+NOTE_AXIS_UNITS = 128
 
 TIME_AXIS_LAYERS = 2
 NOTE_AXIS_LAYERS = 2
