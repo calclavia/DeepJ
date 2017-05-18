@@ -75,9 +75,8 @@ def time_axis(dropout):
         for l in range(TIME_AXIS_LAYERS):
             # Integrate style
             style_proj = Dense(int(x.get_shape()[3]))(style)
-            style_proj = Activation('tanh')(style_proj)
-            style_proj = Dropout(dropout)(style_proj)
             style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+            style_proj = Dropout(dropout)(style_proj)
             style_proj = Permute((2, 1, 3))(style_proj)
             x = Add()([x, style_proj])
 
@@ -111,9 +110,8 @@ def note_axis(dropout):
                 dense_layer_cache[l] = Dense(int(x.get_shape()[3]))
 
             style_proj = dense_layer_cache[l](style)
-            style_proj = Activation('tanh')(style_proj)
-            style_proj = Dropout(dropout)(style_proj)
             style_proj = TimeDistributed(RepeatVector(NUM_NOTES))(style_proj)
+            style_proj = Dropout(dropout)(style_proj)
             x = Add()([x, style_proj])
 
             if l not in lstm_layer_cache:
@@ -123,13 +121,6 @@ def note_axis(dropout):
             x = Dropout(dropout)(x)
 
         return Concatenate()([note_dense(x), volume_dense(x)])
-    return f
-
-def style_layer(input_dropout):
-    emb = Dense(STYLE_UNITS, name='style')
-    def f(style_in):
-        style = emb(style_in)
-        return Dropout(input_dropout)(style)
     return f
 
 def build_models(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
@@ -145,7 +136,7 @@ def build_models(time_steps=SEQ_LEN, input_dropout=0.2, dropout=0.5):
     chosen = Dropout(input_dropout)(chosen_in)
 
     # Distributed representations
-    style_l = style_layer(input_dropout)
+    style_l = Dense(STYLE_UNITS, name='style')
     style = style_l(style_in)
 
     """ Time axis """

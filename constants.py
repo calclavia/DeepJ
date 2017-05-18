@@ -4,8 +4,7 @@ import os
 genre = [
     'baroque',
     'classical',
-    'romantic',
-    'modern'
+    'romantic'
 ]
 
 styles = [
@@ -37,17 +36,6 @@ styles = [
         'data/romantic/schumann',
         'data/romantic/tchaikovsky',
         'data/romantic/tschai'
-    ],
-    [
-        'data/modern/albeniz',
-        'data/modern/godowsky',
-        'data/modern/granados',
-        'data/modern/grieg',
-        'data/modern/ravel',
-        'data/modern/copland',
-        'data/modern/hindesmith',
-        'data/modern/stravinsky',
-        'data/modern/sinding'
     ]
 ]
 
@@ -75,16 +63,15 @@ NOTES_PER_BEAT = 4
 NOTES_PER_BAR = NOTES_PER_BEAT * BEATS_PER_BAR
 
 # Training parameters
-BATCH_SIZE = 32
-SEQ_LEN = 4 * NOTES_PER_BAR
+BATCH_SIZE = 16
+SEQ_LEN = 8 * NOTES_PER_BAR
 
 # Hyper Parameters
-OCTAVE_UNITS = 32
-STYLE_UNITS = 32
-BEAT_UNITS = 32
+OCTAVE_UNITS = 64
+STYLE_UNITS = 64
 NOTE_UNITS = 3
-TIME_AXIS_UNITS = 300
-NOTE_AXIS_UNITS = 150
+TIME_AXIS_UNITS = 256
+NOTE_AXIS_UNITS = 128
 
 TIME_AXIS_LAYERS = 2
 NOTE_AXIS_LAYERS = 2
