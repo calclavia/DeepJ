@@ -95,7 +95,7 @@ def process_inputs(ins):
     ins = [np.array(i) for i in ins]
     return ins
 
-def generate(models, num_bars, styles=[compute_genre(i) for i in range(len(genre))]):
+def generate(models, num_bars, styles):
     print('Generating with styles:', styles)
 
     _, time_model, note_model = models
@@ -136,10 +136,18 @@ def write_file(name, results):
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--bars', default=32, type=int, help='Number of bars to generate')
+    parser.add_argument('--styles', default=None, type=int, nargs='+', help='Styles to mix together')
     args = parser.parse_args()
 
     models = build_or_load()
-    write_file('output', generate(models, args.bars))
+
+    styles = [compute_genre(i) for i in range(len(genre))]
+
+    if args.styles:
+        # Custom style
+        styles = [np.mean([one_hot(i, NUM_STYLES) for i in args.styles], axis=0)]
+
+    write_file('output', generate(models, args.bars, styles))
 
 if __name__ == '__main__':
     main()
