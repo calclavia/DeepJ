@@ -5,50 +5,6 @@ from model import DeepJ
 from util import *
 import unittest
 
-class TestModel(unittest.TestCase):
-    def test_pitch_pos(self):
-        model = DeepJ(3)
-        pitch_pos = model.time_axis.pitch_pos
-        self.assertEqual(pitch_pos.size(), (1, 3))
-        np.testing.assert_allclose(pitch_pos.numpy(), [[0, 1/3, 2/3]])
-
-    def test_pitch_class(self):
-        model = DeepJ(3)
-        pitch_class = model.time_axis.pitch_class
-        self.assertEqual(pitch_class.size(), (1, 3, OCTAVE))
-        np.testing.assert_allclose(pitch_class.numpy(), [[
-            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        ]])
-    """
-    def test_chord_context(self):
-        model = DeepJ(3)
-        test_input = torch.FloatTensor([[1, 1, 0]])
-        context = model.time_axis.compute_chord_context(test_input)
-
-        self.assertEqual(context.size(), (1, 3, OCTAVE))
-        np.testing.assert_allclose(context.numpy(), [[
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        ]])
-    """
-
-    def test_vicinity(self):
-        model = DeepJ(3)
-        test_input = var(torch.FloatTensor([[1, 1, 0]]))
-        vicinity = model.time_axis.compute_vicinity(test_input)
-        self.assertEqual(vicinity.size(), (1, 3, OCTAVE * 2 + 1))
-
-        empty_octave = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-        np.testing.assert_allclose(vicinity.cpu().data.numpy(), [[
-            empty_octave + [1] + [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1] + [1] + empty_octave,
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1] + [0] + empty_octave
-        ]])
-
 class TestMIDIUtil(unittest.TestCase):
 
     def test_encode(self):
@@ -61,7 +17,7 @@ class TestMIDIUtil(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        articulation = [
+        replay = [
             [0, 0, 0, 0],
             [0, 0, 0, 0],
             [0, 0, 0, 0],
@@ -70,7 +26,16 @@ class TestMIDIUtil(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        pattern = midi_encode(composition, articulation, step=1)
+        volume = [
+            [0, 0.5, 0, 0],
+            [0, 0.5, 0, 0],
+            [0, 0.5, 0, 0.5],
+            [0, 0.5, 0, 0.5],
+            [0, 0, 0, 0.5],
+            [0, 0, 0, 0]
+        ]
+
+        pattern = midi_encode(np.stack([composition, replay, volume], 2), step=1)
         self.assertEqual(pattern.resolution, NOTES_PER_BEAT)
         self.assertEqual(len(pattern), 1)
         track = pattern[0]
@@ -104,7 +69,8 @@ class TestMIDIUtil(unittest.TestCase):
         track.append(midi.NoteOffEvent(tick=48, velocity=127, pitch=1))
         track.append(midi.EndOfTrackEvent(tick=1))
 
-        composition, articulation = midi_decode(pattern, 4, step=DEFAULT_RES // 2)
+        note_sequence = midi_decode(pattern, 4, step=DEFAULT_RES // 2)
+        composition = note_sequence[:, :, 0]
 
         np.testing.assert_array_equal(composition, [
             [1, 0, 0, 0],
@@ -123,7 +89,7 @@ class TestMIDIUtil(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        articulation = [
+        replay = [
             [0, 0, 0, 0],
             [0, 0, 0, 0],
             [0, 0, 0, 0],
@@ -132,10 +98,19 @@ class TestMIDIUtil(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        new_comp, new_artic = midi_decode(midi_encode(composition, articulation, step=1), 4, step=1)
-        np.testing.assert_array_equal(composition, new_comp)
+        volume = [
+            [0, 0.5, 0, 0],
+            [0, 0.5, 0, 0],
+            [0, 0.5, 0, 0.5],
+            [0, 0.5, 0, 0.5],
+            [0, 0, 0, 0.5],
+            [0, 0, 0, 0]
+        ]
 
-    def test_articulation_decode(self):
+        note_seq = midi_decode(midi_encode(np.stack([composition, replay, volume], 2), step=1), 4, step=1)
+        np.testing.assert_array_equal(composition, note_seq[:, :, 0])
+
+    def test_replay_decode(self):
         # Instantiate a MIDI Pattern (contains a list of tracks)
         pattern = midi.Pattern(resolution=96)
         # Instantiate a MIDI Track (contains a list of MIDI events)
@@ -150,15 +125,40 @@ class TestMIDIUtil(unittest.TestCase):
         track.append(midi.NoteOnEvent(tick=2, velocity=127, pitch=3))
         track.append(midi.EndOfTrackEvent(tick=1))
 
-        composition, articulation = midi_decode(pattern, 4, step=3)
+        note_seq = midi_decode(pattern, 4, step=3)
 
-        np.testing.assert_array_equal(articulation, [
+        np.testing.assert_array_equal(note_seq[:, :, 1], [
             [0., 0., 0., 0.],
             [0., 0., 0., 1.],
             [0., 0., 0., 0.]
         ])
 
-    def test_articulation_encode_decode(self):
+
+    def test_volume_decode(self):
+        # Instantiate a MIDI Pattern (contains a list of tracks)
+        pattern = midi.Pattern(resolution=96)
+        # Instantiate a MIDI Track (contains a list of MIDI events)
+        track = midi.Track()
+        # Append the track to the pattern
+        pattern.append(track)
+
+        track.append(midi.NoteOnEvent(tick=0, velocity=24, pitch=0))
+        track.append(midi.NoteOnEvent(tick=96, velocity=89, pitch=1))
+        track.append(midi.NoteOffEvent(tick=0, pitch=0))
+        track.append(midi.NoteOffEvent(tick=48, pitch=1))
+        track.append(midi.EndOfTrackEvent(tick=1))
+
+        note_seq = midi_decode(pattern, 4, step=DEFAULT_RES // 2)
+
+        np.testing.assert_array_almost_equal(note_seq[:, :, 2], [
+            [24/127, 0., 0., 0.],
+            [24/127, 0., 0., 0.],
+            [0., 89/127, 0., 0.],
+            [0., 0., 0., 0.]
+        ], decimal=5)
+
+
+    def test_replay_encode_decode(self):
         # TODO: Fix this test
         composition = [
             [0, 1, 0, 1],
@@ -170,7 +170,7 @@ class TestMIDIUtil(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        articulation = [
+        replay = [
             [0, 0, 0, 0],
             [0, 0, 0, 0],
             [0, 0, 0, 0],
@@ -180,9 +180,19 @@ class TestMIDIUtil(unittest.TestCase):
             [0, 0, 0, 0]
         ]
 
-        new_comp, new_artic = midi_decode(midi_encode(composition, articulation, step=2), 4, step=2)
-        np.testing.assert_array_equal(composition, new_comp)
+        volume = [
+            [0, 0.5, 0, 0.5],
+            [0, 0, 0, 0.5],
+            [0, 0, 0, 0.5],
+            [0, 0.5, 0, 0.5],
+            [0, 0.5, 0, 0.5],
+            [0, 0.5, 0, 0.5],
+            [0, 0, 0, 0]
+        ]
+
+        note_seq = midi_decode(midi_encode(np.stack([composition, replay, volume], 2), step=2), 4, step=2)
+        np.testing.assert_array_equal(composition, note_seq[:, :, 0])
         # TODO: Downsampling might have caused loss of information
-        # np.testing.assert_array_equal(articulation, new_artic)
+        # np.testing.assert_array_equal(replay, note_seq[:, :, 1])
 
 unittest.main()

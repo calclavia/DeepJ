@@ -12,7 +12,7 @@ class DeepJ(nn.Module):
         super().__init__()
         self.num_notes = num_notes
         self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
-        self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
+        self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 3)
 
     def forward(self, note_input, beat_in, states, condition_notes):
         out, states = self.time_axis(note_input, beat_in, states)
@@ -120,10 +120,6 @@ class TimeAxis(nn.Module):
             states[l] = (out, state)
             out = self.dropout(out)
 
-            # Residual connection
-            if l > 0:
-                out = prev_out + out
-
         out = out.view(batch_size, self.num_notes, -1)
         return out, states
 
@@ -142,7 +138,7 @@ class NoteAxis(nn.Module):
         self.input_dropout = nn.Dropout(0.2)
         self.dropout = nn.Dropout(0.5)
         self.rnn = nn.LSTM(num_inputs, num_units, num_layers, dropout=0.5, batch_first=True)
-        self.output = nn.Linear(num_units, 1)
+        self.output = nn.Linear(num_units, 3)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, note_features, condition_notes, temperature=1):
