@@ -12,7 +12,7 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
-from generate import generate, sample_note
+from generate import generate, sample_timestep
 
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
@@ -145,7 +145,7 @@ def compute_loss(model, data, teach_prob):
             prev_note = targets
         else:
             model.eval()
-            prev_note, _ = sample_note(model, prev_note, beat, states, batch_size=BATCH_SIZE)
+            prev_note, _ = sample_timestep(model, prev_note, beat, states, batch_size=BATCH_SIZE)
             prev_note = var(prev_note.data)
             model.train()
 

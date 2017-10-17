@@ -78,9 +78,9 @@ class TimeAxis(nn.Module):
         Return:
             ([batch_size, num_notes, features], states)
         """
-        # Normalize
-        note_in = (note_in - 0.5) * 2
-        beat_in = (beat_in - 0.5) * 2
+        # Normalize TODO: Does this improve?
+        # note_in = (note_in - 0.5) * 2
+        # beat_in = (beat_in - 0.5) * 2
 
         batch_size = note_in.size()[0]
         notes = self.input_dropout(note_in)
@@ -147,8 +147,8 @@ class NoteAxis(nn.Module):
             note_features: Features for each note [batch_size, num_notes, features]
             condition_notes: Target notes [batch_size, num_notes] (for training)
         """
-        # Normalize
-        condition_notes = (condition_notes - 0.5) * 2
+        # Normalize TODO: Does this improve?
+        # condition_notes = (condition_notes - 0.5) * 2
         batch_size = note_features.size()[0]
 
         note_features = self.dropout(note_features)
