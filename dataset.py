@@ -75,7 +75,7 @@ def iteration_indices(data, seq_len=SEQ_LEN):
     """
     Returns a list of tuple, which are the iteration indices.
     """
-    note_seqs, beat_tags, style_tags = data
+    note_seqs, *_ = data
 
     # List of composition and their sequence start indices
     it_list = []
