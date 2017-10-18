@@ -174,6 +174,7 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading data...')
+    styles = load_styles()
     data = process(load_styles())
     print()
     print('Creating data generators...')

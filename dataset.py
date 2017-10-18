@@ -34,6 +34,7 @@ def load_styles(styles=STYLES):
         # Parallel process all files into a list of music sequences
         style_seq = [list(load_midi(f)) for f in tqdm(get_all_files([style]))]
         style_seqs.append(style_seq)
+
     return style_seqs
 
 def extract_beat(compositions):
@@ -55,11 +56,10 @@ def process(style_seqs, seq_len=SEQ_LEN):
     flat_seq = [x for y in style_seqs for x in y]
     style_tags = torch.stack([to_torch(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
 
-    note_seqs, replay_seqs = zip(*flat_seq)
-    note_seqs = [to_torch(pad_before(clamp_midi(x))) for x in note_seqs if len(x) > seq_len]
-    replay_seqs = [to_torch(pad_before(clamp_midi(x))) for x in replay_seqs if len(x) > seq_len]
-    beat_tags = extract_beat(note_seqs)
-    return note_seqs, replay_seqs, beat_tags, style_tags
+    seqs = zip(*flat_seq)
+    seqs = [to_torch(pad_before(clamp_midi(x))) for x in seqs if len(x) > seq_len]
+    beat_tags = extract_beat(seqs)
+    return seqs, beat_tags, style_tags
 
 def validation_split(it_list, split=0.1):
     """
@@ -142,13 +142,10 @@ def clamp_midi(sequence):
     """
     Clamps the midi base on the MIN and MAX notes
     """
-    sequence = np.minimum(np.ceil(sequence[:, MIN_NOTE:MAX_NOTE]), 1)
-    assert (sequence >= 0).all()
-    assert (sequence <= 1).all()
-    return sequence
+    return sequence[:, MIN_NOTE:MAX_NOTE, :]
 
 def unclamp_midi(sequence):
     """
     Restore clamped MIDI sequence back to MIDI note values
     """
-    return np.concatenate((np.zeros((len(sequence), MIN_NOTE)), sequence), axis=1)
+    return np.pad(sequence, ((0, 0), (MIN_NOTE, 0), (0, 0)), 'constant')
