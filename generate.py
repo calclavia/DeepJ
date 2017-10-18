@@ -34,8 +34,8 @@ def sample_timestep(model, prev_timestep, beat, states, temperature=1, batch_siz
         if note_on:
             # Sample replay
             current_timestep[0, n, 1] = 1 if np.random.random() <= output[0, n, 1] else 0
-            # Volume
-            current_timestep[0, n, 2] = output[0, n, 2]
+            # Volume (Bound the volume between 0 and 1)
+            current_timestep[0, n, 2] = min(max(output[0, n, 2], 0), 1)
 
     return current_timestep, states
 
