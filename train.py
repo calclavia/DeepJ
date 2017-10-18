@@ -140,9 +140,9 @@ def compute_loss(model, data, teach_prob):
 
         # Compute the loss.
         # TODO: Do replay loss masking
-        loss += note_loss(output[:, :, 0], targets[:, :, 0])
-        loss += note_loss(output[:, :, 1], targets[:, :, 1])
-        loss += volume_loss(output[:, :, 2], targets[:, :, 2])
+        loss += note_loss(output[:, 0], targets[:, 0])
+        loss += note_loss(output[:, 1], targets[:, 1])
+        loss += volume_loss(output[:, 2], targets[:, 2])
 
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
