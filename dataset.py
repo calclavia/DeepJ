@@ -16,10 +16,6 @@ from midi_util import load_midi
 from util import *
 
 def compute_beat(beat, notes_in_bar):
-    # TODO: Compare methods
-    # Angle method
-    # angle = (beat % notes_in_bar) / notes_in_bar * 2 * math.pi
-    # return np.array([math.cos(angle), math.sin(angle)])
     return one_hot(beat % notes_in_bar, notes_in_bar)
 
 def compute_completion(beat, len_melody):
@@ -32,7 +28,7 @@ def load_styles(styles=STYLES):
     style_seqs = []
     for style in tqdm(styles):
         # Parallel process all files into a list of music sequences
-        style_seq = [list(load_midi(f)) for f in tqdm(get_all_files([style]))]
+        style_seq = [load_midi(f) for f in tqdm(get_all_files([style]))]
         style_seqs.append(style_seq)
 
     return style_seqs
@@ -50,13 +46,12 @@ def extract_beat(compositions):
 
 def process(style_seqs, seq_len=SEQ_LEN):
     """
-    Process data
+    Process data. Takes a list of styles and flattens the data, returning the necessary tags.
     """
     # Flatten into compositions list
-    flat_seq = [x for y in style_seqs for x in y]
+    seqs = [s for y in style_seqs for s in y]
     style_tags = torch.stack([to_torch(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
 
-    seqs = zip(*flat_seq)
     seqs = [to_torch(pad_before(clamp_midi(x))) for x in seqs if len(x) > seq_len]
     beat_tags = extract_beat(seqs)
     return seqs, beat_tags, style_tags
@@ -80,7 +75,7 @@ def iteration_indices(data, seq_len=SEQ_LEN):
     """
     Returns a list of tuple, which are the iteration indices.
     """
-    note_seqs, replay_seqs, beat_tags, style_tags = data
+    note_seqs, beat_tags, style_tags = data
 
     # List of composition and their sequence start indices
     it_list = []
@@ -95,7 +90,7 @@ def sampler(data, it_list, seq_len=SEQ_LEN):
     """
     Generates sequences of data.
     """
-    note_seqs, replay_seqs, beat_tags, style_tags = data
+    note_seqs, beat_tags, style_tags = data
 
     if len(note_seqs) == 0:
         raise 'Insufficient training data.'
@@ -105,7 +100,6 @@ def sampler(data, it_list, seq_len=SEQ_LEN):
 
     for c, t in it_shuffled:
         yield (note_seqs[c][t:t+seq_len], \
-               replay_seqs[c][t:t+seq_len], \
                beat_tags[c][t:t+seq_len], \
                style_tags[c])
 
@@ -113,16 +107,15 @@ def data_it(data, seq_len=SEQ_LEN):
     """
     Iterates through each note in all songs.
     """
-    note_seqs, replay_seqs, beat_tags, style_tags = data
+    note_seqs, beat_tags, style_tags = data
 
     for c in range(len(note_seqs)):
         note_seq = note_seqs[c]
-        replay_seq = replay_seqs[c]
         beat_seq = beat_tags[c]
         style_tag = style_tags[c]
 
         for t in range(0, len(note_seq)):
-            yield (note_seq[t], replay_seq[t], beat_seq[t], style_tag)
+            yield (note_seq[t], beat_seq[t], style_tag)
 
 def batcher(sampler, batch_size=BATCH_SIZE):
     """

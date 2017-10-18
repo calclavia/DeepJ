@@ -12,7 +12,7 @@ def pad_before(sequence):
     """
     Pads a sequence with a zero in the first (temporal) dimension
     """
-    return np.pad(sequence, ((1, 0), (0, 0)), 'constant')
+    return np.pad(sequence, ((1, 0), (0, 0), (0, 0)), 'constant')
 
 def get_all_files(paths, ext='.mid'):
     potential_files = []

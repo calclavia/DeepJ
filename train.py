@@ -14,6 +14,9 @@ from util import *
 from model import DeepJ
 from generate import generate, sample_timestep
 
+note_loss = nn.BCELoss()
+volume_loss = nn.BCELoss()
+
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
     plt.clf()
@@ -100,7 +103,6 @@ def train_step(model, data, teach_prob):
     Trains the model on a single batch of sequence.
     """
     model.train()
-    criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters())
 
     # Zero out the gradient
@@ -121,22 +123,26 @@ def compute_loss(model, data, teach_prob):
     """
     Trains the model on a single batch of sequence.
     """
-    note_seq, replay_seq, beat_seq, style = data
-    criterion = nn.BCELoss()
+    note_seq, beat_seq, style = data
 
     loss = 0
     seq_len = note_seq.size()[1]
 
     # Initialize hidden states
     states = None
-    prev_note = note_seq[:, 0]
+    prev_note = note_seq[:, 0, :]
 
     # Iterate through the entire sequence
     for i in range(1, seq_len):
         beat = beat_seq[:, i - 1]
-        targets = note_seq[:, i]
+        targets = note_seq[:, i, :]
         output, states = model(prev_note, beat, states, targets)
-        loss += criterion(output, targets)
+
+        # Compute the loss.
+        # TODO: Do replay loss masking
+        loss += note_loss(output[:, :, 0], targets[:, :, 0])
+        loss += note_loss(output[:, :, 1], targets[:, :, 1])
+        loss += volume_loss(output[:, :, 2], targets[:, :, 2])
 
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
