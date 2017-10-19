@@ -12,10 +12,7 @@ from constants import *
 from util import *
 from model import DeepJ
 
-def generate(model, name='output', num_bars=8):
-    # if prime:
-    #     print('Priming melody')
-
+def generate(model, name='output', num_bars=8, primer=None):
     model.eval()
 
     # Output note sequence
@@ -28,8 +25,13 @@ def generate(model, name='output', num_bars=8):
     temperature = 1
     silent_time = NOTES_PER_BAR
 
-    # Last generated note time step
-    prev_timestep = var(torch.zeros((NUM_NOTES, NOTE_UNITS)), volatile=True).unsqueeze(0)
+    if primer:
+        print('Priming melody')
+        prev_timestep, *_ = next(primer)
+        prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
+    else:
+        # Last generated note time step
+        prev_timestep = var(torch.zeros((NUM_NOTES, NOTE_UNITS)), volatile=True).unsqueeze(0)
 
     for t in trange(NOTES_PER_BAR * num_bars):
         beat = var(to_torch(compute_beat(t, NOTES_PER_BAR)), volatile=True).unsqueeze(0)
@@ -38,11 +40,12 @@ def generate(model, name='output', num_bars=8):
         # Add note to note sequence
         note_seq.append(current_timestep.cpu().data[0, :].numpy())
 
-        # if prime:
-        #     prev_timestep, *_ = next(prime)
-        #     prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
-        # else:
-        prev_timestep = current_timestep
+        if primer:
+            # Inject training data to input
+            prev_timestep, *_ = next(primer)
+            prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
+        else:
+            prev_timestep = current_timestep
 
         # Increase temperature if silent
         if np.count_nonzero(current_timestep) == 0:
@@ -74,10 +77,10 @@ def main():
     parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
 
-    # primer = None
-    # if args.debug:
-    #     print('=== Loading Data ===')
-    #     primer = data_it(process(load_styles()))
+    primer = None
+    if args.debug:
+        print('=== Loading Data ===')
+        primer = data_it(process(load_styles()))
 
     print('=== Loading Model ===')
     print('Path: {}'.format(args.path))
@@ -93,7 +96,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    generate(model, num_bars=args.bars)
+    generate(model, num_bars=args.bars, primer=primer)
 
 if __name__ == '__main__':
     main()

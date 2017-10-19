@@ -31,7 +31,7 @@ def var(tensor, **kwargs):
     """
     Creates a Torch variable based on CUDA settings.
     """
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not kwargs.get('use_cpu', False):
         return Variable(tensor, **kwargs).cuda()
     else:
         return Variable(tensor, **kwargs)

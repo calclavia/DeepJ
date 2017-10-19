@@ -275,10 +275,10 @@ class NoteAxis(nn.Module):
 
             for b in range(batch_size):
                 # Sample note randomly
-                note_on = 1 if np.random.random() <= prob_out[b, 0] else 0
+                note_on = np.random.random() <= prob_out[b, 0]
                 
                 if note_on:
-                    note_batch[b, 0] = note_on
+                    note_batch[b, 0] = 1
                     # Sample replay
                     note_batch[b, 1] = 1 if np.random.random() <= prob_out[b, 1] else 0
                     # Volume (Bound the volume between 0 and 1)
