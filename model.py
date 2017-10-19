@@ -52,7 +52,8 @@ class TimeAxis(nn.Module):
         # Layers
         self.vicinity_conv = nn.Conv1d(NOTE_UNITS, VICINITY_UNITS, OCTAVE * 2 + 1, padding=OCTAVE)
         # self.chord_conv = nn.Conv1d(NOTE_UNITS, CHORD_UNITS, NUM_OCTAVES, dilation=OCTAVE, padding=OCTAVE)
-        self.rnns = [nn.LSTMCell(input_features if i == 0 else num_units, num_units) for i in range(num_layers)]
+        # self.rnns = [nn.LSTMCell(input_features if i == 0 else num_units, num_units) for i in range(num_layers)]
+        self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
         self.beat_proj = nn.Linear(NOTES_PER_BAR, BEAT_UNITS)
 
         # Constants
@@ -62,8 +63,8 @@ class TimeAxis(nn.Module):
         stack_vecs = np.array(stack_vecs)
         self.pitch_class = torch.from_numpy(stack_vecs).float().unsqueeze(0)
 
-        for i, rnn in enumerate(self.rnns):
-            self.add_module('rnn_' + str(i), rnn)
+        # for i, rnn in enumerate(self.rnns):
+            # self.add_module('rnn_' + str(i), rnn)
 
     def compute_chord_context(self, notes_in):
         """
@@ -137,11 +138,11 @@ class TimeAxis(nn.Module):
         features = features.view(-1, features.size(2))
 
         # Initialize hidden states
-        if states is None:
-            states = [[var(torch.zeros(features.size(0), self.num_units)) for _ in range(2)] for _ in self.rnns]
+        # if states is None:
+            # states = [[var(torch.zeros(features.size(0), self.num_units)) for _ in range(2)] for _ in self.rnns]
 
         out = features
-        out = self.compute_rnn(out, states)
+        out, states = self.compute_rnn(out, states)
         out = out.view(batch_size, self.num_notes, -1)
         return out, states
 
@@ -150,11 +151,18 @@ class TimeAxis(nn.Module):
         Feed x into the layers of RNN
         Return: The output of the RNN layers. [batch, units]
         """
+        # Note that "sequence" is first dimension
+        x = x.unsqueeze(0)
+        x, states = self.rnn(x, states)
+        x = x.squeeze(0)
+        return x, states
+        """
         for l, rnn in enumerate(self.rnns):
             x, state = rnn(x, states[l])
             states[l] = (x, state)
             x = self.dropout(x)
         return x
+        """
 
 class NoteAxis(nn.Module):
     """
@@ -171,13 +179,14 @@ class NoteAxis(nn.Module):
         self.input_dropout = nn.Dropout(0.2)
         self.dropout = nn.Dropout(0.5)
 
-        self.rnns = [nn.LSTMCell(num_inputs if i == 0 else num_units, num_units) for i in range(num_layers)]
+        # self.rnns = [nn.LSTMCell(num_inputs if i == 0 else num_units, num_units) for i in range(num_layers)]
+        self.rnn = nn.LSTM(num_inputs, num_units, num_layers, dropout=0.5)
 
         self.output = nn.Linear(num_units, NOTE_UNITS)
         self.sigmoid = nn.Sigmoid()
 
-        for i, rnn in enumerate(self.rnns):
-            self.add_module('rnn_' + str(i), rnn)
+        # for i, rnn in enumerate(self.rnns):
+            # self.add_module('rnn_' + str(i), rnn)
 
     def forward(self, note_features, condition_notes, temperature=1):
         """
@@ -198,20 +207,9 @@ class NoteAxis(nn.Module):
         # Create note features [batch_size, num_notes, features]
         note_features = torch.cat((note_features, shifted), 2)
 
-        # Initialize hidden states
-        states = self.init_states(batch_size)
-        
-        outs = []
-
-        # TODO: Can benefit from batching this operation?
-        # Note axis RNN
-        for n in range(self.num_notes):
-            cur_out = note_features[:, n, :]
-            cur_out = self.compute_rnn(cur_out, states)
-            outs.append(cur_out)
-
-        # Build the output
-        out = torch.stack(outs, 1)
+        out = note_features.permute(1, 0, 2)
+        out, _ = self.rnn(out, None)
+        out = out.permute(1, 0, 2).contiguous()
 
         # Handle output
         # Move note into batch dimension
@@ -240,7 +238,7 @@ class NoteAxis(nn.Module):
         # Note axis RNN
         for n in range(self.num_notes):
             cur_out = torch.cat((note_features[:, n, :], last_note), 1)
-            cur_out = self.compute_rnn(cur_out, states)
+            cur_out, states = self.compute_rnn(cur_out, states)
 
             # Create output
             cur_out = self.output(cur_out)
@@ -271,15 +269,23 @@ class NoteAxis(nn.Module):
         return out
         
     def init_states(self, batch_size):
-        return [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in self.rnns]
+        # return [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in self.rnns]
+        return None
 
     def compute_rnn(self, x, states):
         """
         Feed x into the layers of RNN
         Return: The output of the RNN layers. [batch, units]
         """
+        # Note that "sequence" is first dimension
+        x = x.unsqueeze(0)
+        x, states = self.rnn(x, states)
+        x = x.squeeze(0)
+        return x, states
+        """
         for l, rnn in enumerate(self.rnns):
             x, state = rnn(x, states[l])
             states[l] = (x, state)
             x = self.dropout(x)
         return x
+        """
