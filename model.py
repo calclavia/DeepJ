@@ -275,20 +275,23 @@ class NoteAxis(nn.Module):
 
             for b in range(batch_size):
                 # Sample note randomly
-                note_on = np.random.random() <= prob_out[b, 0]
+                note_on = np.random.random() <= prob_out[b, 0].data[0]
                 
                 if note_on:
                     note_batch[b, 0] = 1
                     # Sample replay
-                    note_batch[b, 1] = 1 if np.random.random() <= prob_out[b, 1] else 0
+                    note_batch[b, 1] = 1 if np.random.random() <= prob_out[b, 1].data[0] else 0
                     # Volume (Bound the volume between 0 and 1)
-                    note_batch[b, 2] = min(max(cur_out[b, 2], 0), 1)
+                    note_batch[b, 2] = cur_out[b, 2]
 
             last_note = note_batch
             outs.append(note_batch)
 
         # Build the output
-        return torch.stack(outs, 1)
+        out = torch.stack(outs, 1)
+        # Clamp the volume output
+        out = torch.clamp(out, min=0, max=1)
+        return out
         
     def init_states(self, batch_size):
         return [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in self.rnns]

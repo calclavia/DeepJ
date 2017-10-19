@@ -146,6 +146,8 @@ def compute_loss(model, data, teach_prob):
         # Any note that is not supposed to be played (target) will
         # not receive any additional loss.
         loss += note_loss(output[:, :, 1] * target_play, targets[:, :, 1])
+        if i == seq_len - 1:
+            print(output[:, :, 2] * target_play, targets[:, :, 2])
         loss += volume_loss(output[:, :, 2] * target_play, targets[:, :, 2])
         
         # Choose note to feed based on coin flip (scheduled sampling)
