@@ -15,7 +15,7 @@ from model import DeepJ
 from generate import generate
 
 note_loss = nn.BCELoss()
-volume_loss = nn.BCELoss()
+volume_loss = nn.MSELoss()
 
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
@@ -139,11 +139,10 @@ def compute_loss(model, data, teach_prob):
         output, states = model(prev_note, beat, states, targets)
 
         # Compute the loss.
-        # TODO: Do replay loss masking
-        loss += note_loss(output[:, 0], targets[:, 0])
-        loss += note_loss(output[:, 1], targets[:, 1])
-        loss += volume_loss(output[:, 2], targets[:, 2])
-
+        loss += note_loss(output[:, :, 0], targets[:, :, 0])
+        loss += note_loss(output[:, :, 1], targets[:, :, 1])
+        loss += volume_loss(output[:, :, 2], targets[:, :, 2])
+        
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
         # TODO: Make sure this does not mess up gradients
@@ -167,7 +166,7 @@ def main():
     print('=== Loading Model ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()
-    
+
     if torch.cuda.is_available():
         model.cuda()
 

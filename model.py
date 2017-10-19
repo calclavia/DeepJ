@@ -23,7 +23,9 @@ class DeepJ(nn.Module):
     def generate(self, prev_timestep, beat, states, temperature=1):
         """
         Generates the next time step.
-        Returns: The next time step and internal states
+        Call this with the previous time step, the current beat and the internal states of the model.
+        Temperature will increase the randomness of generation.
+        Returns: (The next time step, Model internal states)
         """
         note_features, states = self.time_axis(prev_timestep, beat, states)
         output = self.note_axis.generate(note_features, temperature=temperature)

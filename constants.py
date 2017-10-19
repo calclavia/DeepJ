@@ -20,7 +20,7 @@ MIDI_MAX_NOTES = 128
 MAX_VELOCITY = 127
 
 # Trainin Parameters
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 SEQ_LEN = 4 * NOTES_PER_BAR
 
 # Hyper Parameters
