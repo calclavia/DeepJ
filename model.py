@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from torch.autograd import Variable
 from constants import *
 from util import *
@@ -18,6 +19,15 @@ class DeepJ(nn.Module):
         out, states = self.time_axis(note_input, beat_in, states)
         out = self.note_axis(out, condition_notes)
         return out, states
+
+    def generate(self, prev_timestep, beat, states, temperature=1):
+        """
+        Generates the next time step.
+        Returns: The next time step and internal states
+        """
+        note_features, states = self.time_axis(prev_timestep, beat, states)
+        output = self.note_axis.generate(note_features, temperature=temperature)
+        return output, states
 
 class TimeAxis(nn.Module):
     """
@@ -44,7 +54,7 @@ class TimeAxis(nn.Module):
         self.beat_proj = nn.Linear(NOTES_PER_BAR, BEAT_UNITS)
 
         # Constants
-        self.pitch_pos = torch.range(0, self.num_notes - 1).unsqueeze(0) / self.num_notes
+        self.pitch_pos = torch.arange(0, self.num_notes).unsqueeze(0) / self.num_notes
 
         stack_vecs = [one_hot(i % OCTAVE, OCTAVE) for i in range(self.num_notes)]
         stack_vecs = np.array(stack_vecs)
@@ -113,10 +123,6 @@ class TimeAxis(nn.Module):
         Return:
             ([batch_size, num_notes, features], states)
         """
-        # Normalize TODO: Does this improve?
-        # note_in = (note_in - 0.5) * 2
-        # beat_in = (beat_in - 0.5) * 2
-
         batch_size = note_in.size()[0]
         notes = self.input_dropout(note_in)
 
@@ -150,8 +156,6 @@ class TimeAxis(nn.Module):
         out = features
 
         for l, rnn in enumerate(self.rnns):
-            prev_out = out
-
             out, state = rnn(out, states[l])
             states[l] = (out, state)
             out = self.dropout(out)
@@ -173,10 +177,14 @@ class NoteAxis(nn.Module):
 
         self.input_dropout = nn.Dropout(0.2)
         self.dropout = nn.Dropout(0.5)
-        # TODO: LSTM Cell might be more efficient!
-        self.rnn = nn.LSTM(num_inputs, num_units, num_layers, dropout=0.5, batch_first=True)
+
+        self.rnns = [nn.LSTMCell(num_inputs if i == 0 else num_units, num_units) for i in range(num_layers)]
+
         self.output = nn.Linear(num_units, NOTE_UNITS)
         self.sigmoid = nn.Sigmoid()
+
+        for i, rnn in enumerate(self.rnns):
+            self.add_module('rnn_' + str(i), rnn)
 
     def forward(self, note_features, condition_notes, temperature=1):
         """
@@ -184,30 +192,101 @@ class NoteAxis(nn.Module):
             note_features: Features for each note [batch_size, num_notes, features]
             condition_notes: Target notes [batch_size, num_notes, note_units] (for training)
         """
-        # Normalize TODO: Does this improve?
-        # condition_notes = (condition_notes - 0.5) * 2
-        batch_size = note_features.size()[0]
-
+        batch_size = note_features.size(0)
         note_features = self.dropout(note_features)
+        
+        # Build note conditioning
         condition_notes = self.input_dropout(condition_notes)
 
         # Used for the first target
         zero_padding = var(torch.zeros((batch_size, 1, NOTE_UNITS)))
         shifted = torch.cat((zero_padding, condition_notes), 1)[:, :-1]
 
-        # Create note features
+        # Create note features [batch_size, num_notes, features]
         note_features = torch.cat((note_features, shifted), 2)
 
-        out, _ = self.rnn(note_features, None)
+        # Initialize hidden states
+        states = self.init_states(batch_size)
+        
+        outs = []
 
-        out = self.dropout(out)
+        # TODO: Optimize training by batching RNN computation?
+        # Note axis RNN
+        for n in range(self.num_notes):
+            cur_out = note_features[:, n, :]
 
-        # Apply output
-        out = out.contiguous()
-        out = out.view(-1, out.size(2))
+            # Layers of RNN
+            for l, rnn in enumerate(self.rnns):
+                cur_out, state = rnn(cur_out, states[l])
+                states[l] = (cur_out, state)
+                cur_out = self.dropout(cur_out)
+
+            # cur_out is now the feature output for this particular note
+            # cur_out [batch, NOTE_UNITS]
+            outs.append(cur_out)
+
+        # Build the output
+        out = torch.stack(outs, 1)
+
+        # Handle output
+        out = out.view(-1, self.num_units)
         out = self.output(out)
         out = out.view(-1, self.num_notes, NOTE_UNITS)
 
         # Apply sigmoid to only probability outputs
         prob_out = self.sigmoid(out[:, :, 0:2] / temperature)
         return torch.cat((prob_out, out[:, :, 2:3]), 2)
+
+    def generate(self, note_features, temperature=1):
+        """
+        Perform generation (no condition notes provided.)
+        Returns a sampled timestep (48 notes, 3 note variables each)
+        """
+        batch_size = note_features.size(0)
+        note_features = self.dropout(note_features)
+
+        # Initialize hidden states
+        states = self.init_states(batch_size)
+        
+        outs = []
+        last_note = var(torch.zeros(batch_size, NOTE_UNITS))
+
+        # Note axis RNN
+        for n in range(self.num_notes):
+            cur_out = torch.cat((note_features[:, n, :], last_note), 1)
+
+            # Layers of RNN
+            for l, rnn in enumerate(self.rnns):
+                cur_out, state = rnn(cur_out, states[l])
+                states[l] = (cur_out, state)
+                cur_out = self.dropout(cur_out)
+
+            # cur_out is now the feature output for this particular note
+            # cur_out [batch, NOTE_UNITS]
+            # Create output
+            cur_out = self.output(cur_out)
+            # Apply sigmoid to only probability outputs
+            prob_out = self.sigmoid(cur_out[:, 0:2] / temperature)
+
+            # TODO: Entire batch can be done at once
+            note_batch = var(torch.zeros(batch_size, NOTE_UNITS))
+
+            for b in range(batch_size):
+                # Sample note randomly
+                note_on = 1 if np.random.random() <= prob_out[b, 0] else 0
+                
+                if note_on:
+                    note_batch[b, 0] = note_on
+                    # Sample replay
+                    note_batch[b, 1] = 1 if np.random.random() <= prob_out[b, 1] else 0
+                    # Volume (Bound the volume between 0 and 1)
+                    note_batch[b, 2] = min(max(cur_out[b, 2], 0), 1)
+
+            last_note = note_batch
+            outs.append(note_batch)
+
+        # Build the output
+        return torch.stack(outs, 1)
+        
+    def init_states(self, batch_size):
+        return [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in self.rnns]

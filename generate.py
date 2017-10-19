@@ -12,33 +12,6 @@ from constants import *
 from util import *
 from model import DeepJ
 
-def sample_timestep(model, prev_timestep, beat, states, temperature=1, batch_size=1):
-    """
-    Samples a single note
-    """
-    ## Time Axis
-    note_features, states = model.time_axis(prev_timestep, beat, states)
-
-    ## Note Axis
-    # The current note being generated
-    current_timestep = var(torch.zeros(batch_size, NUM_NOTES, NOTE_UNITS), volatile=True)
-
-    for n in range(NUM_NOTES):
-        output = model.note_axis(note_features, current_timestep, temperature)
-        output = output.cpu().data
-
-        # Sample note randomly
-        note_on = 1 if np.random.random() <= output[0, n, 0] else 0
-        current_timestep[0, n, 0] = note_on
-
-        if note_on:
-            # Sample replay
-            current_timestep[0, n, 1] = 1 if np.random.random() <= output[0, n, 1] else 0
-            # Volume (Bound the volume between 0 and 1)
-            current_timestep[0, n, 2] = min(max(output[0, n, 2], 0), 1)
-
-    return current_timestep, states
-
 def generate(model, name='output', num_bars=8):
     # if prime:
     #     print('Priming melody')
@@ -60,7 +33,7 @@ def generate(model, name='output', num_bars=8):
 
     for t in trange(NOTES_PER_BAR * num_bars):
         beat = var(to_torch(compute_beat(t, NOTES_PER_BAR)), volatile=True).unsqueeze(0)
-        current_timestep, states = sample_timestep(model, prev_timestep, beat, states, temperature=temperature)
+        current_timestep, states = model.generate(prev_timestep, beat, states, temperature=temperature)
 
         # Add note to note sequence
         note_seq.append(current_timestep.cpu().data[0, :].numpy())
@@ -114,8 +87,8 @@ def main():
     if torch.cuda.is_available():
         model.cuda()
 
-    print('WARNING: No model loaded!')
-    # model.load_state_dict(torch.load(args.path))
+    # print('WARNING: No model loaded!')
+    model.load_state_dict(torch.load(args.path))
 
     print('=== Generating ===')
     generate(model, num_bars=args.bars)
