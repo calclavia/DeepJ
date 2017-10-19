@@ -69,7 +69,7 @@ def write_file(name, note_seq):
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
-    parser.add_argument('path', help='Path to model file')
+    parser.add_argument('--path', help='Path to model file')
     parser.add_argument('--bars', default=16, type=int, help='Bars of generation')
     parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
@@ -87,8 +87,10 @@ def main():
     if torch.cuda.is_available():
         model.cuda()
 
-    # print('WARNING: No model loaded!')
-    model.load_state_dict(torch.load(args.path))
+    if args.path:
+        model.load_state_dict(torch.load(args.path))
+    else:
+        print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
     generate(model, num_bars=args.bars)

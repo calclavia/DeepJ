@@ -12,7 +12,7 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
-from generate import generate, sample_timestep
+from generate import generate
 
 note_loss = nn.BCELoss()
 volume_loss = nn.BCELoss()
@@ -151,7 +151,7 @@ def compute_loss(model, data, teach_prob):
             prev_note = targets
         else:
             model.eval()
-            prev_note, _ = sample_timestep(model, prev_note, beat, states, batch_size=BATCH_SIZE)
+            prev_note, _ = model.generate(prev_note, beat, states)
             prev_note = var(prev_note.data)
             model.train()
 
@@ -167,9 +167,8 @@ def main():
     print('=== Loading Model ===')
     print('GPU: {}'.format(torch.cuda.is_available()))
     model = DeepJ()
+    
     if torch.cuda.is_available():
-        # TODO: Pytorch Cudnn bug
-        torch.backends.cudnn.enabled = False
         model.cuda()
 
     if args.path:
