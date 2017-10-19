@@ -143,5 +143,7 @@ def clamp_midi(sequence):
 def unclamp_midi(sequence):
     """
     Restore clamped MIDI sequence back to MIDI note values
+    Args:
+        sequence: [time, notes, note units]
     """
     return np.pad(sequence, ((0, 0), (MIN_NOTE, 0), (0, 0)), 'constant')

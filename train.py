@@ -12,7 +12,7 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
-from generate import generate
+from generate import generate, write_file
 
 note_loss = nn.BCELoss()
 volume_loss = nn.MSELoss()
@@ -103,8 +103,8 @@ def train_step(model, data, teach_prob):
     """
     Trains the model on a single batch of sequence.
     """
-    model.train()
     optimizer = optim.Adam(model.parameters())
+    model.train()
 
     # Zero out the gradient
     optimizer.zero_grad()
@@ -191,6 +191,13 @@ def main():
     train_ind, val_ind = validation_split(iteration_indices(data))
     train_generator = lambda: batcher(sampler(data, train_ind))
     val_generator = lambda: batcher(sampler(data, val_ind))
+
+    """
+    # Checks if training data sounds right.
+    for i, (train_seq, *_) in enumerate(train_generator()):
+        write_file('train_seq_{}'.format(i), train_seq[0].cpu().data.numpy())
+    """
+
     print('Training:', len(train_ind), 'Validation:', len(val_ind))
     print()
 
