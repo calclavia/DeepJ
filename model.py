@@ -216,15 +216,7 @@ class NoteAxis(nn.Module):
         # Note axis RNN
         for n in range(self.num_notes):
             cur_out = note_features[:, n, :]
-
-            # Layers of RNN
-            for l, rnn in enumerate(self.rnns):
-                cur_out, state = rnn(cur_out, states[l])
-                states[l] = (cur_out, state)
-                cur_out = self.dropout(cur_out)
-
-            # cur_out is now the feature output for this particular note
-            # cur_out [batch, NOTE_UNITS]
+            cur_out = self.compute_rnn(cur_out, states)
             outs.append(cur_out)
 
         # Build the output
@@ -256,15 +248,8 @@ class NoteAxis(nn.Module):
         # Note axis RNN
         for n in range(self.num_notes):
             cur_out = torch.cat((note_features[:, n, :], last_note), 1)
+            cur_out = self.compute_rnn(cur_out, states)
 
-            # Layers of RNN
-            for l, rnn in enumerate(self.rnns):
-                cur_out, state = rnn(cur_out, states[l])
-                states[l] = (cur_out, state)
-                cur_out = self.dropout(cur_out)
-
-            # cur_out is now the feature output for this particular note
-            # cur_out [batch, NOTE_UNITS]
             # Create output
             cur_out = self.output(cur_out)
             # Apply sigmoid to only probability outputs
@@ -295,3 +280,14 @@ class NoteAxis(nn.Module):
         
     def init_states(self, batch_size):
         return [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in self.rnns]
+
+    def compute_rnn(self, x, states):
+        """
+        Feed x into the layers of RNN
+        Return: The output of the RNN layers. [batch, units]
+        """
+        for l, rnn in enumerate(self.rnns):
+            x, state = rnn(x, states[l])
+            states[l] = (x, state)
+            x = self.dropout(x)
+        return x
