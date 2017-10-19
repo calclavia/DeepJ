@@ -131,6 +131,9 @@ def batcher(sampler, batch_size=BATCH_SIZE):
             yield [var(torch.stack(x)) for x in zip(*batch)]
             batch = []
 
+    # Yield the remaining batch!
+    yield [var(torch.stack(x)) for x in zip(*batch)]
+
 def clamp_midi(sequence):
     """
     Clamps the midi base on the MIN and MAX notes

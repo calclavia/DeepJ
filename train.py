@@ -43,21 +43,22 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         total_loss = 0
 
         t_gen = train_generator()
-        t = tqdm(total=train_len)
-        t.set_description('Epoch {}'.format(epoch))
 
-        for data in t_gen:
-            train_prob = max(MIN_SCHEDULE_PROB, 1 -SCHEDULE_RATE * total_step)
-            loss = train_step(model, data, train_prob)
+        with tqdm(total=train_len) as t:
+            t.set_description('Epoch {}'.format(epoch))
 
-            total_loss += loss
-            avg_loss = total_loss / step
-            t.set_postfix(loss=avg_loss, prob=train_prob)
-            t.update(BATCH_SIZE)
+            for data in t_gen:
+                train_prob = max(MIN_SCHEDULE_PROB, 1 -SCHEDULE_RATE * total_step)
+                loss = train_step(model, data, train_prob)
 
-            step += 1
-            total_step += 1
-        t.close()
+                total_loss += loss
+                avg_loss = total_loss / step
+                t.set_postfix(loss=avg_loss, prob=train_prob)
+                t.update(BATCH_SIZE)
+
+                step += 1
+                total_step += 1
+
         train_losses.append(avg_loss)
 
         # Validation
@@ -65,18 +66,18 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         total_loss = 0
 
         v_gen = val_generator()
-        t = tqdm(total=val_len)
-        t.set_description('Validation {}'.format(epoch))
 
-        for data in v_gen:
-            loss = val_step(model, data)
-            total_loss += loss
-            avg_loss = total_loss / step
-            t.set_postfix(loss=avg_loss)
-            t.update(BATCH_SIZE)
+        with tqdm(total=val_len) as t:
+            t.set_description('Validation {}'.format(epoch))
 
-            step += 1
-        t.close()
+            for data in v_gen:
+                loss = val_step(model, data)
+                total_loss += loss
+                avg_loss = total_loss / step
+                t.set_postfix(loss=avg_loss)
+                t.update(BATCH_SIZE)
+                step += 1
+            
         val_losses.append(avg_loss)
 
         if plot:
@@ -190,6 +191,7 @@ def main():
     train_ind, val_ind = validation_split(iteration_indices(data))
     train_generator = lambda: batcher(sampler(data, train_ind))
     val_generator = lambda: batcher(sampler(data, val_ind))
+    print('Training:', len(train_ind), 'Validation:', len(val_ind))
     print()
 
     print('=== Training ===')
