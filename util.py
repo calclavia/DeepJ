@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 from torch.autograd import Variable
+from constants import *
 
 def one_hot(index, size):
     x = np.zeros(size)
@@ -31,7 +32,7 @@ def var(tensor, **kwargs):
     """
     Creates a Torch variable based on CUDA settings.
     """
-    if torch.cuda.is_available() and not kwargs.get('use_cpu', False):
+    if torch.cuda.is_available() and not kwargs.get('use_cpu', False) and not FORCE_CPU:
         return Variable(tensor, **kwargs).cuda()
     else:
         return Variable(tensor, **kwargs)
