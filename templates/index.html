@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>DeepJ</title>
+        <!-- polyfill -->
+    	<script src="{{ url_for('static', filename='inc/shim/Base64.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='inc/shim/Base64binary.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='inc/shim/WebAudioAPI.js') }}" type="text/javascript"></script>
+        <script src="{{ url_for('static', filename='inc/shim/WebMIDIAPI.js') }}" type="text/javascript"></script>
+        <script src="{{ url_for('static', filename='inc/jasmid/stream.js') }}" type="text/javascript"></script>
+        <script src="{{ url_for('static', filename='inc/jasmid/midifile.js') }}" type="text/javascript"></script>
+        <script src="{{ url_for('static', filename='inc/jasmid/replayer.js') }}" type="text/javascript"></script>
+    	<!-- midi.js package -->
+    	<script src="{{ url_for('static', filename='js/midi/audioDetect.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='js/midi/gm.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='js/midi/loader.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='js/midi/plugin.audiotag.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='js/midi/plugin.webaudio.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='js/midi/plugin.webmidi.js') }}" type="text/javascript"></script>
+        <script src="{{ url_for('static', filename='js/midi/player.js') }}" type="text/javascript"></script>
+        <script src="{{ url_for('static', filename='js/midi/synesthesia.js') }}" type="text/javascript"></script>
+    	<!-- utils -->
+    	<script src="{{ url_for('static', filename='js/util/dom_request_xhr.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='js/util/dom_request_script.js') }}" type="text/javascript"></script>
+        <!-- midi.js css -->
+    	<link href="{{ url_for('static', filename='css/MIDIPlayer.css') }}" rel="stylesheet" type="text/css" />
+    	<!-- includes -->
+    	<script src="{{ url_for('static', filename='inc/timer.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='inc/colorspace.js') }}" type="text/javascript"></script>
+    	<script src="{{ url_for('static', filename='inc/event.js') }}" type="text/javascript"></script>
+        <!-- etc -->
+        <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script>
+    </head>
+    <body>
+        <script type="text/javascript">
+            var socket;
+            var timestep_list = [];
+            var step = 0;
+            $(document).ready(function(){
+                MIDI.loadPlugin({
+                    soundfontUrl: "{{ url_for('static', filename='soundfont/') }}",
+                    instrument: "acoustic_grand_piano",
+                    onprogress(state, progress) {
+                        console.log(state, progress);
+                    },
+                    onsuccess() {
+                        console.log('MIDI loaded')
+                        socket = io.connect('http://' + document.domain + ':' + location.port);
+
+                        socket.on('connect', function() {
+                            console.log('socket connect')
+                            socket.emit('client_connect', { data: 'Client successfully connected!' });
+                        });
+
+                        socket.on('send_timestep', function(data) {
+                            console.log('received timestep', data)
+                            timestep_list.push(data);
+                            document.getElementById('t_list').innerHTML += (data + '\n');
+                        });
+
+                        window.setInterval(function() {
+                            if(timestep_list.length > 10 && step < timestep_list.length) {
+                                var data = timestep_list[step];
+                                for(var i = 0; i < data.length; i++) {
+                                    var delay = 0;
+                                    var note = data[i][0];
+                                    var velocity = data[i][2];
+                                    var pitch = 36 + i;
+                                    MIDI.setVolume(0, 127);
+                                    MIDI.noteOn(0, pitch, 127 * velocity, delay);
+                                    MIDI.noteOff(0, pitch, delay);
+                                }
+                                step++;
+                            }
+                        }, 500);
+                    }
+                });
+            });
+
+            function play() {
+                socket.emit('play_event', { data : 'Sending play request...' });
+            }
+
+        </script>
+        <h2>DeepJ App</h2>
+        <button onclick="play()">Play</button>
+        <p id="t_list"></p>
+    </body>
+</html>
