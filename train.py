@@ -14,8 +14,8 @@ from util import *
 from model import DeepJ
 from generate import generate, write_file
 
-note_loss = nn.BCELoss()
-volume_loss = nn.MSELoss()
+bce_loss = nn.BCELoss()
+mse_loss = nn.MSELoss()
 
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
@@ -141,13 +141,12 @@ def compute_loss(model, data, teach_prob):
 
         # Compute the loss.
         target_play = targets[:, :, 0]
-        loss += note_loss(output[:, :, 0], target_play)
-        
+        loss += bce_loss(output[:, :, 0], target_play)
         # Play loss masking
         # Any note that is not supposed to be played (target) will
         # not receive any additional loss.
-        loss += note_loss(output[:, :, 1] * target_play, targets[:, :, 1])
-        loss += volume_loss(output[:, :, 2] * target_play, targets[:, :, 2])
+        loss += bce_loss(output[:, :, 1] * target_play, targets[:, :, 1])
+        loss += mse_loss(output[:, :, 2] * target_play, targets[:, :, 2])
         
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling

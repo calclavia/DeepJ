@@ -12,8 +12,8 @@ class DeepJ(nn.Module):
     def __init__(self, num_notes=NUM_NOTES):
         super().__init__()
         self.num_notes = num_notes
-        self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, 2)
-        self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, 2)
+        self.time_axis = TimeAxis(num_notes, TIME_AXIS_UNITS, TIME_AXIS_LAYERS)
+        self.note_axis = NoteAxis(num_notes, TIME_AXIS_UNITS, NOTE_AXIS_UNITS, NOTE_AXIS_LAYERS)
 
     def forward(self, note_input, beat_in, states, condition_notes):
         out, states = self.time_axis(note_input, beat_in, states)
@@ -27,9 +27,9 @@ class DeepJ(nn.Module):
         Temperature will increase the randomness of generation.
         Returns: (The next time step, Model internal states)
         """
-        note_features, states = self.time_axis(prev_timestep, beat, states)
-        output = self.note_axis.generate(note_features, temperature=temperature)
-        return output, states
+        out, states = self.time_axis(prev_timestep, beat, states)
+        out = self.note_axis.generate(out, temperature=temperature)
+        return out, states
 
 class TimeAxis(nn.Module):
     """
@@ -94,21 +94,6 @@ class TimeAxis(nn.Module):
         The notes surrounding a given note.
         Performs convolution around a note's octave
         """
-        """
-        batch_size = notes.size(0)
-        # Expand X with zero padding
-        octave_padding = var(torch.zeros((batch_size, OCTAVE, notes.size(2))))
-        pad_notes = torch.cat((octave_padding, notes, octave_padding), 1)
-
-        # The notes an octave above and below
-        vicinity = []
-
-        # Pad each note
-        for n in range(self.num_notes):
-            vicinity.append(pad_notes[:, n:n + OCTAVE * 2 + 1, :])
-
-        return torch.stack(vicinity, 1)
-        """
         # Permute the channels to 1st index
         notes = notes.permute(0, 2, 1)
         notes = self.vicinity_conv(notes)
@@ -152,18 +137,24 @@ class TimeAxis(nn.Module):
         features = features.view(-1, features.size(2))
 
         # Initialize hidden states
-        if not states:
+        if states is None:
             states = [[var(torch.zeros(features.size(0), self.num_units)) for _ in range(2)] for _ in self.rnns]
 
         out = features
-
-        for l, rnn in enumerate(self.rnns):
-            out, state = rnn(out, states[l])
-            states[l] = (out, state)
-            out = self.dropout(out)
-
+        out = self.compute_rnn(out, states)
         out = out.view(batch_size, self.num_notes, -1)
         return out, states
+
+    def compute_rnn(self, x, states):
+        """
+        Feed x into the layers of RNN
+        Return: The output of the RNN layers. [batch, units]
+        """
+        for l, rnn in enumerate(self.rnns):
+            x, state = rnn(x, states[l])
+            states[l] = (x, state)
+            x = self.dropout(x)
+        return x
 
 class NoteAxis(nn.Module):
     """
@@ -212,7 +203,6 @@ class NoteAxis(nn.Module):
         
         outs = []
 
-        # TODO: Optimize training by batching RNN computation?
         # Note axis RNN
         for n in range(self.num_notes):
             cur_out = note_features[:, n, :]
@@ -223,6 +213,7 @@ class NoteAxis(nn.Module):
         out = torch.stack(outs, 1)
 
         # Handle output
+        # Move note into batch dimension
         out = out.view(-1, self.num_units)
         out = self.output(out)
         out = out.view(-1, self.num_notes, NOTE_UNITS)
