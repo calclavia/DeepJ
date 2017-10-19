@@ -37,8 +37,9 @@ def generate(model, name='output', num_bars=4, primer=None, default_temp=0.85):
         beat = var(to_torch(compute_beat(t, NOTES_PER_BAR)), volatile=True).unsqueeze(0)
         current_timestep, states = model.generate(prev_timestep, beat, states, temperature=temperature)
 
+        cur_timestep_numpy = current_timestep.cpu().data.numpy()
         # Add note to note sequence
-        note_seq.append(current_timestep.cpu().data[0, :].numpy())
+        note_seq.append(cur_timestep_numpy[0, :])
 
         if primer:
             # Inject training data to input
@@ -48,7 +49,7 @@ def generate(model, name='output', num_bars=4, primer=None, default_temp=0.85):
             prev_timestep = current_timestep
 
         # Increase temperature if silent
-        if np.count_nonzero(current_timestep) == 0:
+        if np.count_nonzero(cur_timestep_numpy) == 0:
             silent_time += 1
 
             if silent_time >= NOTES_PER_BAR:
