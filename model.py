@@ -203,6 +203,7 @@ class NoteAxis(nn.Module):
         
         outs = []
 
+        # TODO: Can benefit from batching this operation?
         # Note axis RNN
         for n in range(self.num_notes):
             cur_out = note_features[:, n, :]
