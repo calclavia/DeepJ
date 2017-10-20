@@ -11,6 +11,7 @@ class DeepJ(nn.Module):
     """
     def __init__(self):
         super().__init__()
+        self.dropout = nn.Dropout(0.5)
         self.rnn = nn.LSTMCell(NUM_ACTIONS, LSTM_UNITS)
         self.output = nn.Linear(LSTM_UNITS, NUM_ACTIONS)
         self.softmax = nn.Softmax()
@@ -24,6 +25,8 @@ class DeepJ(nn.Module):
         x, state = self.rnn(inputs, states[0])
         states[0] = (x, state)
 
+        x = self.dropout(x)
+
         x = self.output(x)
         return x, states
 
@@ -33,8 +36,10 @@ class DeepJ(nn.Module):
         x = self.softmax(x / temperature)
 
         # Sample action
+        batch = []
+
         # Iterate over batches
         for prob in x.cpu().data.numpy():
-            sampled = np.random.multinomial(1, pvals=prob, size=None)
+            batch.append(np.random.multinomial(1, pvals=prob, size=None))
         
-        return sampled, states
+        return np.array(batch), states

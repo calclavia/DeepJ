@@ -44,7 +44,7 @@ def generate(model, name='output', seq_len=100, primer=None, default_temp=1):
             prev_timestep, *_ = next(primer)
             prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
         else:
-            prev_timestep = var(to_torch(current_timestep), volatile=True).unsqueeze(0)
+            prev_timestep = var(to_torch(current_timestep), volatile=True)
 
         # Increase temperature if silent
         if np.count_nonzero(current_timestep) == 0:
