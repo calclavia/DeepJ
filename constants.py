@@ -21,7 +21,7 @@ MAX_VELOCITY = 127
 
 # Trainin Parameters
 BATCH_SIZE = 8
-SEQ_LEN = 4 * NOTES_PER_BAR
+SEQ_LEN = 6 * NOTES_PER_BAR
 
 # Hyper Parameters
 TIME_AXIS_UNITS = 200
@@ -48,4 +48,6 @@ OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
 SAMPLES_DIR = 'out/samples'
 
-FORCE_CPU = False
+settings = {
+    'force_cpu': False
+}
