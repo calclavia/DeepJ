@@ -12,7 +12,7 @@ from constants import *
 from util import *
 from model import DeepJ
 
-def generate(model, name='output', num_bars=4, primer=None, default_temp=0.9):
+def generate(model, name='output', num_bars=4, primer=None, default_temp=0.95):
     model.eval()
 
     # Output note sequence

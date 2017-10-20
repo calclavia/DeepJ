@@ -24,7 +24,7 @@ BATCH_SIZE = 16
 SEQ_LEN = 8 * NOTES_PER_BAR
 
 # Hyper Parameters
-TIME_AXIS_UNITS = 200
+TIME_AXIS_UNITS = 300
 NOTE_AXIS_UNITS = 100
 TIME_AXIS_LAYERS = 2
 NOTE_AXIS_LAYERS = 2
@@ -40,7 +40,7 @@ SCHEDULE_RATE = 0#2e-5
 MIN_SCHEDULE_PROB = 0.6
 
 # Style
-STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+STYLES = ['data/baroque', 'data/classical']#, 'data/romantic']
 # STYLES = ['data/baroque_single']
 NUM_STYLES = len(STYLES)
 
