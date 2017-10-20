@@ -63,6 +63,7 @@
                         MIDI.setVolume(0, 127);
 
                         window.setInterval(function() {
+                            // TODO: discard old timesteps
                             if(timestep_list.length > 10 && step < timestep_list.length) {
                                 var data = timestep_list[step];
                                 var chord = []
@@ -77,7 +78,7 @@
                                 MIDI.chordOn(0, chord, 127, 0);
                                 step++;
                             }
-                        }, 250);
+                        }, 200);
                     }
                 });
             });

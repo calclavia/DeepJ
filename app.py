@@ -62,6 +62,7 @@ def generate_infinite():
     for t in range(1000000):
         beat = var(to_torch(compute_beat(t, NOTES_PER_BAR)), volatile=True).unsqueeze(0)
         curr_timestep, s = model.generate(prev_timestep, beat, states)
+        # TODO: Add temperature
         prev_timestep = curr_timestep
         states = s
         # Transform variable into list. CUDA tensor doesn't support GPU array so cpu() is required 
