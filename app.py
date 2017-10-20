@@ -22,7 +22,7 @@ model = DeepJ()
 if torch.cuda.is_available():
     model.cuda()
 
-model_path = 'out/model.pt'
+model_path = 'archives/model.pt'
 
 if os.path.isfile(model_path):
     model.load_state_dict(torch.load(model_path))
