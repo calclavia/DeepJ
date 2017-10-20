@@ -52,7 +52,6 @@ class TimeAxis(nn.Module):
         # Layers
         self.vicinity_conv = nn.Conv1d(NOTE_UNITS, VICINITY_UNITS, OCTAVE * 2 + 1, padding=OCTAVE)
         # self.chord_conv = nn.Conv1d(NOTE_UNITS, CHORD_UNITS, NUM_OCTAVES, dilation=OCTAVE, padding=OCTAVE)
-        # self.rnns = [nn.LSTMCell(input_features if i == 0 else num_units, num_units) for i in range(num_layers)]
         self.rnn = nn.LSTM(input_features, num_units, num_layers, dropout=0.5)
         self.beat_proj = nn.Linear(NOTES_PER_BAR, BEAT_UNITS)
 
@@ -62,9 +61,6 @@ class TimeAxis(nn.Module):
         stack_vecs = [one_hot(i % OCTAVE, OCTAVE) for i in range(self.num_notes)]
         stack_vecs = np.array(stack_vecs)
         self.pitch_class = torch.from_numpy(stack_vecs).float().unsqueeze(0)
-
-        # for i, rnn in enumerate(self.rnns):
-            # self.add_module('rnn_' + str(i), rnn)
 
     def compute_chord_context(self, notes_in):
         """
@@ -192,7 +188,9 @@ class NoteAxis(nn.Module):
         # Create note features [batch_size, num_notes, features]
         note_features = torch.cat((note_features, shifted), 2)
 
-        out, _ = self.rnn(out, None)
+        out, _ = self.rnn(note_features, None)
+        out = out.contiguous()
+
         # Handle output
         # Move note into batch dimension
         out = out.view(-1, self.num_units)
