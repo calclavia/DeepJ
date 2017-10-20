@@ -19,7 +19,6 @@ def seq_to_midi(event_seq):
     midi_file.tracks.append(track)
     last_velocity = 0
     delta_time = 0
-    i=0
 
     for evt in list(event_seq):
         index = np.argmax(evt)
@@ -59,7 +58,7 @@ def midi_to_seq(midi_file, track):
         if msg.time != 0:
             time_in_sec = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
             quantized_time = round(time_in_sec * TIME_QUANTIZATION)
-            
+
             # Add in seconds
             while quantized_time > 0:
                 time_add = min(quantized_time, MAX_TIME_SHIFT)
@@ -92,9 +91,19 @@ def midi_to_seq(midi_file, track):
     return np.array(events)
 
 def load_midi(fname):
-    mid = mido.MidiFile(fname)
-    track = mido.merge_tracks(mid.tracks)
-    return midi_to_seq(mid, track)
+    cache_path = os.path.join(CACHE_DIR, fname + '.npy')
+    try:
+        seq = np.load(cache_path)
+    except Exception as e:
+        # Load
+        mid = mido.MidiFile(fname)
+        track = mido.merge_tracks(mid.tracks)
+        seq = midi_to_seq(mid, track)
+
+        # Perform caching
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        np.save(cache_path, seq)
+    return seq
 
 def save_midi(fname, event_seq):
     """

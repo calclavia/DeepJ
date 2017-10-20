@@ -12,7 +12,7 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
-from generate import generate, write_file
+from generate import generate
 
 bce_loss = nn.BCELoss()
 mse_loss = nn.MSELoss()
@@ -125,7 +125,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
     Trains the model on a single batch of sequence.
     """
     # Convert all tensors into variables
-    note_seq, beat_seq, style = (var(d, volatile=volatile) for d in data)
+    note_seq, style = (var(d, volatile=volatile) for d in data)
 
     loss = 0
     seq_len = note_seq.size()[1]
@@ -136,9 +136,8 @@ def compute_loss(model, data, teach_prob, volatile=False):
 
     # Iterate through the entire sequence
     for i in range(1, seq_len):
-        beat = beat_seq[:, i - 1]
         targets = note_seq[:, i, :]
-        output, states = model(prev_note, beat, states, targets)
+        output, states = model(prev_note, states)
 
         # Compute the loss.
         target_play = targets[:, :, 0]
@@ -184,8 +183,7 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading data...')
-    styles = load_styles()
-    data = process(load_styles())
+    data = process(load())
     print()
     print('Creating data generators...')
     train_ind, val_ind = validation_split(iteration_indices(data))

@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from tqdm import trange
 
-from midi_util import *
+from midi_io import *
 from dataset import *
 from constants import *
 from util import *
@@ -60,16 +60,6 @@ def generate(model, name='output', num_bars=4, primer=None, default_temp=0.95):
 
     note_seq = np.array(note_seq)
     write_file(name, note_seq)
-
-def write_file(name, note_seq):
-    """
-    Takes a list of all notes generated per track and writes it to file
-    """
-    os.makedirs(SAMPLES_DIR, exist_ok=True)
-    fpath = SAMPLES_DIR + '/' + name + '.mid'
-    print('Writing file', fpath)
-    mf = midi_encode(unclamp_midi(note_seq))
-    midi.write_midifile(fpath, mf)
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
