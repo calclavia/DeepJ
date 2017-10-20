@@ -52,3 +52,19 @@ SAMPLES_DIR = 'out/samples'
 settings = {
     'force_cpu': False
 }
+
+### MIDI Parameters ###
+MIDI_VELOCITY = 128
+# Number of possible notes
+NUM_NOTES = 128
+# Number of time steps per second
+TIME_QUANTIZATION = 100
+MAX_TIME_SHIFT = 100
+# Number of velocity buns
+VEL_QUANTIZATION = 32
+
+NOTE_ON_OFFSET = 0
+NOTE_OFF_OFFSET = NOTE_ON_OFFSET + NUM_NOTES
+TIME_OFFSET = NOTE_OFF_OFFSET + NUM_NOTES
+VEL_OFFSET = TIME_OFFSET + TIME_QUANTIZATION
+NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
