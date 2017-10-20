@@ -37,7 +37,8 @@
         <script type="text/javascript">
             var socket;
             var timestep_list = [];
-            var step = 0;
+            var step = 1;
+
             $(document).ready(function(){
                 MIDI.loadPlugin({
                     soundfontUrl: "{{ url_for('static', filename='soundfont/') }}",
@@ -55,23 +56,25 @@
                         });
 
                         socket.on('send_timestep', function(data) {
-                            console.log('received timestep', data)
                             timestep_list.push(data);
                             document.getElementById('t_list').innerHTML += (data + '\n');
                         });
 
+                        MIDI.setVolume(0, 127);
+
                         window.setInterval(function() {
                             if(timestep_list.length > 10 && step < timestep_list.length) {
                                 var data = timestep_list[step];
+                                var chord = []
+                                // TODO: handle replay
                                 for(var i = 0; i < data.length; i++) {
-                                    var delay = 0;
-                                    var note = data[i][0];
-                                    var velocity = data[i][2];
-                                    var pitch = 36 + i;
-                                    MIDI.setVolume(0, 127);
-                                    MIDI.noteOn(0, pitch, 127 * velocity, delay);
-                                    MIDI.noteOff(0, pitch, delay);
+                                    // This check ensures notes are "held" instead of repeating
+                                    if(data[i][0] && !(timestep_list[step - 1])[i][0]) {
+                                        // 36 + i yields MIDI note number or pitch
+                                        chord.push(36 + i);
+                                    }
                                 }
+                                MIDI.chordOn(0, chord, 127, 0);
                                 step++;
                             }
                         }, 250);
