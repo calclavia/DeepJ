@@ -12,11 +12,11 @@ from constants import *
 from util import *
 from model import DeepJ
 
-def generate(model, name='output', num_bars=4, primer=None, default_temp=0.95):
+def generate(model, name='output', seq_len=100, primer=None, default_temp=1):
     model.eval()
 
     # Output note sequence
-    note_seq = []
+    seq = []
 
     # RNN state
     states = None
@@ -31,25 +31,23 @@ def generate(model, name='output', num_bars=4, primer=None, default_temp=0.95):
         prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
     else:
         # Last generated note time step
-        prev_timestep = var(torch.zeros((NUM_NOTES, NOTE_UNITS)), volatile=True).unsqueeze(0)
+        prev_timestep = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
 
-    for t in trange(NOTES_PER_BAR * num_bars):
-        beat = var(to_torch(compute_beat(t, NOTES_PER_BAR)), volatile=True).unsqueeze(0)
-        current_timestep, states = model.generate(prev_timestep, beat, states, temperature=temperature)
+    for t in trange(NOTES_PER_BAR * seq_len):
+        current_timestep, states = model.generate(prev_timestep, states, temperature=temperature)
 
-        cur_timestep_numpy = current_timestep.cpu().data.numpy()
         # Add note to note sequence
-        note_seq.append(cur_timestep_numpy[0, :])
+        seq.append(current_timestep[0])
 
         if primer:
             # Inject training data to input
             prev_timestep, *_ = next(primer)
             prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
         else:
-            prev_timestep = current_timestep
+            prev_timestep = var(to_torch(current_timestep), volatile=True).unsqueeze(0)
 
         # Increase temperature if silent
-        if np.count_nonzero(cur_timestep_numpy) == 0:
+        if np.count_nonzero(current_timestep) == 0:
             silent_time += 1
 
             if silent_time >= NOTES_PER_BAR:
@@ -58,8 +56,8 @@ def generate(model, name='output', num_bars=4, primer=None, default_temp=0.95):
             silent_time = 0
             temperature = default_temp
 
-    note_seq = np.array(note_seq)
-    write_file(name, note_seq)
+    seq = np.array(seq)
+    save_midi(name, seq)
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -71,7 +69,7 @@ def main():
     primer = None
     if args.debug:
         print('=== Loading Data ===')
-        primer = data_it(process(load_styles()))
+        primer = data_it(process(load()))
 
     print('=== Loading Model ===')
     print('Path: {}'.format(args.path))
@@ -86,7 +84,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    generate(model, num_bars=args.bars, primer=primer)
+    generate(model, seq_len=args.bars, primer=primer)
 
 if __name__ == '__main__':
     main()

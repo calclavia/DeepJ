@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from torch.autograd import Variable
 from constants import *
 from util import *
+import numpy as np
 
 class DeepJ(nn.Module):
     """
@@ -27,7 +27,14 @@ class DeepJ(nn.Module):
         x = self.output(x)
         return x, states
 
-    def generate(self, inputs, states):
+    def generate(self, inputs, states, temperature=1):
         x, states = self.forward(inputs, states)
-        x = self.softmax(x)
-        return x, states
+        # TODO: Check temperature?
+        x = self.softmax(x / temperature)
+
+        # Sample action
+        # Iterate over batches
+        for prob in x.cpu().data.numpy():
+            sampled = np.random.multinomial(1, pvals=prob, size=None)
+        
+        return sampled, states

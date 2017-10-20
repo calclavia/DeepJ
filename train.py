@@ -139,7 +139,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
         output, states = model(prev_note, states)
 
         # Compute the loss.
-        loss += ce_loss(output, torch.max(target, 1)[1].squeeze(1))
+        loss += ce_loss(output, torch.max(target, 1)[1])
 
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
