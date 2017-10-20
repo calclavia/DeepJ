@@ -12,7 +12,7 @@ from constants import *
 from util import *
 from model import DeepJ
 
-def generate(model, name='output', seq_len=1000, primer=None, default_temp=1):
+def generate(model, name='output', seq_len=200, primer=None, default_temp=1):
     model.eval()
 
     # Output note sequence
@@ -33,7 +33,7 @@ def generate(model, name='output', seq_len=1000, primer=None, default_temp=1):
         # Last generated note time step
         prev_timestep = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
 
-    for t in trange(SILENT_LENGTH * seq_len):
+    for t in trange(seq_len):
         current_timestep, states = model.generate(prev_timestep, states, temperature=temperature)
 
         # Add note to note sequence

@@ -117,5 +117,6 @@ def save_midi(fname, event_seq):
 
 if __name__ == '__main__':
     # Test
-    event_seq = load_midi('data/baroque/bach/bach_846.mid')
-    save_midi('midi_test', event_seq)
+    save_midi('midi_test1', load_midi('data/baroque/bach/bach_846.mid'))
+    save_midi('midi_test2', load_midi('data/classical/beethoven/appass_1.mid'))
+    save_midi('midi_test3', load_midi('data/jazz/Dannyboy.mid'))
