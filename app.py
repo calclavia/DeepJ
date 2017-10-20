@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import midi
 import torch
@@ -21,10 +22,12 @@ model = DeepJ()
 if torch.cuda.is_available():
     model.cuda()
 
-# if args.path:
-#     model.load_state_dict(torch.load(args.path))
-# else:
-#     print('WARNING: No model loaded! Please specify model path.')
+model_path = 'out/model.pt'
+
+if os.path.isfile(model_path):
+    model.load_state_dict(torch.load(model_path))
+else:
+    print('WARNING: No model loaded! Please make sure a model exists.')
 
 # TODO: Add style
 
@@ -61,6 +64,7 @@ def generate_infinite():
         curr_timestep, s = model.generate(prev_timestep, beat, states)
         prev_timestep = curr_timestep
         states = s
+        # Transform variable into list. CUDA tensor doesn't support GPU array so cpu() is required 
         timestep = curr_timestep.data.cpu().numpy().tolist()[0]
         print('TIMESTEP: ', timestep)
         socketio.emit('send_timestep', timestep)
