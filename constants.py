@@ -19,6 +19,7 @@ BATCH_SIZE = 64
 SEQ_LEN = 1000
 # The higher this parameter, the less overlap in sequence data
 SEQ_SPLIT = SEQ_LEN // 5
+SILENT_LENGTH = 100
 
 # Hyper Parameters
 LSTM_UNITS = 512

@@ -23,7 +23,7 @@ def generate(model, name='output', seq_len=1000, primer=None, default_temp=1):
 
     # Temperature of generation
     temperature = default_temp
-    silent_time = NOTES_PER_BAR
+    silent_time = SILENT_LENGTH
 
     if primer:
         print('Priming melody')
@@ -33,7 +33,7 @@ def generate(model, name='output', seq_len=1000, primer=None, default_temp=1):
         # Last generated note time step
         prev_timestep = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
 
-    for t in trange(NOTES_PER_BAR * seq_len):
+    for t in trange(SILENT_LENGTH * seq_len):
         current_timestep, states = model.generate(prev_timestep, states, temperature=temperature)
 
         # Add note to note sequence
@@ -47,14 +47,16 @@ def generate(model, name='output', seq_len=1000, primer=None, default_temp=1):
             prev_timestep = var(to_torch(current_timestep), volatile=True)
 
         # Increase temperature if silent
+        """
         if np.count_nonzero(current_timestep) == 0:
             silent_time += 1
 
-            if silent_time >= NOTES_PER_BAR:
+            if silent_time >= SILENT_LENGTH:
                 temperature += 0.1
         else:
             silent_time = 0
             temperature = default_temp
+        """
 
     seq = np.array(seq)
     save_midi(name, seq)
