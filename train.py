@@ -118,13 +118,14 @@ def train_step(model, data, teach_prob):
 
 def val_step(model, data):
     model.eval()
-    return compute_loss(model, data, 1)[1]
+    return compute_loss(model, data, 1, volatile=True)[1]
 
-def compute_loss(model, data, teach_prob):
+def compute_loss(model, data, teach_prob, volatile=False):
     """
     Trains the model on a single batch of sequence.
     """
-    note_seq, beat_seq, style = data
+    # Convert all tensors into variables
+    note_seq, beat_seq, style = (var(d, volatile=volatile) for d in data)
 
     loss = 0
     seq_len = note_seq.size()[1]

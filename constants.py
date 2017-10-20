@@ -41,6 +41,7 @@ MIN_SCHEDULE_PROB = 0.6
 
 # Style
 STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+# STYLES = ['data/baroque_single']
 NUM_STYLES = len(STYLES)
 
 # Paths

@@ -128,11 +128,11 @@ def batcher(sampler, batch_size=BATCH_SIZE):
 
         if len(batch) == batch_size:
             # Convert batch
-            yield [var(torch.stack(x)) for x in zip(*batch)]
+            yield [torch.stack(x) for x in zip(*batch)]
             batch = []
 
     # Yield the remaining batch!
-    yield [var(torch.stack(x)) for x in zip(*batch)]
+    yield [torch.stack(x) for x in zip(*batch)]
 
 def clamp_midi(sequence):
     """
