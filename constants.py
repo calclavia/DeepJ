@@ -16,8 +16,9 @@ NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 
 # Trainin Parameters
 BATCH_SIZE = 64
-SEQ_LEN = 100
-SEQ_SPLIT = SEQ_LEN // 4
+SEQ_LEN = 1000
+# The higher this parameter, the less overlap in sequence data
+SEQ_SPLIT = SEQ_LEN // 5
 
 # Hyper Parameters
 LSTM_UNITS = 512

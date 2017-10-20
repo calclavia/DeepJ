@@ -23,14 +23,18 @@ def load(styles=STYLES):
     for style in styles:
         # Parallel process all files into a list of music sequences
         style_seq = []
+        seq_len_sum = 0
+
         for f in tqdm(get_all_files([style])):
             try:
-                style_seq.append(to_torch(load_midi(f)))
+                seq = load_midi(f)
+                style_seq.append(to_torch(seq))
+                seq_len_sum += len(seq)
             except Exception as e:
                 print('Unable to load {}'.format(f))
         
         style_seqs.append(style_seq)
-        print('Loading {} MIDI file(s)'.format(len(style_seq)))
+        print('Loading {} MIDI file(s) with average event count {}'.format(len(style_seq), seq_len_sum / len(style_seq)))
     return style_seqs
 
 def process(style_seqs, seq_len=SEQ_LEN):
