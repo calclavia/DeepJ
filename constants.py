@@ -20,7 +20,7 @@ MIDI_MAX_NOTES = 128
 MAX_VELOCITY = 127
 
 # Trainin Parameters
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 SEQ_LEN = 4 * NOTES_PER_BAR
 
 # Hyper Parameters
@@ -40,9 +40,7 @@ SCHEDULE_RATE = 0#2e-5
 MIN_SCHEDULE_PROB = 0.6
 
 # Style
-STYLES = ['data/baroque']
-# STYLES = ['data/classical/mozart']
-# STYLES = ['data/baroque', 'data/classical', 'data/romantic']
+STYLES = ['data/baroque''data/classical', 'data/romantic']
 NUM_STYLES = len(STYLES)
 
 # Paths
