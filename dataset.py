@@ -67,7 +67,7 @@ def iteration_indices(data, seq_len=SEQ_LEN):
     it_list = []
 
     for c, seq in enumerate(seqs):
-        for t in range(0, len(seq) - 1 - seq_len, NOTES_PER_BAR):
+        for t in range(0, len(seq) - 1 - seq_len, SEQ_SPLIT):
             it_list.append((c, t))
 
     return it_list

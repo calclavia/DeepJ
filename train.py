@@ -14,8 +14,7 @@ from util import *
 from model import DeepJ
 from generate import generate
 
-bce_loss = nn.BCELoss()
-mse_loss = nn.MSELoss()
+ce_loss = nn.CrossEntropyLoss()
 
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
@@ -136,26 +135,20 @@ def compute_loss(model, data, teach_prob, volatile=False):
 
     # Iterate through the entire sequence
     for i in range(1, seq_len):
-        targets = note_seq[:, i, :]
+        target = note_seq[:, i]
         output, states = model(prev_note, states)
 
         # Compute the loss.
-        target_play = targets[:, :, 0]
-        loss += bce_loss(output[:, :, 0], target_play)
-        # Play loss masking
-        # Any note that is not supposed to be played (target) will
-        # not receive any additional loss.
-        loss += bce_loss(output[:, :, 1] * target_play, targets[:, :, 1])
-        loss += mse_loss(output[:, :, 2] * target_play, targets[:, :, 2])
-        
+        loss += ce_loss(output, torch.max(target, 1)[1].squeeze(1))
+
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
         # TODO: Make sure this does not mess up gradients
         if np.random.random() <= teach_prob:
-            prev_note = targets
+            prev_note = target
         else:
             model.eval()
-            prev_note, _ = model.generate(prev_note, beat, states)
+            prev_note, _ = model.generate(prev_note, states)
             prev_note = var(prev_note.data)
             model.train()
 
