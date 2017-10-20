@@ -72,8 +72,6 @@ def write_file(name, note_seq):
     midi.write_midifile(fpath, mf)
 
 def main():
-    global FORCE_CPU
-
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--path', help='Path to model file')
     parser.add_argument('--bars', default=16, type=int, help='Bars of generation')
@@ -88,12 +86,9 @@ def main():
     print('=== Loading Model ===')
     print('Path: {}'.format(args.path))
     print('GPU: {}'.format(torch.cuda.is_available()))
-    FORCE_CPU = True
+    settings['force_cpu'] = True
     
     model = DeepJ()
-    
-    # if torch.cuda.is_available():
-        # model.cuda()
 
     if args.path:
         model.load_state_dict(torch.load(args.path))
