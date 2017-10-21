@@ -26,8 +26,8 @@ SCHEDULE_RATE = 0#2e-5
 MIN_SCHEDULE_PROB = 0.6
 
 # Style
-# STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
-STYLES = ['data/baroque']
+STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
+# STYLES = ['data/baroque']
 NUM_STYLES = len(STYLES)
 
 # Paths

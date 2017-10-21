@@ -61,8 +61,8 @@ class DeepJ(nn.Module):
         x = self.output(x)
         return x, states
 
-    def generate(self, inputs, states, temperature=1):
-        x, states = self.forward(inputs, states)
+    def generate(self, inputs, style, states, temperature=1):
+        x, states = self.forward(inputs, style, states)
         # TODO: Check temperature?
         x = self.softmax(x / temperature)
 
