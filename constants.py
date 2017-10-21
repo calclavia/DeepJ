@@ -27,7 +27,6 @@ MIN_SCHEDULE_PROB = 0.6
 
 # Style
 # STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
-# STYLES = ['data/baroque_single']
 STYLES = ['data/baroque']
 NUM_STYLES = len(STYLES)
 

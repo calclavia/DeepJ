@@ -64,7 +64,7 @@ def generate(model, name='output', seq_len=200, primer=None, default_temp=1):
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--path', help='Path to model file')
-    parser.add_argument('--bars', default=16, type=int, help='Bars of generation')
+    parser.add_argument('--length', default=16, type=int, help='Length of generation')
     parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
 
@@ -86,7 +86,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    generate(model, seq_len=args.bars, primer=primer)
+    generate(model, seq_len=args.length, primer=primer)
 
 if __name__ == '__main__':
     main()
