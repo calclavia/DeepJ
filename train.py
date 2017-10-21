@@ -148,7 +148,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
             prev_note = target
         else:
             model.eval()
-            prev_note, _ = model.generate(prev_note, states)
+            prev_note, _ = model.generate(prev_note, styles, states)
             prev_note = var(prev_note.data)
             model.train()
 

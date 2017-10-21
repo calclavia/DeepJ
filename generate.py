@@ -24,7 +24,8 @@ class Generation():
         self.style = style if style is not None else one_hot(np.random.randint(0, NUM_STYLES), NUM_STYLES)
 
         # Temperature of generation
-        self.temperature = default_temp
+        self.default_temp = default_temp
+        self.temperature = self.default_temp
         # How much time of silence
         self.silent_time = SILENT_LENGTH
 
@@ -42,20 +43,25 @@ class Generation():
         # Add note to note sequence
         self.prev_out = var(to_torch(output), volatile=True)
 
-        # Increase temperature if silent
         """
-        if np.count_nonzero(current_timestep) == 0:
-            self.silent_time += 1
+        # Increase temperature if silent
+        index = np.argmax(output)
+        # If it's a time shift action, it means it's probably silent.
+        if index >= TIME_OFFSET and index < VEL_OFFSET:
+            # TODO: Use a better method to increase silent time
+            self.silent_time += 0.1
 
             if self.silent_time >= SILENT_LENGTH:
                 self.temperature += 0.1
         else:
+            # Reset temperature
             self.silent_time = 0
-            self.temperature = default_temp
+            self.temperature = self.default_temp
         """
+
         return output[0]
 
-    def export(self, name='output', seq_len=200):
+    def export(self, seq_len=200, name='output'):
         """
         Export into a MIDI file.
         """
@@ -65,7 +71,7 @@ class Generation():
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--path', help='Path to model file')
-    parser.add_argument('--length', default=16, type=int, help='Length of generation')
+    parser.add_argument('--length', default=200, type=int, help='Length of generation')
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Styles to mix together')
     parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
