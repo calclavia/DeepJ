@@ -14,10 +14,13 @@ class TrackBuilder():
     def __init__(self, event_seq):
         self.event_seq = event_seq
         
-        self.midi_file = mido.MidiFile()
-        self.track = mido.MidiTrack()
         self.last_velocity = 0
         self.delta_time = 0
+        # self.tempo = tempo
+        # Slower tempo during generation to recalibrate?
+        self.tempo = mido.bpm2tempo(100)
+        
+        self.reset()
     
     def __iter__(self):
         return self
@@ -33,7 +36,7 @@ class TrackBuilder():
         elif index >= TIME_OFFSET:
             # Shifting forward in time
             time_shift = (index - TIME_OFFSET) / TIME_QUANTIZATION
-            self.delta_time += int(mido.second2tick(time_shift, self.midi_file.ticks_per_beat, tempo))
+            self.delta_time += int(mido.second2tick(time_shift, self.midi_file.ticks_per_beat, self.tempo))
         elif index >= NOTE_OFF_OFFSET:
             # Turning a note off
             note = index - NOTE_OFF_OFFSET
@@ -44,7 +47,11 @@ class TrackBuilder():
             note = index - NOTE_ON_OFFSET
             self.track.append(mido.Message('note_on', note=note, time=self.delta_time, velocity=self.last_velocity))
             self.delta_time = 0
-        
+
+    def reset(self):
+        self.midi_file = mido.MidiFile()
+        self.track = mido.MidiTrack()
+        self.track.append(mido.MetaMessage('set_tempo', tempo=self.tempo))
     
     def export(self):
         """
@@ -52,8 +59,7 @@ class TrackBuilder():
         """
         self.midi_file.tracks.append(self.track)
         return_file = self.midi_file
-        self.midi_file = mido.MidiFile()
-        self.track = mido.MidiTrack()
+        self.reset()
         return return_file
 
 def seq_to_midi(event_seq):

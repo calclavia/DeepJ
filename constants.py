@@ -23,7 +23,7 @@ SEQ_SPLIT = SEQ_LEN // 2
 SILENT_LENGTH = 3
 
 # Sampling schedule decay
-SCHEDULE_RATE = 1e-5
+SCHEDULE_RATE = 1e-4
 MIN_SCHEDULE_PROB = 0.5
 
 # Style
