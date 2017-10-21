@@ -30,6 +30,9 @@ class DeepJ(nn.Module):
         self.style_layers = [nn.Linear(self.style_units, NUM_ACTIONS if i == 0 else self.num_units) for i in range(num_layers)]
         self.tanh = nn.Tanh()
 
+        for i, layer in enumerate(self.style_layers):
+            self.add_module('style_layers_' + str(i), layer)
+
     def forward(self, x, style, states=None):
         batch_size = x.size(0)
 
