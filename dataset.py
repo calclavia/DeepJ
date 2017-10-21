@@ -27,6 +27,7 @@ def load(styles=STYLES):
 
         for f in tqdm(get_all_files([style])):
             try:
+                # Pad the sequence by an empty event
                 seq = load_midi(f)
                 style_seq.append(to_torch(seq))
                 seq_len_sum += len(seq)
@@ -43,7 +44,7 @@ def process(style_seqs, seq_len=SEQ_LEN):
     """
     # Flatten into compositions list
     seqs = [s for y in style_seqs for s in y]
-    style_tags = torch.stack([to_torch(pad_before(one_hot(s, NUM_STYLES))) for s, y in enumerate(style_seqs) for x in y])
+    style_tags = torch.stack([to_torch(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
     return seqs, style_tags
 
 def validation_split(it_list, split=0.1):

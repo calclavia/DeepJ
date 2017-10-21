@@ -124,7 +124,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
     Trains the model on a single batch of sequence.
     """
     # Convert all tensors into variables
-    note_seq, style = (var(d, volatile=volatile) for d in data)
+    note_seq, styles = (var(d, volatile=volatile) for d in data)
 
     loss = 0
     seq_len = note_seq.size()[1]
@@ -136,7 +136,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
     # Iterate through the entire sequence
     for i in range(1, seq_len):
         target = note_seq[:, i]
-        output, states = model(prev_note, states)
+        output, states = model(prev_note, styles, states)
 
         # Compute the loss.
         loss += ce_loss(output, torch.max(target, 1, keepdim=False)[1])
@@ -171,9 +171,6 @@ def main():
     if args.path:
         model.load_state_dict(torch.load(args.path))
         print('Restored model from checkpoint.')
-    
-    # Run on multiple GPUs if available
-    # model = nn.DataParallel(model)
 
     print()
 
