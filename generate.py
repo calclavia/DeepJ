@@ -12,59 +12,55 @@ from constants import *
 from util import *
 from model import DeepJ
 
-def generate(model, name='output', style=None, seq_len=200, primer=None, default_temp=1):
-    model.eval()
+class Generation():
+    """
+    Represents a music generation sequence
+    """
 
-    if style is None:
+    def __init__(self, model, style=None, primer=None, default_temp=1):
+        self.model = model
+
         # Pick a random style
-        style = one_hot(np.random.randint(0, NUM_STYLES), NUM_STYLES)
+        self.style = style if style is not None else one_hot(np.random.randint(0, NUM_STYLES), NUM_STYLES)
 
-    # Output note sequence
-    seq = []
+        # Temperature of generation
+        self.temperature = default_temp
+        # How much time of silence
+        self.silent_time = SILENT_LENGTH
 
-    # RNN state
-    states = None
-    style = var(to_torch(style), volatile=True)
+        # Model parametrs
+        self.prev_out = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
+        self.states = None
 
-    # Temperature of generation
-    temperature = default_temp
-    silent_time = SILENT_LENGTH
-
-    if primer:
-        print('Priming melody')
-        prev_timestep, *_ = next(primer)
-        prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
-    else:
-        # Last generated note time step
-        prev_timestep = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
-
-    for t in trange(seq_len):
-        current_timestep, states = model.generate(prev_timestep, style, states, temperature=temperature)
-
+    def next(self):
+        """
+        Generates the next event
+        """
+        # Create variables
+        style = var(to_torch(self.style), volatile=True)
+        output, self.states = self.model.generate(self.prev_out, style, self.states, temperature=self.temperature)
         # Add note to note sequence
-        seq.append(current_timestep[0])
-
-        if primer:
-            # Inject training data to input
-            prev_timestep, *_ = next(primer)
-            prev_timestep = var(prev_timestep, volatile=True).unsqueeze(0)
-        else:
-            prev_timestep = var(to_torch(current_timestep), volatile=True)
+        self.prev_out = var(to_torch(output), volatile=True)
 
         # Increase temperature if silent
         """
         if np.count_nonzero(current_timestep) == 0:
-            silent_time += 1
+            self.silent_time += 1
 
-            if silent_time >= SILENT_LENGTH:
-                temperature += 0.1
+            if self.silent_time >= SILENT_LENGTH:
+                self.temperature += 0.1
         else:
-            silent_time = 0
-            temperature = default_temp
+            self.silent_time = 0
+            self.temperature = default_temp
         """
+        return output[0]
 
-    seq = np.array(seq)
-    save_midi(name, seq)
+    def export(self, name='output', seq_len=200):
+        """
+        Export into a MIDI file.
+        """
+        seq = np.array([self.next() for t in trange(seq_len)])
+        save_midi(name, seq)
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -98,7 +94,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    generate(model, style=style, seq_len=args.length, primer=primer)
+    Generation(model, style=style, primer=primer).export(seq_len=args.length)
 
 if __name__ == '__main__':
     main()

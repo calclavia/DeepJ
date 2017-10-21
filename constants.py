@@ -19,7 +19,8 @@ BATCH_SIZE = 32
 SEQ_LEN = 1000
 # The higher this parameter, the less overlap in sequence data
 SEQ_SPLIT = SEQ_LEN // 5
-SILENT_LENGTH = 100
+# Maximum silence time in seconds
+SILENT_LENGTH = 3
 
 # Sampling schedule decay
 SCHEDULE_RATE = 0#2e-5

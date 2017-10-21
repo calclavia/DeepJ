@@ -12,7 +12,7 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
-from generate import generate
+from generate import Generation
 
 ce_loss = nn.CrossEntropyLoss()
 
@@ -88,7 +88,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         # Generate
         if epoch % gen_rate == 0:
             print('Generating...')
-            generate(model, name='epoch_' + str(epoch))
+            Generation(model).export(name='epoch_' + str(epoch))
 
         epoch += 1
 
