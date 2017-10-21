@@ -70,11 +70,5 @@ class DeepJ(nn.Module):
         x = self.softmax(x / temperature)
 
         # Sample action
-        batch = []
-
-        # Iterate over batches
-        for prob in x.cpu().data.numpy():
-            sampled_index = np.random.choice(len(prob), 1, p=prob)
-            batch.append(one_hot(sampled_index, len(prob)))
-        
-        return np.array(batch), states
+        batch = batch_sample(x.cpu().data.numpy())
+        return batch, states

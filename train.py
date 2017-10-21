@@ -47,12 +47,12 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
             t.set_description('Epoch {}'.format(epoch))
 
             for data in t_gen:
-                train_prob = max(MIN_SCHEDULE_PROB, 1 -SCHEDULE_RATE * total_step)
-                loss = train_step(model, data, train_prob)
+                teach_prob = max(MIN_SCHEDULE_PROB, 1 - SCHEDULE_RATE * total_step)
+                loss = train_step(model, data, teach_prob)
 
                 total_loss += loss
                 avg_loss = total_loss / step
-                t.set_postfix(loss=avg_loss, prob=train_prob)
+                t.set_postfix(loss=avg_loss, prob=teach_prob)
                 t.update(BATCH_SIZE)
 
                 step += 1
@@ -132,7 +132,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
     # Initialize hidden states
     states = None
     prev_note = note_seq[:, 0, :]
-
+    
     # Iterate through the entire sequence
     for i in range(1, seq_len):
         target = note_seq[:, i]
@@ -143,14 +143,13 @@ def compute_loss(model, data, teach_prob, volatile=False):
 
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
-        # TODO: Make sure this does not mess up gradients
         if np.random.random() <= teach_prob:
             prev_note = target
         else:
-            model.eval()
-            prev_note, _ = model.generate(prev_note, styles, states)
-            prev_note = var(prev_note.data)
-            model.train()
+            # Apply softmax
+            output = model.softmax(output)
+            # Sample from the output
+            prev_note = var(to_torch(batch_sample(output.cpu().data.numpy())))
 
     return loss, loss.data[0] / seq_len
 

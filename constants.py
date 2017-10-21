@@ -23,8 +23,8 @@ SEQ_SPLIT = SEQ_LEN // 2
 SILENT_LENGTH = 3
 
 # Sampling schedule decay
-SCHEDULE_RATE = 0#2e-5
-MIN_SCHEDULE_PROB = 0.6
+SCHEDULE_RATE = 1e-5
+MIN_SCHEDULE_PROB = 0.5
 
 # Style
 STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']

@@ -88,7 +88,7 @@ def main():
 
     if args.style:
         # Custom style
-        style = [np.mean([one_hot(i, NUM_STYLES) for i in args.style], axis=0)]
+        style = np.mean([one_hot(i, NUM_STYLES) for i in args.style], axis=0)
 
     print('=== Loading Model ===')
     print('Path: {}'.format(args.path))

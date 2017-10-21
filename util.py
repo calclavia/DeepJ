@@ -4,6 +4,19 @@ import torch
 from torch.autograd import Variable
 from constants import *
 
+def batch_sample(probabilities):
+    """
+    Samples from a batch of probabilities
+    """
+    batch = []
+
+    # Iterate over batches
+    for prob in probabilities:
+        sampled_index = np.random.choice(len(prob), 1, p=prob)
+        batch.append(one_hot(sampled_index, len(prob)))
+    
+    return np.array(batch)
+
 def one_hot(index, size):
     x = np.zeros(size)
     x[index] = 1
