@@ -6,4 +6,4 @@ services:
     image: deepj
     ports:
       - 5000:5000
-    command: python /src/app.py
+    command: python /server/app.py
