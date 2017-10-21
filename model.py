@@ -35,6 +35,10 @@ class DeepJ(nn.Module):
             states[l] = (x, state)
             x = self.dropout(x)
 
+            # Residual connection?
+            if l != 0:
+                x += prev_x
+
         x = self.output(x)
         return x, states
 
