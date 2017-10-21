@@ -33,7 +33,10 @@ class Generation():
         self.prev_out = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
         self.states = None
 
-    def next(self):
+    def __iter__(self):
+        return self
+
+    def __next__(self):
         """
         Generates the next event
         """
