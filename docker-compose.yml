@@ -1,9 +1,9 @@
 version: '2'
 
 services:
-  deepj-web:
+  deepj:
     build: .
     image: deepj
     ports:
       - 5000:5000
-    command: python /server/app.py
+    command: python3 /src/server.py
