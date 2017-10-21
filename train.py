@@ -173,7 +173,7 @@ def main():
         print('Restored model from checkpoint.')
     
     # Run on multiple GPUs if available
-    model = nn.DataParallel(model)
+    # model = nn.DataParallel(model)
 
     print()
 

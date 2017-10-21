@@ -21,7 +21,7 @@ class DeepJ(nn.Module):
 
         for i, rnn in enumerate(self.rnns):
             self.add_module('rnn_' + str(i), rnn)
-            
+
     def forward(self, x, states=None):
         batch_size = x.size(0)
 
@@ -29,6 +29,8 @@ class DeepJ(nn.Module):
             states = [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in range(self.num_layers)]
 
         for l, rnn in enumerate(self.rnns):
+            prev_x = x
+
             x, state = rnn(x, states[l])
             states[l] = (x, state)
             x = self.dropout(x)
@@ -46,6 +48,7 @@ class DeepJ(nn.Module):
 
         # Iterate over batches
         for prob in x.cpu().data.numpy():
-            batch.append(np.random.multinomial(1, pvals=prob, size=None))
+            sampled_index = np.random.choice(len(prob), 1, p=prob)
+            batch.append(one_hot(sampled_index, len(prob)))
         
         return np.array(batch), states
