@@ -68,7 +68,7 @@ class Generation():
         """
         Export into a MIDI file.
         """
-        seq = np.array([self.next() for t in trange(seq_len)])
+        seq = np.array([next(self) for t in trange(seq_len)])
         save_midi(name, seq)
 
 def main():
