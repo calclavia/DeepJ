@@ -5,5 +5,5 @@ services:
     build: .
     image: deepj
     ports:
-      - 80:5000
+      - 5000:5000
     command: python3 /src/server.py
