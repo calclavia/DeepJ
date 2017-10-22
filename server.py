@@ -3,8 +3,7 @@ import sys
 import logging
 import numpy as np
 
-from flask import stream_with_context, request, Response
-from flask import Flask
+from flask import stream_with_context, request, Response, render_template, Flask
 
 import torch
 from model import DeepJ
