@@ -143,6 +143,14 @@ def save_midi(fname, event_seq):
     midi_file = seq_to_midi(event_seq)
     print('Writing file', fpath)
     midi_file.save(fpath)
+    
+def save_midi_file(file, event_seq):
+    """
+    Takes a list of all notes generated per track and writes it to file
+    """
+    os.makedirs(SAMPLES_DIR, exist_ok=True)
+    midi_file = seq_to_midi(event_seq)
+    midi_file.save(file=file)
 
 if __name__ == '__main__':
     # Test

@@ -64,11 +64,16 @@ class Generation():
 
         return output[0]
 
-    def export(self, seq_len=200, name='output'):
+    def generate(self, seq_len=200, show_progress=True):
+        if show_progress:
+            return np.array([next(self) for t in trange(seq_len)])
+        return np.array([next(self) for t in range(seq_len)])
+
+    def export(self, name='output', seq_len=200, show_progress=True):
         """
         Export into a MIDI file.
         """
-        seq = np.array([next(self) for t in trange(seq_len)])
+        seq = self.generate(seq_len, show_progress=show_progress)
         save_midi(name, seq)
 
 def main():
