@@ -2,9 +2,10 @@
 MIDI_VELOCITY = 128
 # Number of possible notes
 NUM_NOTES = 128
-# Number of time steps per second
-TIME_QUANTIZATION = 100
-MAX_TIME_SHIFT = 100
+# Number of time shift quantizations
+TIME_QUANTIZATION = 64
+# Maximum time shift in seconds
+MAX_TIME_SHIFT = 1
 # Number of velocity buns
 VEL_QUANTIZATION = 32
 

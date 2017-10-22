@@ -8,7 +8,7 @@ from constants import *
 from util import *
 
 # TODO: Handle custom tempo?
-tempo = 400000
+tempo = mido.bpm2tempo(120)
 
 class TrackBuilder():
     def __init__(self, event_seq):
@@ -16,9 +16,7 @@ class TrackBuilder():
         
         self.last_velocity = 0
         self.delta_time = 0
-        # self.tempo = tempo
-        # Slower tempo during generation to recalibrate?
-        self.tempo = mido.bpm2tempo(80)
+        self.tempo = tempo
         
         self.reset()
     
@@ -35,7 +33,9 @@ class TrackBuilder():
             self.last_velocity = (index - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
         elif index >= TIME_OFFSET:
             # Shifting forward in time
-            time_shift = (index - TIME_OFFSET) / TIME_QUANTIZATION
+            quantized_time_shift = index - TIME_OFFSET + 1
+            assert quantized_time_shift >= 1 and quantized_time_shift <= TIME_QUANTIZATION
+            time_shift = quantized_time_shift / TIME_QUANTIZATION * MAX_TIME_SHIFT
             self.delta_time += int(mido.second2tick(time_shift, self.midi_file.ticks_per_beat, self.tempo))
         elif index >= NOTE_OFF_OFFSET:
             # Turning a note off
@@ -85,18 +85,21 @@ def midi_to_seq(midi_file, track):
     events = []
     last_velocity = None
 
-    for msg in track:
+    for msg in track:        
         event_type = msg.type
         
         # Parse delta time
         if msg.time != 0:
             time_in_sec = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
-            quantized_time = round(time_in_sec * TIME_QUANTIZATION)
+            # Delta time, in quantized units
+            quantized_time = round(time_in_sec / MAX_TIME_SHIFT * TIME_QUANTIZATION)
 
             # Add in seconds
             while quantized_time > 0:
-                time_add = min(quantized_time, MAX_TIME_SHIFT)
-                events.append(one_hot(TIME_OFFSET + time_add, NUM_ACTIONS))
+                time_add = min(quantized_time, TIME_QUANTIZATION)
+                evt_index = TIME_OFFSET + time_add - 1
+                assert evt_index >= TIME_OFFSET and evt_index < VEL_OFFSET
+                events.append(one_hot(evt_index, NUM_ACTIONS))
                 quantized_time -= time_add
 
         # Ignore meta messages
@@ -159,6 +162,6 @@ def save_midi_file(file, event_seq):
 
 if __name__ == '__main__':
     # Test
-    save_midi('midi_test1', load_midi('data/baroque/bach/bach_846.mid'))
-    save_midi('midi_test2', load_midi('data/classical/beethoven/appass_1.mid'))
-    save_midi('midi_test3', load_midi('data/jazz/Dannyboy.mid'))
+    save_midi('midi_test1', load_midi('data/baroque/bach/Ahfat01.mid'))
+    # save_midi('midi_test2', load_midi('data/classical/beethoven/appass_1.mid'))
+    # save_midi('midi_test3', load_midi('data/jazz/Dannyboy.mid'))
