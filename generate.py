@@ -42,8 +42,10 @@ class Generation():
         """
         # Create variables
         style = var(to_torch(self.style), volatile=True)
-        output, self.states = self.model.generate(self.prev_out, style, self.states, temperature=self.temperature)
+        output, new_state = self.model.generate(self.prev_out, style, self.states, temperature=self.temperature)
+
         # Add note to note sequence
+        self.states = new_state
         self.prev_out = var(to_torch(output), volatile=True)
 
         """
