@@ -103,55 +103,7 @@
         </style>    
     </head>
     <body>
-        <script type="text/javascript">
-            var socket;
-            var timestep_list = [];
-            var step = 1;
-
-            $(document).ready(function(){
-                MIDI.loadPlugin({
-                    soundfontUrl: "{{ url_for('static', filename='soundfont/') }}",
-                    instrument: "acoustic_grand_piano",
-                    onprogress(state, progress) {
-                        console.log(state, progress);
-                    },
-                    onsuccess() {
-                        console.log('MIDI loaded')
-                        socket = io.connect('http://' + document.domain + ':' + location.port);
-
-                        socket.on('connect', function() {
-                            console.log('socket connect')
-                            socket.emit('client_connect', { data: 'Client successfully connected!' });
-                        });
-
-                        socket.on('send_timestep', function(data) {
-                            timestep_list.push(data);
-                        });
-
-                        MIDI.setVolume(0, 127);
-
-                        window.setInterval(function() {
-                            // TODO: discard old timesteps
-                            if(timestep_list.length > 10 && step < timestep_list.length) {
-                                var data = timestep_list[step];
-                                var chord = []
-                                // TODO: handle replay
-                                for(var i = 0; i < data.length; i++) {
-                                    // This check ensures notes are "held" instead of repeating
-                                    if(data[i][0] && !(timestep_list[step - 1])[i][0]) {
-                                        // 36 + i yields MIDI note number or pitch
-                                        chord.push(36 + i);
-                                    }
-                                }
-                                MIDI.chordOn(0, chord, 127, 0);
-                                step++;
-                            }
-                        }, 200);
-                    }
-                });
-            });
-
-        </script>
+        <audio autoplay loop><source src="/stream.wav" type="audio/wav"></audio>
         <div class="header">
             <h1 class="title-lg">Deep<span style="color: #2595FE">J</span></h1>
         </div>

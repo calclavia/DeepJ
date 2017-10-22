@@ -92,10 +92,7 @@ def streamed_response():
 
 @app.route('/')
 def index():
-    return """
-    Streaming Audio
-    <audio autoplay loop><source src="/stream.wav" type="audio/wav"></audio>
-    """
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
