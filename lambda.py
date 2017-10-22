@@ -9,7 +9,7 @@ http://amzn.to/1LGWsLG
 
 from __future__ import print_function
 
-LIST_OF_GENRES = [ 'baroque' ]
+LIST_OF_GENRES = [ 'baroque', 'classical', 'jazz', 'modern', 'romantic' ]
 
 # --------------- Helpers that build all of the responses ----------------------
 
@@ -33,7 +33,7 @@ def build_speechlet_response(title, output, reprompt_text, should_end_session):
         'shouldEndSession': should_end_session
     }
 
-def build_playback_response():
+def build_playback_response(curr_genre):
     return {
         'directives': [
             {
@@ -42,7 +42,7 @@ def build_playback_response():
                 'audioItem': {
                     'stream': {
                         'token': '12345',
-                        'url': 'https://blivi0.github.io/Mix2D/res/originalAudio.mp3',
+                        'url': 'http://deepj.ai/stream.wav?' + curr_genre + '=1',
                         'offsetInMilliseconds': 0
                     }
                 }
@@ -112,7 +112,7 @@ def compose(intent, session):
             curr_genre = intent['slots']['Genre']['value']
             if curr_genre in LIST_OF_GENRES:
                 session_attributes = create_curr_genre_attributes(curr_genre)
-                return build_response(session_attributes, build_playback_response())
+                return build_response(session_attributes, build_playback_response(curr_genre))
         else:
             speech_output = "That genre is not supported " \
                             "Please try again."
