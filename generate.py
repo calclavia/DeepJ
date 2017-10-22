@@ -17,7 +17,7 @@ class Generation():
     Represents a music generation sequence
     """
 
-    def __init__(self, model, style=None, primer=None, default_temp=1):
+    def __init__(self, model, style=None, primer=None, default_temp=0.9):
         self.model = model
 
         # Pick a random style
