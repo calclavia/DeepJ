@@ -31,10 +31,6 @@ model.load_state_dict(saved_obj)
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
 gain = 1
 
-# Warm up Pytorch
-print('Warming up Pytorch')
-Generation(model).generate(seq_len=10, show_progress=False) 
-
 @app.route('/stream.wav')
 def streamed_response():
     def generate():
@@ -49,7 +45,7 @@ def streamed_response():
         wav_fname = os.path.join(folder, 'generation.wav')
 
         logger.info('Generating MIDI')
-        seq = Generation(model).generate(seq_len=5000, show_progress=False) 
+        seq = Generation(model).generate(seq_len=3000, show_progress=False) 
         midi_file = seq_to_midi(seq)
         midi_file.save(mid_fname)
 

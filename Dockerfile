@@ -1,18 +1,9 @@
 FROM ubuntu:latest
 
-# Install Python (Most of them are for development?)
+# Install Python & dependencies
 RUN \
   apt-get update && \
-  apt-get install -y python3 python3-dev python3-pip git fluidsynth
-
-# Install PyFluidSynth
-RUN \
-    git clone https://github.com/nwhitehead/pyfluidsynth && \
-    cd pyfluidsynth && \
-    python3 setup.py install
-
-# TODO: Merge this command
-RUN apt-get install -y curl
+  apt-get install -y python3 python3-dev python3-pip git fluidsynth curl
 
 # Download Soundfonts
 RUN mkdir src && \

@@ -18,7 +18,7 @@ class TrackBuilder():
         self.delta_time = 0
         # self.tempo = tempo
         # Slower tempo during generation to recalibrate?
-        self.tempo = mido.bpm2tempo(100)
+        self.tempo = mido.bpm2tempo(80)
         
         self.reset()
     
@@ -57,6 +57,11 @@ class TrackBuilder():
         """
         Export buffer track to MIDI file
         """
+        # Turn all notes off
+        # for note in range(NUM_NOTES):
+        #   self.track.append(mido.Message('note_off', note=note, time=0))
+
+        # self.track.append(mido.Message('note_off', note=note, time=int(mido.second2tick(2, self.midi_file.ticks_per_beat, self.tempo))))
         self.midi_file.tracks.append(self.track)
         return_file = self.midi_file
         self.reset()
