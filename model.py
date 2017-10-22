@@ -9,7 +9,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=512, num_layers=5, style_units=32):
+    def __init__(self, num_units=512, num_layers=3, style_units=32):
         super().__init__()
         self.num_units = num_units
         self.num_layers = num_layers
@@ -58,8 +58,8 @@ class DeepJ(nn.Module):
             x = self.dropout(x)
 
             # Residual connection
-            if l != 0:
-                x = x + prev_x
+            # if l != 0:
+                # x = x + prev_x
 
         x = self.output(x)
         return x, states

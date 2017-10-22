@@ -16,7 +16,7 @@ NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 
 # Trainin Parameters
 BATCH_SIZE = 32
-SEQ_LEN = 1000
+SEQ_LEN = 800
 # The higher this parameter, the less overlap in sequence data
 SEQ_SPLIT = SEQ_LEN // 2
 # Maximum silence time in seconds
@@ -27,7 +27,8 @@ SCHEDULE_RATE = 1e-4
 MIN_SCHEDULE_PROB = 0.5
 
 # Style
-STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
+STYLES = ['data/baroque', 'data/classical', 'data/romantic']#, 'data/modern', 'data/jazz']
+# STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
 # STYLES = ['data/baroque']
 NUM_STYLES = len(STYLES)
 
