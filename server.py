@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import numpy as np
 
 from flask import stream_with_context, request, Response
 from flask import Flask
@@ -31,12 +32,35 @@ model.load_state_dict(saved_obj)
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
 gain = 1
 
+styles = {
+    'baroque': 0,
+    'classical': 1,
+    'romantic': 2,
+    'modern': 3,
+    'jazz': 4
+}
+
 @app.route('/stream.wav')
 def streamed_response():
     def generate():
-        # style = request.args['style']
+        # Determine style
+        gen_style = []
+
+        for style, style_id in styles.items():
+            strength = request.args.get(style, 0)
+            gen_style.append(one_hot(style_id, NUM_STYLES) * float(strength))
+
+        gen_style = np.mean(gen_style, axis=0)
+
+        if np.sum(gen_style) > 0:
+            # Normalize
+            gen_style /= np.sum(gen_style)
+        else:
+            gen_style = None
+
         uuid = uuid4()
         logger.info('Stream ID: {}'.format(uuid))
+        logger.info('Style: {}'.format(gen_style))
         folder = os.path.join('/tmp', str(uuid))
 
         os.makedirs(folder, exist_ok=True)
@@ -45,7 +69,7 @@ def streamed_response():
         wav_fname = os.path.join(folder, 'generation.wav')
 
         logger.info('Generating MIDI')
-        seq = Generation(model).generate(seq_len=3000, show_progress=False) 
+        seq = Generation(model, style=gen_style).generate(seq_len=3000, show_progress=False) 
         midi_file = seq_to_midi(seq)
         midi_file.save(mid_fname)
 
