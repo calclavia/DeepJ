@@ -29,7 +29,7 @@ def load(styles=STYLES):
             try:
                 # Pad the sequence by an empty event
                 seq = load_midi(f)
-                style_seq.append(torch.from_numpy(seq))
+                style_seq.append(torch.from_numpy(seq).long())
                 seq_len_sum += len(seq)
             except Exception as e:
                 print('Unable to load {}'.format(f))
@@ -91,7 +91,7 @@ def sampler(data, it_list, seq_len=SEQ_LEN):
 
     for seq_id, t in it_shuffled:
         yield (
-            seqs[seq_id][t:t+seq_len],
+            augment(seqs[seq_id][t:t+seq_len]),
             # Need to retain the tensor object
             style_tags[seq_id:seq_id+1]
         )
@@ -125,3 +125,16 @@ def data_it(data, seq_len=SEQ_LEN):
 
         for t in range(0, len(note_seq)):
             yield (note_seq[t], style_tag)
+
+def augment(sequence):
+    """
+    Takes a sequence of events and randomly perform augmentations.
+    """
+    # Transpose by 4 semitones at most
+    transpose = random.randint(-4, 4)
+
+    if transpose == 0:
+        return sequence
+
+    # Perform transposition (consider only notes)
+    return torch.LongTensor([evt + transpose if evt < TIME_OFFSET else evt for evt in sequence])

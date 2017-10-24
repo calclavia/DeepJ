@@ -161,6 +161,12 @@ def save_midi_file(file, event_seq):
 
 if __name__ == '__main__':
     # Test
-    save_midi('midi_test1', load_midi('data/baroque/bach/bach_846.mid'))
-    # save_midi('midi_test2', load_midi('data/classical/beethoven/appass_1.mid'))
-    # save_midi('midi_test3', load_midi('data/jazz/Dannyboy.mid'))
+    # seq = load_midi('data/baroque/bach/Goldberg Variations No 114.mid')
+    seq = load_midi('data/classical/Beethoven/Sonata Op 53 1st mvmt.mid')
+    import matplotlib.pyplot as plt
+    print('Event Frequency')
+    plt.hist(seq, NUM_ACTIONS)
+    plt.grid(True)
+    plt.show()
+    print(seq)
+    save_midi('midi_test', seq)
