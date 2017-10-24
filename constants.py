@@ -16,12 +16,13 @@ VEL_OFFSET = TIME_OFFSET + TIME_QUANTIZATION
 NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 
 # Trainin Parameters
-BATCH_SIZE = 32
-SEQ_LEN = 800
+BATCH_SIZE = 64
+SEQ_LEN = 512
 # The higher this parameter, the less overlap in sequence data
 SEQ_SPLIT = SEQ_LEN // 2
 # Maximum silence time in seconds
 SILENT_LENGTH = 3
+GRADIENT_CLIP = 3
 
 # Sampling schedule decay
 SCHEDULE_RATE = 0#1e-4

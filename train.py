@@ -111,10 +111,10 @@ def train_step(model, data, teach_prob):
     loss, avg_loss = compute_loss(model, data, teach_prob)
 
     loss.backward()
-    
+
     # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
     # Reference: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
-    torch.nn.utils.clip_grad_norm(model.parameters(), 3)
+    torch.nn.utils.clip_grad_norm(model.parameters(), GRADIENT_CLIP)
 
     optimizer.step()
 
