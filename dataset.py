@@ -29,7 +29,7 @@ def load(styles=STYLES):
             try:
                 # Pad the sequence by an empty event
                 seq = load_midi(f)
-                style_seq.append(torch.from_numpy(seq))
+                style_seq.append(torch.from_numpy(seq).long())
                 seq_len_sum += len(seq)
             except Exception as e:
                 print('Unable to load {}'.format(f))
