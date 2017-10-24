@@ -6,21 +6,27 @@ from constants import *
 
 def batch_sample(probabilities):
     """
-    Samples from a batch of probabilities
+    Samples from a batch of probabilities.
+    Returns the indices chosen
     """
     batch = []
 
     # Iterate over batches
     for prob in probabilities:
         sampled_index = np.random.choice(len(prob), 1, p=prob)
-        batch.append(one_hot(sampled_index, len(prob)))
+        batch.append(sampled_index[0])
     
-    return np.array(batch)
+    return batch
 
 def one_hot(index, size):
     x = np.zeros(size)
     x[index] = 1
     return x
+
+def one_hot_batch(index_batch, n):
+    one_hot = torch.FloatTensor(index_batch.size(0), n).zero_()
+    one_hot.scatter_(1, index_batch, 1.0)
+    return one_hot
 
 def pad_before(sequence):
     """

@@ -43,10 +43,10 @@ class Generation():
         # Create variables
         style = var(to_torch(self.style), volatile=True)
         output, new_state = self.model.generate(self.prev_out, style, self.states, temperature=self.temperature)
-
+        event = output[0]
         # Add note to note sequence
         self.states = new_state
-        self.prev_out = var(to_torch(output), volatile=True)
+        self.prev_out = var(to_torch(one_hot(event, NUM_ACTIONS)), volatile=True)
 
         """
         # Increase temperature if silent
@@ -63,8 +63,7 @@ class Generation():
             self.silent_time = 0
             self.temperature = self.default_temp
         """
-
-        return output[0]
+        return event
 
     def generate(self, seq_len=200, show_progress=True):
         if show_progress:

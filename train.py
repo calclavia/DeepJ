@@ -129,27 +129,29 @@ def compute_loss(model, data, teach_prob, volatile=False):
     Trains the model on a single batch of sequence.
     """
     # Convert all tensors into variables
-    note_seq, styles = (var(d, volatile=volatile) for d in data)
+    note_seq, styles = data
+    styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
 
     loss = 0
     seq_len = note_seq.size()[1]
 
     # Initialize hidden states
     states = None
-    prev_note = note_seq[:, 0, :]
+    prev_note = var(one_hot_batch(note_seq[:, 0].unsqueeze(1), NUM_ACTIONS), volatile=volatile)
     
     # Iterate through the entire sequence
     for i in range(1, seq_len):
         target = note_seq[:, i]
+
         output, states = model(prev_note, styles, states)
 
         # Compute the loss.
-        loss += ce_loss(output, torch.max(target, 1, keepdim=False)[1])
+        loss += ce_loss(output, var(target, volatile=volatile))
 
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
         if np.random.random() <= teach_prob:
-            prev_note = target
+            prev_note = var(one_hot_batch(target.unsqueeze(1), NUM_ACTIONS), volatile=volatile)
         else:
             # Apply softmax
             output = model.softmax(output)

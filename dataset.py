@@ -29,7 +29,7 @@ def load(styles=STYLES):
             try:
                 # Pad the sequence by an empty event
                 seq = load_midi(f)
-                style_seq.append(to_torch(seq))
+                style_seq.append(torch.from_numpy(seq))
                 seq_len_sum += len(seq)
             except Exception as e:
                 print('Unable to load {}'.format(f))
@@ -44,7 +44,7 @@ def process(style_seqs, seq_len=SEQ_LEN):
     """
     # Flatten into compositions list
     seqs = [s for y in style_seqs for s in y]
-    style_tags = torch.stack([to_torch(one_hot(s, NUM_STYLES)) for s, y in enumerate(style_seqs) for x in y])
+    style_tags = torch.LongTensor([s for s, y in enumerate(style_seqs) for x in y])
     return seqs, style_tags
 
 def validation_split(it_list, split=0.1):
@@ -89,8 +89,12 @@ def sampler(data, it_list, seq_len=SEQ_LEN):
     # A list of iteration indices that specify the iteration order
     it_shuffled = random.sample(it_list, len(it_list))
 
-    for c, t in it_shuffled:
-        yield (seqs[c][t:t+seq_len], style_tags[c])
+    for seq_id, t in it_shuffled:
+        yield (
+            seqs[seq_id][t:t+seq_len],
+            # Need to retain the tensor object
+            style_tags[seq_id:seq_id+1]
+        )
 
 def batcher(sampler, batch_size=BATCH_SIZE):
     """
@@ -111,7 +115,7 @@ def batcher(sampler, batch_size=BATCH_SIZE):
 
 def data_it(data, seq_len=SEQ_LEN):
     """
-    Iterates through each note in all songs.
+    Iterates through each event in all songs.
     """
     seqs, style_tags = data
 
