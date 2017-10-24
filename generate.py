@@ -83,6 +83,7 @@ def main():
     parser.add_argument('--path', help='Path to model file')
     parser.add_argument('--length', default=200, type=int, help='Length of generation')
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Styles to mix together')
+    parser.add_argument('--temperature', default=1, type=float, help='Temperature of generation')
     parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
 
@@ -110,7 +111,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    Generation(model, style=style, primer=primer).export(seq_len=args.length)
+    Generation(model, style=style, primer=primer, default_temp=args.temperature).export(seq_len=args.length)
 
 if __name__ == '__main__':
     main()
