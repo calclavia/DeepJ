@@ -25,26 +25,25 @@ class TrackBuilder():
     
     def __next__(self):
         evt = next(self.event_seq)
-        index = np.argmax(evt)
 
         # Interpret event data
-        if index >= VEL_OFFSET:
+        if evt >= VEL_OFFSET:
             # A velocity change
-            self.last_velocity = (index - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
-        elif index >= TIME_OFFSET:
+            self.last_velocity = (evt - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
+        elif evt >= TIME_OFFSET:
             # Shifting forward in time
-            quantized_time_shift = index - TIME_OFFSET + 1
+            quantized_time_shift = evt - TIME_OFFSET + 1
             assert quantized_time_shift >= 1 and quantized_time_shift <= TIME_QUANTIZATION
             time_shift = quantized_time_shift / TIME_QUANTIZATION * MAX_TIME_SHIFT
             self.delta_time += int(mido.second2tick(time_shift, self.midi_file.ticks_per_beat, self.tempo))
-        elif index >= NOTE_OFF_OFFSET:
+        elif evt >= NOTE_OFF_OFFSET:
             # Turning a note off
-            note = index - NOTE_OFF_OFFSET
+            note = evt - NOTE_OFF_OFFSET
             self.track.append(mido.Message('note_off', note=note, time=self.delta_time))
             self.delta_time = 0
-        elif index >= NOTE_ON_OFFSET:
+        elif evt >= NOTE_ON_OFFSET:
             # Turning a note off
-            note = index - NOTE_ON_OFFSET
+            note = evt - NOTE_ON_OFFSET
             self.track.append(mido.Message('note_on', note=note, time=self.delta_time, velocity=self.last_velocity))
             self.delta_time = 0
 
@@ -99,7 +98,7 @@ def midi_to_seq(midi_file, track):
                 time_add = min(quantized_time, TIME_QUANTIZATION)
                 evt_index = TIME_OFFSET + time_add - 1
                 assert evt_index >= TIME_OFFSET and evt_index < VEL_OFFSET
-                events.append(one_hot(evt_index, NUM_ACTIONS))
+                events.append(evt_index)
                 quantized_time -= time_add
 
         # Ignore meta messages
@@ -119,12 +118,12 @@ def midi_to_seq(midi_file, track):
         if event_type == 'note_on':
             # See if we need to update velocity
             if last_velocity != velocity:
-                events.append(one_hot(VEL_OFFSET + velocity, NUM_ACTIONS))
+                events.append(VEL_OFFSET + velocity)
                 last_velocity = velocity
 
-            events.append(one_hot(NOTE_ON_OFFSET + msg.note, NUM_ACTIONS))
+            events.append(NOTE_ON_OFFSET + msg.note)
         elif event_type == 'note_off':
-            events.append(one_hot(NOTE_OFF_OFFSET + msg.note, NUM_ACTIONS))
+            events.append(NOTE_OFF_OFFSET + msg.note)
     return np.array(events)
 
 def load_midi(fname):
@@ -162,6 +161,6 @@ def save_midi_file(file, event_seq):
 
 if __name__ == '__main__':
     # Test
-    save_midi('midi_test1', load_midi('data/baroque/bach/Ahfat01.mid'))
+    save_midi('midi_test1', load_midi('data/baroque/bach/bach_846.mid'))
     # save_midi('midi_test2', load_midi('data/classical/beethoven/appass_1.mid'))
     # save_midi('midi_test3', load_midi('data/jazz/Dannyboy.mid'))
