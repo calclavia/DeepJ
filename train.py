@@ -24,7 +24,7 @@ def plot_loss(training_loss, validation_loss, name):
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(model, train_generator, train_len, val_generator, val_len, plot=True, gen_rate=1, patience=5):
+def train(model, train_generator, train_len, val_generator, val_len, optimizer, plot=True, gen_rate=1, patience=5):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -51,7 +51,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
 
                 for data in t_gen:
                     teach_prob = max(MIN_SCHEDULE_PROB, 1 - SCHEDULE_RATE * total_step)
-                    loss = train_step(model, data, teach_prob)
+                    loss = train_step(model, data, optimizer, teach_prob)
 
                     total_loss += loss
                     avg_loss = total_loss / step
@@ -101,11 +101,10 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
             if min(val_losses[-patience:]) > min_loss:
                 break
 
-def train_step(model, data, teach_prob):
+def train_step(model, data, optimizer, teach_prob):
     """
     Trains the model on a single batch of sequence.
     """
-    optimizer = optim.Adam(model.parameters())
     model.train()
 
     # Zero out the gradient
@@ -181,6 +180,9 @@ def main():
         model.load_state_dict(torch.load(args.path))
         print('Restored model from checkpoint.')
 
+    # Construct optimizer
+    optimizer = optim.Adam(model.parameters())
+
     print()
 
     print('=== Dataset ===')
@@ -203,8 +205,8 @@ def main():
     print()
 
     print('=== Training ===')
-    train(model, train_generator, len(train_data[0]) * TRAIN_CYCLES, val_generator, \
-         len(val_data[0]), plot=not args.noplot, gen_rate=args.gen)
+    train(model, train_generator, len(train_data[0]) * TRAIN_CYCLES * BATCH_SIZE, val_generator, \
+         len(val_data[0]), optimizer, plot=not args.noplot, gen_rate=args.gen)
 
 if __name__ == '__main__':
     main()
