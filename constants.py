@@ -3,9 +3,14 @@ MIDI_VELOCITY = 128
 # Number of possible notes
 NUM_NOTES = 128
 # Number of time shift quantizations
-TIME_QUANTIZATION = 64
-# Maximum time shift in seconds
-MAX_TIME_SHIFT = 1
+TIME_QUANTIZATION = 100
+# Exponential representation of time shifts
+TICK_EXP = 1
+TICK_MUL = 1
+# The number of ticks represented in each bin
+TICK_BINS = [int(TICK_EXP ** x + TICK_MUL * x) for x in range(TIME_QUANTIZATION)]
+# Ticks per second
+TICKS_PER_SEC = 100
 # Number of velocity buns
 VEL_QUANTIZATION = 32
 
@@ -18,11 +23,11 @@ NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 # Trainin Parameters
 BATCH_SIZE = 64
 SEQ_LEN = 512
-# The higher this parameter, the less overlap in sequence data
-SEQ_SPLIT = SEQ_LEN // 2
 # Maximum silence time in seconds
 SILENT_LENGTH = 3
 GRADIENT_CLIP = 3
+# The number of train generator cycles per epoch
+TRAIN_CYCLES = 30
 
 # Sampling schedule decay
 SCHEDULE_RATE = 0#1e-4

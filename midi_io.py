@@ -2,13 +2,11 @@
 Handles MIDI file loading
 """
 import mido
+import math
 import numpy as np
 import os
 from constants import *
 from util import *
-
-# TODO: Handle custom tempo?
-tempo = mido.bpm2tempo(120)
 
 class TrackBuilder():
     def __init__(self, event_seq):
@@ -16,7 +14,7 @@ class TrackBuilder():
         
         self.last_velocity = 0
         self.delta_time = 0
-        self.tempo = tempo
+        self.tempo = mido.bpm2tempo(120)
         
         self.reset()
     
@@ -32,10 +30,10 @@ class TrackBuilder():
             self.last_velocity = (evt - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
         elif evt >= TIME_OFFSET:
             # Shifting forward in time
-            quantized_time_shift = evt - TIME_OFFSET + 1
-            assert quantized_time_shift >= 1 and quantized_time_shift <= TIME_QUANTIZATION
-            time_shift = quantized_time_shift / TIME_QUANTIZATION * MAX_TIME_SHIFT
-            self.delta_time += int(mido.second2tick(time_shift, self.midi_file.ticks_per_beat, self.tempo))
+            tick_bin = evt - TIME_OFFSET
+            assert tick_bin >= 0 and tick_bin < TIME_QUANTIZATION
+            seconds = TICK_BINS[tick_bin] / TICKS_PER_SEC
+            self.delta_time += int(mido.second2tick(seconds, self.midi_file.ticks_per_beat, self.tempo))
         elif evt >= NOTE_OFF_OFFSET:
             # Turning a note off
             note = evt - NOTE_OFF_OFFSET
@@ -56,11 +54,6 @@ class TrackBuilder():
         """
         Export buffer track to MIDI file
         """
-        # Turn all notes off
-        # for note in range(NUM_NOTES):
-        #   self.track.append(mido.Message('note_off', note=note, time=0))
-
-        # self.track.append(mido.Message('note_off', note=note, time=int(mido.second2tick(2, self.midi_file.ticks_per_beat, self.tempo))))
         self.midi_file.tracks.append(self.track)
         return_file = self.midi_file
         self.reset()
@@ -82,27 +75,35 @@ def midi_to_seq(midi_file, track):
     Converts a MIDO track object into an event sequence
     """
     events = []
+    tempo = None
     last_velocity = None
-
-    for msg in track:        
+    
+    for msg in track:
         event_type = msg.type
         
         # Parse delta time
         if msg.time != 0:
-            time_in_sec = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
-            # Delta time, in quantized units
-            quantized_time = round(time_in_sec / MAX_TIME_SHIFT * TIME_QUANTIZATION)
+            seconds = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
+            standard_ticks = round(seconds * TICKS_PER_SEC)
 
             # Add in seconds
-            while quantized_time > 0:
-                time_add = min(quantized_time, TIME_QUANTIZATION)
-                evt_index = TIME_OFFSET + time_add - 1
-                assert evt_index >= TIME_OFFSET and evt_index < VEL_OFFSET
+            while standard_ticks >= 1:
+                # Find the largest bin to put this time in
+                tick_bin = find_tick_bin(standard_ticks)
+
+                if tick_bin is None:
+                    break
+
+                evt_index = TIME_OFFSET + tick_bin
+                assert evt_index >= TIME_OFFSET and evt_index < VEL_OFFSET, (standard_ticks, tick_bin)
                 events.append(evt_index)
-                quantized_time -= time_add
+                standard_ticks -= TICK_BINS[tick_bin]
 
         # Ignore meta messages
         if msg.is_meta:
+            if msg.type == 'set_tempo':
+                # Handle tempo setting
+                tempo = msg.tempo
             continue
 
         # Ignore control changes
@@ -168,5 +169,5 @@ if __name__ == '__main__':
     plt.hist(seq, NUM_ACTIONS)
     plt.grid(True)
     plt.show()
-    print(seq)
+    print('Sequence Length', len(seq))
     save_midi('midi_test', seq)
