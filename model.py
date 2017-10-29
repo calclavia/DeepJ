@@ -36,25 +36,25 @@ class DeepJ(nn.Module):
 
         ## Process style ##
         # Distributed style representation
-        style = self.style_linear(style)
+        # style = self.style_linear(style)
 
         ## Process RNN ##
         if states is None:
             states = [[var(torch.zeros(batch_size, self.num_units)) for _ in range(2)] for _ in range(self.num_layers)]
 
         for l, rnn in enumerate(self.rnns):
-            prev_x = x
+            # prev_x = x
 
             # Style integration
-            style_activation = self.tanh(self.style_layers[l](style))
-            x = x + style_activation
+            # style_activation = self.tanh(self.style_layers[l](style))
+            # x = x + style_activation
 
             x, state = rnn(x, states[l])
             states[l] = (x, state)
 
             # Residual connection
-            if l != 0:
-                x = x + prev_x
+            # if l != 0:
+                # x = x + prev_x
 
         x = self.output(x)
         return x, states
