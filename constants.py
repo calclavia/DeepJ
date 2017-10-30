@@ -26,8 +26,8 @@ SEQ_LEN = 512
 # Maximum silence time in seconds
 SILENT_LENGTH = 3
 GRADIENT_CLIP = 3
-# The number of train generator cycles per epoch
-TRAIN_CYCLES = 30
+# The number of train generator cycles per sequence
+TRAIN_CYCLES = 100
 
 # Sampling schedule decay
 SCHEDULE_RATE = 0#1e-4
@@ -35,8 +35,6 @@ MIN_SCHEDULE_PROB = 1#0.5
 
 # Style
 STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']
-# STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern', 'data/jazz']
-# STYLES = ['data/baroque']
 NUM_STYLES = len(STYLES)
 
 # Paths

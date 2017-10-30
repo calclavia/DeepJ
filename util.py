@@ -38,6 +38,11 @@ def one_hot_batch(index_batch, n):
     one_hot.scatter_(1, index_batch, 1.0)
     return one_hot
 
+def one_hot_seq(index_batch, n):
+    one_hot = torch.FloatTensor(index_batch.size(0), index_batch.size(1), n).zero_()
+    one_hot.scatter_(2, index_batch.unsqueeze(2), 1.0)
+    return one_hot
+
 def pad_before(sequence):
     """
     Pads a sequence with a zero in the first (temporal) dimension
