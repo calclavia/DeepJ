@@ -18,7 +18,7 @@ class Generation():
     Represents a music generation sequence
     """
 
-    def __init__(self, model, style=None, primer=None, default_temp=1, beam_size=1):
+    def __init__(self, model, style=None, default_temp=1, beam_size=1):
         self.model = model
 
         self.beam_size = beam_size
@@ -115,13 +115,7 @@ def main():
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Styles to mix together')
     parser.add_argument('--temperature', default=1, type=float, help='Temperature of generation')
     parser.add_argument('--beam', default=1, type=int, help='Beam size')
-    parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
-
-    primer = None
-    if args.debug:
-        print('=== Loading Data ===')
-        primer = data_it(process(load()))
 
     style = None
 
@@ -142,7 +136,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    Generation(model, style=style, primer=primer, default_temp=args.temperature, beam_size=args.beam).export(seq_len=args.length)
+    Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam).export(seq_len=args.length)
 
 if __name__ == '__main__':
     main()

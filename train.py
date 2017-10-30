@@ -88,9 +88,9 @@ def train(model, train_generator, train_len, val_generator, val_len, optimizer, 
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
 
         # Generate
-        # if epoch % gen_rate == 0:
-            # print('Generating...')
-            # Generation(model).export(name='epoch_' + str(epoch))
+        if gen_rate > 0 and epoch % gen_rate == 0:
+            print('Generating...')
+            Generation(model).export(name='epoch_' + str(epoch))
 
         epoch += 1
 
@@ -162,13 +162,15 @@ def compute_loss(model, data, teach_prob, volatile=False):
             # Sample from the output
             prev_note = var(to_torch(batch_sample(output.cpu().data.numpy())))
     """
+    # Feed it to the model
     inputs = var(one_hot_seq(note_seq[:, :-1], NUM_ACTIONS), volatile=volatile)
     targets = var(note_seq[:, 1:], volatile=volatile)
     output, states = model(inputs, styles, states)
+
     # Compute the loss.
     loss += criterion(output.view(-1, NUM_ACTIONS), targets.view(-1))
 
-    return loss, loss.data[0]# / seq_len
+    return loss, loss.data[0]
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
