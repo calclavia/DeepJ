@@ -175,7 +175,7 @@ def compute_loss(model, data, teach_prob, volatile=False):
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--path', help='Load existing model?')
-    parser.add_argument('--gen', default=1, type=int, help='Generate per how many epochs?')
+    parser.add_argument('--gen', default=0, type=int, help='Generate per how many epochs?')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     args = parser.parse_args()
 
@@ -191,7 +191,7 @@ def main():
         print('Restored model from checkpoint.')
 
     # Construct optimizer
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     print()
 

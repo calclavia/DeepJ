@@ -28,6 +28,7 @@ SILENT_LENGTH = 3
 GRADIENT_CLIP = 3
 # The number of train generator cycles per sequence
 TRAIN_CYCLES = 100
+LEARNING_RATE = 1e-3
 
 # Sampling schedule decay
 SCHEDULE_RATE = 0#1e-4
