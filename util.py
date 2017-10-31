@@ -4,6 +4,10 @@ import torch
 from torch.autograd import Variable
 from constants import *
 
+def gen_to_tensor(generator):
+    """ Converts a generator into a Torch LongTensor """
+    return torch.LongTensor(list(generator))
+
 def find_tick_bin(ticks):
     """
     Returns the tick bin this belongs to, or None if the number of ticks is too little
