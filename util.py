@@ -4,6 +4,10 @@ import torch
 from torch.autograd import Variable
 from constants import *
 
+def gen_to_tensor(generator):
+    """ Converts a generator into a Torch LongTensor """
+    return torch.LongTensor(list(generator))
+
 def find_tick_bin(ticks):
     """
     Returns the tick bin this belongs to, or None if the number of ticks is too little
@@ -36,6 +40,11 @@ def one_hot(index, size):
 def one_hot_batch(index_batch, n):
     one_hot = torch.FloatTensor(index_batch.size(0), n).zero_()
     one_hot.scatter_(1, index_batch, 1.0)
+    return one_hot
+
+def one_hot_seq(index_batch, n):
+    one_hot = torch.FloatTensor(index_batch.size(0), index_batch.size(1), n).zero_()
+    one_hot.scatter_(2, index_batch.unsqueeze(2), 1.0)
     return one_hot
 
 def pad_before(sequence):

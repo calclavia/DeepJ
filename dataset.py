@@ -90,7 +90,7 @@ def sampler(data, seq_len=SEQ_LEN):
 
     for seq_id in r:
         yield (
-            augment(random_subseq(seqs[seq_id], seq_len)),
+            gen_to_tensor(augment(random_subseq(seqs[seq_id], seq_len))),
             # Need to retain the tensor object. Hence slicing is used.
             torch.LongTensor(style_tags[seq_id:seq_id+1])
         )
@@ -127,8 +127,42 @@ def data_it(data, seq_len=SEQ_LEN):
 
 def random_subseq(sequence, seq_len):
     """ Randomly creates a subsequence from the sequence """
-    index = random.randint(0, len(sequence) - seq_len - 2)
-    return sequence[index:index + seq_len]
+    index = random.randint(0, len(sequence) - 1 - seq_len)
+
+    def generator():
+        note_ons = set()
+        i = 0
+        current = index
+        
+        while i < seq_len:
+            if current >= len(sequence):
+                # Ran out of events due to skipping
+                # Pad with max silence for end of track
+                yield TIME_OFFSET + TIME_QUANTIZATION - 1
+                i += 1
+                current += 1
+            else:
+                evt = sequence[current]
+
+                if evt < NOTE_OFF_OFFSET + NUM_NOTES:
+                    if evt >= NOTE_OFF_OFFSET:
+                        # This is a note off
+                        note = evt - NOTE_OFF_OFFSET
+                        if note not in note_ons:
+                            # Ignore note offs before note on
+                            current += 1
+                            continue
+                        else:
+                            note_ons.remove(note)
+                    else:
+                        # This is a note on
+                        note_ons.add(evt - NOTE_ON_OFFSET)
+
+                yield evt
+                i += 1
+                current += 1
+
+    return generator()
 
 def augment(sequence):
     """
@@ -141,4 +175,4 @@ def augment(sequence):
         return sequence
 
     # Perform transposition (consider only notes)
-    return torch.LongTensor([evt + transpose if evt < TIME_OFFSET else evt for evt in sequence])
+    return (evt + transpose if evt < TIME_OFFSET else evt for evt in sequence)

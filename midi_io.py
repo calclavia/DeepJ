@@ -9,12 +9,12 @@ from constants import *
 from util import *
 
 class TrackBuilder():
-    def __init__(self, event_seq):
+    def __init__(self, event_seq, tempo=mido.bpm2tempo(120)):
         self.event_seq = event_seq
         
         self.last_velocity = 0
         self.delta_time = 0
-        self.tempo = mido.bpm2tempo(120)
+        self.tempo = tempo
         
         self.reset()
     
@@ -27,7 +27,7 @@ class TrackBuilder():
         # Interpret event data
         if evt >= VEL_OFFSET:
             # A velocity change
-            self.last_velocity = (evt - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
+            self.last_velocity = (evt - VEL_OFFSET + 1) * (MIDI_VELOCITY // VEL_QUANTIZATION) - 1
         elif evt >= TIME_OFFSET:
             # Shifting forward in time
             tick_bin = evt - TIME_OFFSET
@@ -37,18 +37,31 @@ class TrackBuilder():
         elif evt >= NOTE_OFF_OFFSET:
             # Turning a note off
             note = evt - NOTE_OFF_OFFSET
-            self.track.append(mido.Message('note_off', note=note, time=self.delta_time))
-            self.delta_time = 0
+
+            if note in self.on_notes:
+                # We cannot turn a note off when it was never on
+                self.track.append(mido.Message('note_off', note=note, time=self.delta_time))
+                self.delta_time = 0
+                self.on_notes.remove(note)
+
         elif evt >= NOTE_ON_OFFSET:
-            # Turning a note off
+            # Turning a note on
             note = evt - NOTE_ON_OFFSET
+            # We can turn a note on twice, indicating a replay
             self.track.append(mido.Message('note_on', note=note, time=self.delta_time, velocity=self.last_velocity))
             self.delta_time = 0
+            self.on_notes.add(note)
 
     def reset(self):
         self.midi_file = mido.MidiFile()
         self.track = mido.MidiTrack()
         self.track.append(mido.MetaMessage('set_tempo', tempo=self.tempo))
+        # Tracks on notes
+        self.on_notes = set()
+    
+    def run(self):
+        for _ in self:
+            pass
     
     def export(self):
         """
@@ -64,10 +77,7 @@ def seq_to_midi(event_seq):
     Takes an event sequence and encodes it into MIDI file
     """
     track_builder = TrackBuilder(iter(event_seq))
-
-    for _ in track_builder:
-        pass
-
+    track_builder.run()
     return track_builder.export()
 
 def midi_to_seq(midi_file, track):
@@ -110,13 +120,13 @@ def midi_to_seq(midi_file, track):
         if (event_type != 'note_on' and event_type != 'note_off'):
             continue
 
-        velocity = msg.velocity // (MIDI_VELOCITY // VEL_QUANTIZATION)
-
         # Velocity = 0 is equivalent to note off
-        if msg.type == 'note_on' and velocity == 0:
+        if msg.type == 'note_on' and msg.velocity == 0:
             event_type = 'note_off'
 
         if event_type == 'note_on':
+            velocity = (msg.velocity + 1) // (MIDI_VELOCITY // VEL_QUANTIZATION) - 1
+
             # See if we need to update velocity
             if last_velocity != velocity:
                 events.append(VEL_OFFSET + velocity)

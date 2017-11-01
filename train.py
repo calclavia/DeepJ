@@ -15,7 +15,7 @@ from model import DeepJ
 from generate import Generation
 from midi_io import save_midi
 
-ce_loss = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss()
 
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
@@ -24,7 +24,7 @@ def plot_loss(training_loss, validation_loss, name):
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(model, train_generator, train_len, val_generator, val_len, plot=True, gen_rate=1, patience=5):
+def train(model, train_generator, train_len, val_generator, val_len, optimizer, plot=True, gen_rate=1, patience=5):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -42,7 +42,6 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         step = 1
         total_loss = 0
 
-
         with tqdm(total=train_len) as t:
             t.set_description('Epoch {}'.format(epoch))
             
@@ -51,7 +50,7 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
 
                 for data in t_gen:
                     teach_prob = max(MIN_SCHEDULE_PROB, 1 - SCHEDULE_RATE * total_step)
-                    loss = train_step(model, data, teach_prob)
+                    loss = train_step(model, data, optimizer, teach_prob)
 
                     total_loss += loss
                     avg_loss = total_loss / step
@@ -89,23 +88,24 @@ def train(model, train_generator, train_len, val_generator, val_len, plot=True, 
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
 
         # Generate
-        if epoch % gen_rate == 0:
+        if gen_rate > 0 and epoch % gen_rate == 0:
             print('Generating...')
             Generation(model).export(name='epoch_' + str(epoch))
 
         epoch += 1
 
         # Early stopping
+        """
         if epoch > patience:
             min_loss = min(val_losses)
             if min(val_losses[-patience:]) > min_loss:
                 break
+        """
 
-def train_step(model, data, teach_prob):
+def train_step(model, data, optimizer, teach_prob):
     """
     Trains the model on a single batch of sequence.
     """
-    optimizer = optim.Adam(model.parameters())
     model.train()
 
     # Zero out the gradient
@@ -143,13 +143,14 @@ def compute_loss(model, data, teach_prob, volatile=False):
     prev_note = var(one_hot_batch(note_seq[:, 0].unsqueeze(1), NUM_ACTIONS), volatile=volatile)
     
     # Iterate through the entire sequence
+    """
     for i in range(1, seq_len):
         target = note_seq[:, i]
 
         output, states = model(prev_note, styles, states)
 
         # Compute the loss.
-        loss += ce_loss(output, var(target, volatile=volatile))
+        loss += criterion(output, var(target, volatile=volatile))
 
         # Choose note to feed based on coin flip (scheduled sampling)
         # TODO: Compare with and without scheduled sampling
@@ -160,13 +161,21 @@ def compute_loss(model, data, teach_prob, volatile=False):
             output = model.softmax(output)
             # Sample from the output
             prev_note = var(to_torch(batch_sample(output.cpu().data.numpy())))
+    """
+    # Feed it to the model
+    inputs = var(one_hot_seq(note_seq[:, :-1], NUM_ACTIONS), volatile=volatile)
+    targets = var(note_seq[:, 1:], volatile=volatile)
+    output, states = model(inputs, styles, states)
 
-    return loss, loss.data[0] / seq_len
+    # Compute the loss.
+    loss += criterion(output.view(-1, NUM_ACTIONS), targets.view(-1))
+
+    return loss, loss.data[0]
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--path', help='Load existing model?')
-    parser.add_argument('--gen', default=1, type=int, help='Generate per how many epochs?')
+    parser.add_argument('--gen', default=0, type=int, help='Generate per how many epochs?')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     args = parser.parse_args()
 
@@ -180,6 +189,9 @@ def main():
     if args.path:
         model.load_state_dict(torch.load(args.path))
         print('Restored model from checkpoint.')
+
+    # Construct optimizer
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     print()
 
@@ -204,7 +216,7 @@ def main():
 
     print('=== Training ===')
     train(model, train_generator, len(train_data[0]) * TRAIN_CYCLES, val_generator, \
-         len(val_data[0]), plot=not args.noplot, gen_rate=args.gen)
+         len(val_data[0]), optimizer, plot=not args.noplot, gen_rate=args.gen)
 
 if __name__ == '__main__':
     main()

@@ -8,6 +8,7 @@ from flask import Flask, stream_with_context, request, Response, render_template
 import torch
 from model import DeepJ
 
+import mido
 from uuid import uuid4
 from midi_io import *
 from subprocess import call
@@ -29,7 +30,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 1
+gain = 2.3
 
 styles = {
     'baroque': 0,
@@ -56,6 +57,8 @@ def streamed_response():
         else:
             gen_style = None
 
+        seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
+
         uuid = uuid4()
         logger.info('Stream ID: {}'.format(uuid))
         logger.info('Style: {}'.format(gen_style))
@@ -64,19 +67,21 @@ def streamed_response():
         os.makedirs(folder, exist_ok=True)
 
         mid_fname = os.path.join(folder, 'generation.mid')
-        wav_fname = os.path.join(folder, 'generation.wav')
+        output_fname = os.path.join(folder, 'generation.wav')
 
         logger.info('Generating MIDI')
-        seq = Generation(model, style=gen_style).generate(seq_len=3000, show_progress=False) 
-        midi_file = seq_to_midi(seq)
+        seq = Generation(model, style=gen_style, default_temp=0.97).generate(seq_len=seq_len, show_progress=False)         
+        track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(95))
+        track_builder.run()
+        midi_file = track_builder.export()
         midi_file.save(mid_fname)
 
         logger.info('Synthesizing MIDI')
-        call(['fluidsynth', '-F', wav_fname, '-g', str(gain), soundfont, mid_fname])
+        call(['fluidsynth', '--reverb', '1', '-F', output_fname, '-g', str(gain), soundfont, mid_fname])
 
         logger.info('Streaming data')
 
-        with open(wav_fname, "rb") as f:
+        with open(output_fname, "rb") as f:
             data = f.read(1024)
             while data:
                 yield data
@@ -84,7 +89,7 @@ def streamed_response():
                 
         # Clean up the temporary files
         os.remove(mid_fname)
-        os.remove(wav_fname)
+        os.remove(output_fname)
         os.rmdir(folder)
     return Response(stream_with_context(generate()), mimetype='audio/wav')
 

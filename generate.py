@@ -18,7 +18,7 @@ class Generation():
     Represents a music generation sequence
     """
 
-    def __init__(self, model, style=None, primer=None, default_temp=1, beam_size=1):
+    def __init__(self, model, style=None, default_temp=1, beam_size=1):
         self.model = model
 
         self.beam_size = beam_size
@@ -56,8 +56,9 @@ class Generation():
             else:
                 prev_event = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
 
+            prev_event = prev_event.unsqueeze(1)
             probs, new_state = self.model.generate(prev_event, style, state, temperature=self.temperature)
-            probs = probs.cpu().data.numpy()
+            probs = probs[0].cpu().data.numpy()
 
             for _ in range(self.beam_size):
                 # Sample action
@@ -90,7 +91,7 @@ class Generation():
             self.temperature = self.default_temp
         """
 
-    def generate(self, seq_len=200, show_progress=True):
+    def generate(self, seq_len=1000, show_progress=True):
         r = trange(seq_len) if show_progress else range(seq_len)
 
         for _ in r:
@@ -100,7 +101,7 @@ class Generation():
         best_seq = best[1]
         return np.array(best_seq)
 
-    def export(self, name='output', seq_len=200, show_progress=True):
+    def export(self, name='output', seq_len=1000, show_progress=True):
         """
         Export into a MIDI file.
         """
@@ -110,17 +111,11 @@ class Generation():
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('--path', help='Path to model file')
-    parser.add_argument('--length', default=200, type=int, help='Length of generation')
+    parser.add_argument('--length', default=1000, type=int, help='Length of generation')
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Styles to mix together')
     parser.add_argument('--temperature', default=1, type=float, help='Temperature of generation')
     parser.add_argument('--beam', default=1, type=int, help='Beam size')
-    parser.add_argument('--debug', default=False, action='store_true', help='Use training data as input')
     args = parser.parse_args()
-
-    primer = None
-    if args.debug:
-        print('=== Loading Data ===')
-        primer = data_it(process(load()))
 
     style = None
 
@@ -141,7 +136,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    Generation(model, style=style, primer=primer, default_temp=args.temperature, beam_size=args.beam).export(seq_len=args.length)
+    Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam).export(seq_len=args.length)
 
 if __name__ == '__main__':
     main()
