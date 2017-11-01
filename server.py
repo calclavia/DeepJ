@@ -30,7 +30,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 2
+gain = 2.3
 
 styles = {
     'baroque': 0,
