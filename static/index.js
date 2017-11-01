@@ -34,6 +34,7 @@ function bufferNextTrack(seqLength) {
         loadingQueue.push(
             new Howl({
                 src: ['/stream.wav?length=' + seqLength],
+                html5: true,
                 onload() {
                     console.log('Track loaded.');
 

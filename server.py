@@ -30,7 +30,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 2.3
+gain = 4.5
 
 styles = {
     'baroque': 0,
@@ -41,6 +41,7 @@ styles = {
 
 @app.route('/stream.wav')
 def streamed_response():
+    # TODO: Need to create threads for this to prevent blocking response time.
     def generate():
         # Determine style
         gen_style = []
@@ -98,4 +99,4 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', threaded=True)
