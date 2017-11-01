@@ -14,6 +14,7 @@ var loadedQueue = [];
 var loadingQueue = [];
 var fadeTime = 5 * 1000;
 var maxSeqLength = 10000;
+var lenIncMultiplier = 3;
 
 function initMusic() {
     bufferNextTrack(1000);
@@ -24,7 +25,9 @@ function playAndFade(sound) {
     // Fade in sound
     sound.fade(0, 1, fadeTime, sid)
     // Fade out ending of sound
-    setTimeout(() => sound.fade(1, 0, fadeTime, sid), (sound.duration(sid) * 1000) - fadeTime);
+    setTimeout(function() {
+        sound.fade(1, 0, fadeTime, sid) 
+    }, (sound.duration(sid) * 1000) - fadeTime);
     return sid;
 }
 
@@ -33,8 +36,7 @@ function bufferNextTrack(seqLength) {
         console.log('Loading next track...')
         loadingQueue.push(
             new Howl({
-                src: ['/stream.wav?length=' + seqLength],
-                html5: true,
+                src: ['/stream.mp3?length=' + seqLength],
                 onload() {
                     console.log('Track loaded.');
 
@@ -49,7 +51,7 @@ function bufferNextTrack(seqLength) {
                     }
 
                     // Queue the loading of next track
-                    bufferNextTrack(Math.min(seqLength * 2, maxSeqLength));
+                    bufferNextTrack(Math.min(seqLength * lenIncMultiplier, maxSeqLength));
                 },
                 onend() {
                     console.log('Track ended.');
@@ -63,7 +65,7 @@ function bufferNextTrack(seqLength) {
                     }
                     
                     // Queue the loading of next track
-                    bufferNextTrack(Math.min(seqLength * 2, maxSeqLength));
+                    bufferNextTrack(Math.min(seqLength * lenIncMultiplier, maxSeqLength));
                 }
             })
         )

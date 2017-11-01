@@ -2,6 +2,9 @@ import os
 import sys
 import logging
 import numpy as np
+import subprocess
+from functools import partial
+from tempfile import TemporaryFile
 
 from flask import Flask, stream_with_context, request, Response, render_template
 
@@ -30,7 +33,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 4.5
+gain = 4.3
 
 styles = {
     'baroque': 0,
@@ -39,60 +42,59 @@ styles = {
     'modern': 3
 }
 
-@app.route('/stream.wav')
+@app.route('/stream.mp3')
 def streamed_response():
-    # TODO: Need to create threads for this to prevent blocking response time.
-    def generate():
-        # Determine style
-        gen_style = []
+    # Determine style
+    gen_style = []
 
-        for style, style_id in styles.items():
-            strength = request.args.get(style, 0)
-            gen_style.append(one_hot(style_id, NUM_STYLES) * float(strength))
+    for style, style_id in styles.items():
+        strength = request.args.get(style, 0)
+        gen_style.append(one_hot(style_id, NUM_STYLES) * float(strength))
 
-        gen_style = np.mean(gen_style, axis=0)
+    gen_style = np.mean(gen_style, axis=0)
 
-        if np.sum(gen_style) > 0:
-            # Normalize
-            gen_style /= np.sum(gen_style)
-        else:
-            gen_style = None
+    if np.sum(gen_style) > 0:
+        # Normalize
+        gen_style /= np.sum(gen_style)
+    else:
+        gen_style = None
 
-        seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
+    seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
 
-        uuid = uuid4()
-        logger.info('Stream ID: {}'.format(uuid))
-        logger.info('Style: {}'.format(gen_style))
-        folder = os.path.join('/tmp', str(uuid))
+    uuid = uuid4()
+    logger.info('Stream ID: {}'.format(uuid))
+    logger.info('Style: {}'.format(gen_style))
+    folder = '/tmp'
+    mid_fname = os.path.join(folder, '{}.mid'.format(uuid))
 
-        os.makedirs(folder, exist_ok=True)
+    logger.info('Generating MIDI')
+    seq = Generation(model, style=gen_style, default_temp=0.93).generate(seq_len=seq_len, show_progress=False)         
+    track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(90))
+    track_builder.run()
+    midi_file = track_builder.export()
+    midi_file.save(mid_fname)
 
-        mid_fname = os.path.join(folder, 'generation.mid')
-        output_fname = os.path.join(folder, 'generation.wav')
+    logger.info('Synthesizing MIDI')
 
-        logger.info('Generating MIDI')
-        seq = Generation(model, style=gen_style, default_temp=0.97).generate(seq_len=seq_len, show_progress=False)         
-        track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(95))
-        track_builder.run()
-        midi_file = track_builder.export()
-        midi_file.save(mid_fname)
+    # Synthsize
+    fsynth_proc = subprocess.Popen([
+        'fluidsynth',
+        '-nl',
+        '-f', 'fluidsynth.cfg',
+        '-T', 'raw',
+        '-g', str(gain),
+        '-F', '-',
+        soundfont,
+        mid_fname
+    ], stdout=subprocess.PIPE)
 
-        logger.info('Synthesizing MIDI')
-        call(['fluidsynth', '--reverb', '1', '-F', output_fname, '-g', str(gain), soundfont, mid_fname])
+    # Convert to MP3
+    lame_proc = subprocess.Popen(['lame', '-q', '2', '-r', '-'], stdin=fsynth_proc.stdout, stdout=subprocess.PIPE)
 
-        logger.info('Streaming data')
-
-        with open(output_fname, "rb") as f:
-            data = f.read(1024)
-            while data:
-                yield data
-                data = f.read(1024)
-                
-        # Clean up the temporary files
-        os.remove(mid_fname)
-        os.remove(output_fname)
-        os.rmdir(folder)
-    return Response(stream_with_context(generate()), mimetype='audio/wav')
+    logger.info('Streaming data')
+    data, err = lame_proc.communicate()
+    os.remove(mid_fname)
+    return Response(data, mimetype='audio/mp3')
 
 @app.route('/')
 def index():
