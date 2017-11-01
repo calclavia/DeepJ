@@ -30,7 +30,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 2.5
+gain = 2
 
 styles = {
     'baroque': 0,
@@ -70,7 +70,7 @@ def streamed_response():
         output_fname = os.path.join(folder, 'generation.wav')
 
         logger.info('Generating MIDI')
-        seq = Generation(model, style=gen_style, default_temp=0.95).generate(seq_len=seq_len, show_progress=False)         
+        seq = Generation(model, style=gen_style, default_temp=0.97).generate(seq_len=seq_len, show_progress=False)         
         track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(95))
         track_builder.run()
         midi_file = track_builder.export()

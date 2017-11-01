@@ -7,11 +7,13 @@
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
         <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.0.5/howler.core.min.js"></script>
+        <script type="text/javascript" src="https://cdn.rawgit.com/JulianLaval/canvas-particle-network/7cfd75c6/particle-network.min.js"></script>
         <script type="text/javascript" src="{{ url_for('static', filename='index.js') }}"></script>
     </head>
     <body>
+        <div id="particle-canvas"></div>
         <div class="header">
-            <h1 class="title-lg">Deep<span style="color: #2595FE">J</span></h1>
+            <h1 class="title-lg">Deep<span class="accent">J</span></h1>
         </div>
         <!--         
         <div class="controls">
@@ -41,8 +43,7 @@
             <span></span>
         </div>
         <div class="caption">
-            <p>DeepJ is an artificial intelligence that composes classical music.</p>
-            <p>The music you hear is composed in real time and different every time.</p>
+            <p>DeepJ is an artificial intelligence that composes classical music in real time.</p>
         </div>
     </body>
 </html>
