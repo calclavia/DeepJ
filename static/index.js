@@ -54,7 +54,7 @@ $(document).ready(function() {
 // A buffer of tracks to be played. Contains only loadable tracks.
 var loadedQueue = [];
 var loadingQueue = [];
-var fadeTime = 4 * 1000;
+var fadeTime = 5 * 1000;
 var maxSeqLength = 10000;
 
 function initMusic() {
