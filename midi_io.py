@@ -9,12 +9,12 @@ from constants import *
 from util import *
 
 class TrackBuilder():
-    def __init__(self, event_seq):
+    def __init__(self, event_seq, tempo=mido.bpm2tempo(120)):
         self.event_seq = event_seq
         
         self.last_velocity = 0
         self.delta_time = 0
-        self.tempo = mido.bpm2tempo(120)
+        self.tempo = tempo
         
         self.reset()
     
@@ -59,6 +59,10 @@ class TrackBuilder():
         # Tracks on notes
         self.on_notes = set()
     
+    def run(self):
+        for _ in self:
+            pass
+    
     def export(self):
         """
         Export buffer track to MIDI file
@@ -73,10 +77,7 @@ def seq_to_midi(event_seq):
     Takes an event sequence and encodes it into MIDI file
     """
     track_builder = TrackBuilder(iter(event_seq))
-
-    for _ in track_builder:
-        pass
-
+    track_builder.run()
     return track_builder.export()
 
 def midi_to_seq(midi_file, track):
