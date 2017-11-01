@@ -51,43 +51,62 @@ $(document).ready(function() {
     */
 });
 
-// A buffer of tracks to be played
-var trackBuffer = [];
+// A buffer of tracks to be played. Contains only loadable tracks.
+var loadedQueue = [];
+var loadingQueue = [];
+var fadeTime = 4 * 1000;
+var maxSeqLength = 10000;
 
 function initMusic() {
-    bufferNextTrack(2000);
+    bufferNextTrack(1000);
+}
+
+function playAndFade(sound) {
+    var sid = sound.play();
+    // Fade in sound
+    sound.fade(0, 1, fadeTime, sid)
+    // Fade out ending of sound
+    setTimeout(() => sound.fade(1, 0, fadeTime, sid), (sound.duration(sid) * 1000) - fadeTime);
+    return sid;
 }
 
 function bufferNextTrack(seqLength) {
-    console.log('Loading next track...')
-    new Howl({
-        src: ['/stream.wav?length=' + seqLength],
-        onload() {
-            console.log('Track loaded.');
-            // Add this track to buffer
-            trackBuffer.push(this)
+    if ((loadedQueue.length + loadingQueue.length) < 2) {
+        console.log('Loading next track...')
+        loadingQueue.push(
+            new Howl({
+                src: ['/stream.wav?length=' + seqLength],
+                onload() {
+                    console.log('Track loaded.');
 
-            if (trackBuffer.length === 1) {
-                // No previous track was playing, so let's play
-                console.log('Playing only available track...')
-                this.play();
-            }
+                    // Move from loading queue to loaded
+                    loadingQueue.splice(loadingQueue.indexOf(this), 1);
+                    loadedQueue.push(this)
 
-            if (trackBuffer.length <= 2) {
-                // Queue the loading of next track
-                bufferNextTrack(6000);
-            }
-        },
-        onend() {
-            console.log('Track ended.');
-            // Remove track from buffer
-            trackBuffer.splice(0)
+                    if (loadedQueue.length === 1) {
+                        // No previous track was playing, so let's play
+                        console.log('No track was playing. Now playing the only available track...')
+                        playAndFade(this);
+                    }
 
-            if (trackBuffer.length >= 1) {
-                // There's a track on the buffer. Let's play it!
-                console.log('Playing next track...')
-                trackBuffer[0].play();
-            }
-        }
-    })
+                    // Queue the loading of next track
+                    bufferNextTrack(Math.min(seqLength * 2, maxSeqLength));
+                },
+                onend() {
+                    console.log('Track ended.');
+                    // Remove track from loaded queue
+                    loadedQueue.splice(0, 1)
+
+                    if (loadedQueue.length > 0) {
+                        // There's a track on the buffer. Let's play it!
+                        console.log('Playing next track...')
+                        playAndFade(loadedQueue[0]);      
+                    }
+                    
+                    // Queue the loading of next track
+                    bufferNextTrack(Math.min(seqLength * 2, maxSeqLength));
+                }
+            })
+        )
+    }
 }
