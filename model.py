@@ -17,7 +17,7 @@ class DeepJ(nn.Module):
 
         # RNN
         # self.rnns = [nn.LSTMCell(NUM_ACTIONS if i == 0 else self.num_units, self.num_units) for i in range(num_layers)]
-        self.rnn = nn.LSTM(NUM_ACTIONS, num_units, num_layers, batch_first=True)
+        self.rnn = nn.LSTM(NUM_ACTIONS + self.style_units, num_units, num_layers, batch_first=True)
 
         self.output = nn.Linear(self.num_units, NUM_ACTIONS)
         self.softmax = nn.Softmax()
@@ -26,7 +26,7 @@ class DeepJ(nn.Module):
             # self.add_module('rnn_' + str(i), rnn)
 
         # Style
-        # self.style_linear = nn.Linear(NUM_STYLES, self.style_units)
+        self.style_linear = nn.Linear(NUM_STYLES, self.style_units)
         # self.style_layers = [nn.Linear(self.style_units, NUM_ACTIONS if i == 0 else self.num_units) for i in range(num_layers)]
         # self.tanh = nn.Tanh()
 
@@ -35,10 +35,11 @@ class DeepJ(nn.Module):
 
     def forward(self, x, style, states=None):
         batch_size = x.size(0)
+        seq_len = x.size(1)
 
         ## Process style ##
         # Distributed style representation
-        # style = self.style_linear(style)
+        style = self.style_linear(style)
 
         ## Process RNN ##
         # if states is None:
@@ -59,9 +60,10 @@ class DeepJ(nn.Module):
             # if l != 0:
                 # x = x + prev_x
         """
-        # x = x.unsqueeze(1)
+        style_seq = style.unsqueeze(1)
+        style_seq = style_seq.expand(batch_size, seq_len, self.style_units)
+        x = torch.cat((x, style_seq), 2)
         x, states = self.rnn(x, states)
-        # x = x.squeeze(1)
 
         x = self.output(x)
         return x, states
