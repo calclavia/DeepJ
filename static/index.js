@@ -15,6 +15,7 @@ var loadingQueue = [];
 var fadeTime = 5 * 1000;
 var maxSeqLength = 10000;
 var lenIncMultiplier = 3;
+var index = 0;
 
 function initMusic() {
     bufferNextTrack(1000);
@@ -36,7 +37,7 @@ function bufferNextTrack(seqLength) {
         console.log('Loading next track...')
         loadingQueue.push(
             new Howl({
-                src: ['/stream.mp3?length=' + seqLength],
+                src: ['/stream.mp3?length=' + seqLength + '&index=' + index],
                 onload() {
                     console.log('Track loaded.');
 
@@ -69,6 +70,8 @@ function bufferNextTrack(seqLength) {
                 }
             })
         )
+
+        index += 1;
     }
 }
 
