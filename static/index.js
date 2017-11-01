@@ -1,4 +1,8 @@
-document.addEventListener('DOMContentLoaded', function(event) {
+$(document).ready(function() {
+    console.log('DOM Loaded')
+    initMusic();
+
+    /*
     var slider_baroque = document.getElementById('baroque');
     var slider_classical = document.getElementById('classical');
     var slider_romantic = document.getElementById('romantic');
@@ -44,4 +48,46 @@ document.addEventListener('DOMContentLoaded', function(event) {
             console.log('Sent GET request to ' + url);
         });
     };
+    */
 });
+
+// A buffer of tracks to be played
+var trackBuffer = [];
+
+function initMusic() {
+    bufferNextTrack(2000);
+}
+
+function bufferNextTrack(seqLength) {
+    console.log('Loading next track...')
+    new Howl({
+        src: ['/stream.wav?length=' + seqLength],
+        onload() {
+            console.log('Track loaded.');
+            // Add this track to buffer
+            trackBuffer.push(this)
+
+            if (trackBuffer.length === 1) {
+                // No previous track was playing, so let's play
+                console.log('Playing only available track...')
+                this.play();
+            }
+
+            if (trackBuffer.length <= 2) {
+                // Queue the loading of next track
+                bufferNextTrack(6000);
+            }
+        },
+        onend() {
+            console.log('Track ended.');
+            // Remove track from buffer
+            trackBuffer.splice(0)
+
+            if (trackBuffer.length >= 1) {
+                // There's a track on the buffer. Let's play it!
+                console.log('Playing next track...')
+                trackBuffer[0].play();
+            }
+        }
+    })
+}
