@@ -2,8 +2,13 @@ import os
 import sys
 import logging
 import numpy as np
+import subprocess
+from functools import partial
+from tempfile import TemporaryFile
 
-from flask import Flask, stream_with_context, request, Response, render_template
+from flask import Flask, request, Response, render_template, make_response
+from functools import wraps, update_wrapper
+from datetime import datetime
 
 import torch
 from model import DeepJ
@@ -30,7 +35,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 2.3
+gain = 4.2
 
 styles = {
     'baroque': 0,
@@ -39,63 +44,82 @@ styles = {
     'modern': 3
 }
 
-@app.route('/stream.wav')
-def streamed_response():
-    def generate():
-        # Determine style
-        gen_style = []
+def nocache(view):
+    @wraps(view)
+    def no_cache(*args, **kwargs):
+        response = make_response(view(*args, **kwargs))
+        response.headers['Last-Modified'] = datetime.now()
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+        return response
+        
+    return update_wrapper(no_cache, view)
 
-        for style, style_id in styles.items():
-            strength = request.args.get(style, 0)
-            gen_style.append(one_hot(style_id, NUM_STYLES) * float(strength))
+@app.route('/stream.mp3')
+@nocache
+def stream():
+    # Determine style
+    gen_style = []
 
-        gen_style = np.mean(gen_style, axis=0)
+    for style, style_id in styles.items():
+        strength = request.args.get(style, 0)
+        gen_style.append(one_hot(style_id, NUM_STYLES) * float(strength))
 
-        if np.sum(gen_style) > 0:
-            # Normalize
-            gen_style /= np.sum(gen_style)
-        else:
-            gen_style = None
+    gen_style = np.mean(gen_style, axis=0)
 
-        seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
+    if np.sum(gen_style) > 0:
+        # Normalize
+        gen_style /= np.sum(gen_style)
+    else:
+        gen_style = None
 
-        uuid = uuid4()
-        logger.info('Stream ID: {}'.format(uuid))
-        logger.info('Style: {}'.format(gen_style))
-        folder = os.path.join('/tmp', str(uuid))
+    seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
 
-        os.makedirs(folder, exist_ok=True)
+    if 'seed' in request.args:
+        # TODO: This may not work for multithreading?
+        seed = int(request.args['seed'])
+        np.random.seed(seed)
+        print('Using seed {}'.format(seed))
 
-        mid_fname = os.path.join(folder, 'generation.mid')
-        output_fname = os.path.join(folder, 'generation.wav')
+    uuid = uuid4()
+    logger.info('Stream ID: {}'.format(uuid))
+    logger.info('Style: {}'.format(gen_style))
+    folder = '/tmp'
+    mid_fname = os.path.join(folder, '{}.mid'.format(uuid))
 
-        logger.info('Generating MIDI')
-        seq = Generation(model, style=gen_style, default_temp=0.97).generate(seq_len=seq_len, show_progress=False)         
-        track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(95))
-        track_builder.run()
-        midi_file = track_builder.export()
-        midi_file.save(mid_fname)
+    logger.info('Generating MIDI')
+    seq = Generation(model, style=gen_style, default_temp=0.95).generate(seq_len=seq_len, show_progress=False)         
+    track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(90))
+    track_builder.run()
+    midi_file = track_builder.export()
+    midi_file.save(mid_fname)
 
-        logger.info('Synthesizing MIDI')
-        call(['fluidsynth', '--reverb', '1', '-F', output_fname, '-g', str(gain), soundfont, mid_fname])
+    logger.info('Synthesizing MIDI')
 
-        logger.info('Streaming data')
+    # Synthsize
+    fsynth_proc = subprocess.Popen([
+        'fluidsynth',
+        '-nl',
+        '-f', 'fluidsynth.cfg',
+        '-T', 'raw',
+        '-g', str(gain),
+        '-F', '-',
+        soundfont,
+        mid_fname
+    ], stdout=subprocess.PIPE)
 
-        with open(output_fname, "rb") as f:
-            data = f.read(1024)
-            while data:
-                yield data
-                data = f.read(1024)
-                
-        # Clean up the temporary files
-        os.remove(mid_fname)
-        os.remove(output_fname)
-        os.rmdir(folder)
-    return Response(stream_with_context(generate()), mimetype='audio/wav')
+    # Convert to MP3
+    lame_proc = subprocess.Popen(['lame', '-q', '2', '-r', '-'], stdin=fsynth_proc.stdout, stdout=subprocess.PIPE)
+
+    logger.info('Streaming data')
+    data, err = lame_proc.communicate()
+    os.remove(mid_fname)
+    return Response(data, mimetype='audio/mp3')
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', threaded=True)

@@ -5,6 +5,9 @@ RUN \
   apt-get update && \
   apt-get install -y python3 python3-dev python3-pip git fluidsynth curl
 
+# Install lame
+RUN apt-get install -y lame
+
 # Download Soundfonts
 RUN mkdir src && \
     curl -o /src/acoustic_grand_piano.sf2 http://zenvoid.org/audio/acoustic_grand_piano_ydp_20080910.sf2

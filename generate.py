@@ -75,21 +75,6 @@ class Generation():
         # Find the top most probable sequences
         self.beam = heapq.nlargest(self.beam_size, new_beam, key=lambda x: x[0])
         self.step_count += 1
-        """
-        # Increase temperature if silent
-        index = np.argmax(output)
-        # If it's a time shift action, it means it's probably silent.
-        if index >= TIME_OFFSET and index < VEL_OFFSET:
-            # TODO: Use a better method to increase silent time
-            self.silent_time += 0.1
-
-            if self.silent_time >= SILENT_LENGTH:
-                self.temperature += 0.1
-        else:
-            # Reset temperature
-            self.silent_time = 0
-            self.temperature = self.default_temp
-        """
 
     def generate(self, seq_len=1000, show_progress=True):
         r = trange(seq_len) if show_progress else range(seq_len)
