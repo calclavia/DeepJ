@@ -44,7 +44,7 @@ class Generation():
         Generates the next set of beams
         """
         # Create variables
-        style = var(to_torch(self.style), volatile=True)
+        style = var(to_torch(self.style), volatile=True).unsqueeze(0)
 
         new_beam = []
         sum_seq_prob = 0
@@ -52,7 +52,7 @@ class Generation():
         # Iterate through the beam
         for prev_prob, evts, state in self.beam:
             if len(evts) > 0:
-                prev_event = var(to_torch(one_hot(evts[-1], NUM_ACTIONS)), volatile=True)
+                prev_event = var(to_torch(one_hot(evts[-1], NUM_ACTIONS)), volatile=True).unsqueeze(0)
             else:
                 prev_event = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
 

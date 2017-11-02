@@ -16,9 +16,10 @@ class DeepJ(nn.Module):
         self.style_units = style_units
 
         # RNN
-        self.rnns = [nn.LSTM(NUM_ACTIONS if i == 0 else self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
+        self.rnns = [nn.LSTM(self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
 
-        self.output = nn.Linear(self.num_units, NUM_ACTIONS)
+        self.input_linear = nn.Linear(NUM_ACTIONS, self.num_units)
+        self.output_linear = nn.Linear(self.num_units, NUM_ACTIONS)
         self.softmax = nn.Softmax()
 
         for i, rnn in enumerate(self.rnns):
@@ -39,15 +40,14 @@ class DeepJ(nn.Module):
         ## Process style ##
         # Distributed style representation
         style = self.style_linear(style)
+        x = self.tanh(self.input_linear(x))
 
         ## Process RNN ##
         if states is None:
             states = [None for _ in range(self.num_layers)]
 
         for l, rnn in enumerate(self.rnns):
-            prev_x = x
-
-            x, states[l] = rnn(x, states[l])
+            # prev_x = x
 
             # Style integration
             style_activation = self.tanh(self.style_layers[l](style))
@@ -55,16 +55,18 @@ class DeepJ(nn.Module):
             style_seq = style_seq.expand(batch_size, seq_len, self.num_units)
             x = x + style_seq
 
-            # Residual connection
-            if l != 0:
-                x = x + prev_x
+            x, states[l] = rnn(x, states[l])
 
-        x = self.output(x)
+            # Residual connection
+            # if l != 0:
+                # x = x + prev_x
+
+        x = self.output_linear(x)
         return x, states
 
-    def generate(self, inputs, style, states, temperature=1):
+    def generate(self, x, style, states, temperature=1):
         """ Returns the probability of outputs """
-        x, states = self.forward(inputs, style, states)
+        x, states = self.forward(x, style, states)
         seq_len = x.size(1)
         x = x.view(-1, NUM_ACTIONS)
         x = self.softmax(x / temperature)
