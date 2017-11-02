@@ -35,7 +35,7 @@ model.load_state_dict(saved_obj)
 
 # Synth parameters
 soundfont = os.path.join(path, 'acoustic_grand_piano.sf2')
-gain = 4.3
+gain = 4.2
 
 styles = {
     'baroque': 0,
@@ -76,6 +76,12 @@ def stream():
 
     seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
 
+    if 'seed' in request.args:
+        # TODO: This may not work for multithreading?
+        seed = int(request.args['seed'])
+        np.random.seed(seed)
+        print('Using seed {}'.format(seed))
+
     uuid = uuid4()
     logger.info('Stream ID: {}'.format(uuid))
     logger.info('Style: {}'.format(gen_style))
@@ -83,7 +89,7 @@ def stream():
     mid_fname = os.path.join(folder, '{}.mid'.format(uuid))
 
     logger.info('Generating MIDI')
-    seq = Generation(model, style=gen_style, default_temp=0.94).generate(seq_len=seq_len, show_progress=False)         
+    seq = Generation(model, style=gen_style, default_temp=0.95).generate(seq_len=seq_len, show_progress=False)         
     track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(90))
     track_builder.run()
     midi_file = track_builder.export()

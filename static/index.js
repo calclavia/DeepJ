@@ -37,7 +37,7 @@ function bufferNextTrack(seqLength) {
         console.log('Loading next track...')
         loadingQueue.push(
             new Howl({
-                src: ['/stream.mp3?length=' + seqLength + '&index=' + index],
+                src: ['/stream.mp3?length=' + seqLength + '&seed=' + index],
                 onload() {
                     console.log('Track loaded.');
 
