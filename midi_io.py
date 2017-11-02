@@ -14,7 +14,8 @@ class TrackBuilder():
         
         self.last_velocity = 0
         self.delta_time = 0
-        self.tempo = tempo
+        self.tempo = mido.bpm2tempo(120)
+        self.track_tempo = tempo
         
         self.reset()
     
@@ -55,7 +56,7 @@ class TrackBuilder():
     def reset(self):
         self.midi_file = mido.MidiFile()
         self.track = mido.MidiTrack()
-        self.track.append(mido.MetaMessage('set_tempo', tempo=self.tempo))
+        self.track.append(mido.MetaMessage('set_tempo', tempo=self.track_tempo))
         # Tracks on notes
         self.on_notes = set()
     

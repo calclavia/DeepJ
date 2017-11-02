@@ -3,6 +3,9 @@ $(document).ready(function() {
     // Init music
     initMusic();
 
+    // Init controls
+    initControls();
+
     // Create particle fxs
     var particleCanvas = new ParticleNetwork(document.getElementById('particle-canvas'), {
     	background: '#1A1423'
@@ -75,16 +78,19 @@ function bufferNextTrack(seqLength) {
     }
 }
 
-function initSliders() {
-     /*
+function initControls() {
     var slider_baroque = document.getElementById('baroque');
     var slider_classical = document.getElementById('classical');
     var slider_romantic = document.getElementById('romantic');
     var slider_modern = document.getElementById('modern');
-    var baroque = slider_baroque.value / 100;
-    var classical = slider_classical.value / 100;
-    var romantic = slider_romantic.value / 100;
-    var modern = slider_modern.value / 100;
+    slider_baroque.value = Math.random();
+    slider_classical.value = Math.random();
+    slider_romantic.value = Math.random();
+    slider_modern.value = Math.random();
+    var baroque = slider_baroque.value;
+    var classical = slider_classical.value;
+    var romantic = slider_romantic.value;
+    var modern = slider_modern.value;
     var stream_url = '/stream.wav?';
 
     function build_url(baroque, classical, romantic, modern) {
@@ -92,7 +98,7 @@ function initSliders() {
     }
 
     slider_baroque.onchange = function() {
-        baroque = this.value / 100;
+        baroque = this.value;
         var url = build_url(baroque, classical, romantic, modern);
         $.get(url, function(data) {
             console.log('Sent GET request to ' + url);
@@ -100,7 +106,7 @@ function initSliders() {
     };
 
     slider_classical.onchange = function() {
-        classical = this.value / 100;
+        classical = this.value;
         var url = build_url(baroque, classical, romantic, modern);
         $.get(url, function(data) {
             console.log('Sent GET request to ' + url);
@@ -108,7 +114,7 @@ function initSliders() {
     };
 
     slider_romantic.onchange = function() {
-        romantic = this.value / 100;
+        romantic = this.value;
         var url = build_url(baroque, classical, romantic, modern);
         $.get(url, function(data) {
             console.log('Sent GET request to ' + url);
@@ -116,11 +122,10 @@ function initSliders() {
     };
 
     slider_modern.onchange = function() {
-        modern = this.value / 100;
+        modern = this.value;
         var url = build_url(baroque, classical, romantic, modern);
         $.get(url, function(data) {
             console.log('Sent GET request to ' + url);
         });
     };
-    */
 }
