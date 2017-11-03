@@ -89,7 +89,7 @@ def stream():
     mid_fname = os.path.join(folder, '{}.mid'.format(uuid))
 
     logger.info('Generating MIDI')
-    seq = Generation(model, style=gen_style, default_temp=0.95).generate(seq_len=seq_len, show_progress=False)         
+    seq = Generation(model, style=gen_style, default_temp=0.97).generate(seq_len=seq_len, show_progress=False)         
     track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(90))
     track_builder.run()
     midi_file = track_builder.export()

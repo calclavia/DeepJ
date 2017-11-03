@@ -1,3 +1,16 @@
+var availableStyles = ['baroque', 'classical', 'romantic', 'modern']
+
+// Holds the current style configuration
+var style = {}
+
+// A buffer of tracks to be played. Contains only loadable tracks.
+var loadedQueue = [];
+var loadingQueue = [];
+var fadeTime = 5 * 1000;
+var maxSeqLength = 8000;
+var lenIncMultiplier = 3;
+var index = 0;
+
 $(document).ready(function() {
     console.log('DOM Loaded')
     // Init music
@@ -12,13 +25,6 @@ $(document).ready(function() {
     }); 
 });
 
-// A buffer of tracks to be played. Contains only loadable tracks.
-var loadedQueue = [];
-var loadingQueue = [];
-var fadeTime = 5 * 1000;
-var maxSeqLength = 10000;
-var lenIncMultiplier = 3;
-var index = 0;
 
 function initMusic() {
     bufferNextTrack(1000);
@@ -38,9 +44,15 @@ function playAndFade(sound) {
 function bufferNextTrack(seqLength) {
     if ((loadedQueue.length + loadingQueue.length) < 2) {
         console.log('Loading next track...')
+
+        var styleStr = '';
+        for (var s in style) {
+            styleStr += '&' + s + '=' + style[s]
+        }
+
         loadingQueue.push(
             new Howl({
-                src: ['/stream.mp3?length=' + seqLength + '&seed=' + index],
+                src: ['/stream.mp3?length=' + seqLength + '&seed=' + index + styleStr],
                 onload() {
                     console.log('Track loaded.');
 
@@ -79,53 +91,14 @@ function bufferNextTrack(seqLength) {
 }
 
 function initControls() {
-    var slider_baroque = document.getElementById('baroque');
-    var slider_classical = document.getElementById('classical');
-    var slider_romantic = document.getElementById('romantic');
-    var slider_modern = document.getElementById('modern');
-    slider_baroque.value = Math.random();
-    slider_classical.value = Math.random();
-    slider_romantic.value = Math.random();
-    slider_modern.value = Math.random();
-    var baroque = slider_baroque.value;
-    var classical = slider_classical.value;
-    var romantic = slider_romantic.value;
-    var modern = slider_modern.value;
-    var stream_url = '/stream.wav?';
+    for (var currentStyle of availableStyles) {
+        var slider = document.getElementById(currentStyle);
 
-    function build_url(baroque, classical, romantic, modern) {
-        return stream_url + 'baroque=' + baroque + '&classical=' + classical + '&romantic=' + romantic + '&modern=' + modern;
+        // Randomize
+        slider.value = Math.random();
+        slider.onchange = function() {
+            style[currentStyle] = this.value;
+        };
+        style[currentStyle] = slider.value;        
     }
-
-    slider_baroque.onchange = function() {
-        baroque = this.value;
-        var url = build_url(baroque, classical, romantic, modern);
-        $.get(url, function(data) {
-            console.log('Sent GET request to ' + url);
-        });
-    };
-
-    slider_classical.onchange = function() {
-        classical = this.value;
-        var url = build_url(baroque, classical, romantic, modern);
-        $.get(url, function(data) {
-            console.log('Sent GET request to ' + url);
-        });
-    };
-
-    slider_romantic.onchange = function() {
-        romantic = this.value;
-        var url = build_url(baroque, classical, romantic, modern);
-        $.get(url, function(data) {
-            console.log('Sent GET request to ' + url);
-        });
-    };
-
-    slider_modern.onchange = function() {
-        modern = this.value;
-        var url = build_url(baroque, classical, romantic, modern);
-        $.get(url, function(data) {
-            console.log('Sent GET request to ' + url);
-        });
-    };
 }
