@@ -8,21 +8,21 @@ var loadedQueue = [];
 var loadingQueue = [];
 var fadeTime = 5 * 1000;
 var maxSeqLength = 8000;
-var lenIncMultiplier = 3;
+var lenIncMultiplier = 2;
 var index = 0;
 
 $(document).ready(function() {
     console.log('DOM Loaded')
-    // Init music
-    initMusic();
-
-    // Init controls
-    initControls();
-
     // Create particle fxs
     var particleCanvas = new ParticleNetwork(document.getElementById('particle-canvas'), {
     	background: '#1A1423'
-    }); 
+    });
+
+    // Init controls
+    initControls();
+    
+    // Init music
+    initMusic();
 });
 
 
