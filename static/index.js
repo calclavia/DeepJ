@@ -91,7 +91,8 @@ function bufferNextTrack(seqLength) {
 }
 
 function initControls() {
-    for (var currentStyle of availableStyles) {
+    for (let currentStyle of availableStyles) {
+        // Need this to move variable into function closure
         var slider = document.getElementById(currentStyle);
 
         // Randomize
