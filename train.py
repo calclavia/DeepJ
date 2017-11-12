@@ -43,10 +43,10 @@ def train(model, train_batcher, train_len, val_batcher, val_len, optimizer, plot
         step = 1
         total_loss = 0
 
-        with tqdm(total=train_len) as t:
+        with tqdm(range(train_len)) as t:
             t.set_description('Epoch {}'.format(epoch))
             
-            for _ in range(train_len):
+            for _ in t:
                 # Randomly create a batch size
                 batch_size = random.randint(MIN_BATCH_SIZE, BATCH_SIZE)
                 seq_len = TRAIN_CAPACITY // batch_size
@@ -57,7 +57,6 @@ def train(model, train_batcher, train_len, val_batcher, val_len, optimizer, plot
                 total_loss += loss
                 avg_loss = total_loss / step
                 t.set_postfix(loss=avg_loss)
-                t.update(BATCH_SIZE)
 
                 step += 1
                 total_step += 1
@@ -70,16 +69,15 @@ def train(model, train_batcher, train_len, val_batcher, val_len, optimizer, plot
 
         v_gen = val_batcher()
 
-        with tqdm(total=val_len) as t:
+        with tqdm(range(val_len)) as t:
             t.set_description('Validation {}'.format(epoch))
 
-            for _ in range(val_len):
+            for _ in t:
                 data = val_batcher()
                 loss = val_step(model, data)
                 total_loss += loss
                 avg_loss = total_loss / step
                 t.set_postfix(loss=avg_loss)
-                t.update(BATCH_SIZE)
                 step += 1
             
         val_losses.append(avg_loss)

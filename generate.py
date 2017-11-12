@@ -29,8 +29,6 @@ class Generation():
         # Temperature of generation
         self.default_temp = default_temp
         self.temperature = self.default_temp
-        # How much time of silence
-        self.silent_time = SILENT_LENGTH
 
         # Model parametrs
         self.beam = [
