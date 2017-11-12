@@ -18,7 +18,7 @@ class Generation():
     Represents a music generation sequence
     """
 
-    def __init__(self, model, style=None, default_temp=1, beam_size=1):
+    def __init__(self, model, style=None, default_temp=1, beam_size=1, adaptive=False):
         self.model = model
 
         self.beam_size = beam_size
@@ -38,6 +38,7 @@ class Generation():
         ]
         self.avg_seq_prob = 1
         self.step_count = 0
+        self.adaptive_temp = adaptive
 
     def step(self):
         """
@@ -68,15 +69,25 @@ class Generation():
                 
                 # Create next beam
                 seq_prob = prev_prob * probs[0, event]
+                # Boost the sequence probability by the average
                 new_beam.append((seq_prob / self.avg_seq_prob, evts + (event,), new_state))
                 sum_seq_prob += seq_prob
 
         self.avg_seq_prob = sum_seq_prob / len(new_beam)
         # Find the top most probable sequences
         self.beam = heapq.nlargest(self.beam_size, new_beam, key=lambda x: x[0])
+
+        if self.adaptive_temp and self.step_count > 50:
+            r = repetitiveness(self.beam[0][1][-50:])
+            if r < 0.1:
+                self.temperature = self.default_temp
+            else:
+                self.temperature += 0.05
+        
         self.step_count += 1
 
     def generate(self, seq_len=1000, show_progress=True):
+        self.model.eval()
         r = trange(seq_len) if show_progress else range(seq_len)
 
         for _ in r:
@@ -100,6 +111,7 @@ def main():
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Styles to mix together')
     parser.add_argument('--temperature', default=1, type=float, help='Temperature of generation')
     parser.add_argument('--beam', default=1, type=int, help='Beam size')
+    parser.add_argument('--adaptive', default=False, action='store_true', help='Adaptive temperature')
     args = parser.parse_args()
 
     style = None
@@ -110,6 +122,8 @@ def main():
 
     print('=== Loading Model ===')
     print('Path: {}'.format(args.path))
+    print('Temperature: {}'.format(args.temperature))
+    print('Adaptive Temperature: {}'.format(args.adaptive))
     print('GPU: {}'.format(torch.cuda.is_available()))
     settings['force_cpu'] = True
     
@@ -121,7 +135,7 @@ def main():
         print('WARNING: No model loaded! Please specify model path.')
 
     print('=== Generating ===')
-    Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam).export(seq_len=args.length)
+    Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam, adaptive=args.adaptive).export(seq_len=args.length)
 
 if __name__ == '__main__':
     main()

@@ -50,7 +50,7 @@ def process(style_seqs, seq_len=SEQ_LEN):
     style_tags = torch.LongTensor([s for s, y in enumerate(style_seqs) for x in y])
     return seqs, style_tags
 
-def validation_split(data, split=0.1):
+def validation_split(data, split=0.05):
     """
     Splits the data iteration list into training and validation indices
     """
