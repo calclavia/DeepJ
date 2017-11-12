@@ -21,18 +21,15 @@ VEL_OFFSET = TIME_OFFSET + TIME_QUANTIZATION
 NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 
 # Trainin Parameters
-BATCH_SIZE = 64
-SEQ_LEN = 512 + 1
-# Maximum silence time in seconds
-SILENT_LENGTH = 3
+MIN_BATCH_SIZE = 4
+BATCH_SIZE = 32
+SEQ_LEN = 512
+TRAIN_CAPACITY = SEQ_LEN * BATCH_SIZE
 GRADIENT_CLIP = 3
 # The number of train generator cycles per sequence
-TRAIN_CYCLES = 100
+TRAIN_CYCLES = 10000
+VAL_CYCLES = int(TRAIN_CYCLES * 0.05)
 LEARNING_RATE = 1e-3
-
-# Sampling schedule decay
-SCHEDULE_RATE = 0#1e-4
-MIN_SCHEDULE_PROB = 1#0.5
 
 # Style
 STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']

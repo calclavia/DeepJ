@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
 import argparse
+import random
 
 from dataset import *
 from constants import *
@@ -24,7 +25,7 @@ def plot_loss(training_loss, validation_loss, name):
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(model, train_generator, train_len, val_generator, val_len, optimizer, plot=True, gen_rate=1, patience=5):
+def train(model, train_batcher, train_len, val_batcher, val_len, optimizer, plot=True, gen_rate=1, patience=5):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -45,20 +46,21 @@ def train(model, train_generator, train_len, val_generator, val_len, optimizer, 
         with tqdm(total=train_len) as t:
             t.set_description('Epoch {}'.format(epoch))
             
-            for _ in range(TRAIN_CYCLES):
-                t_gen = train_generator()
+            for _ in range(train_len):
+                # Randomly create a batch size
+                batch_size = random.randint(MIN_BATCH_SIZE, BATCH_SIZE)
+                seq_len = TRAIN_CAPACITY // batch_size
 
-                for data in t_gen:
-                    teach_prob = max(MIN_SCHEDULE_PROB, 1 - SCHEDULE_RATE * total_step)
-                    loss = train_step(model, data, optimizer, teach_prob)
+                data = train_batcher(batch_size, seq_len)
+                loss = train_step(model, data, optimizer)
 
-                    total_loss += loss
-                    avg_loss = total_loss / step
-                    t.set_postfix(loss=avg_loss, prob=teach_prob)
-                    t.update(BATCH_SIZE)
+                total_loss += loss
+                avg_loss = total_loss / step
+                t.set_postfix(loss=avg_loss)
+                t.update(BATCH_SIZE)
 
-                    step += 1
-                    total_step += 1
+                step += 1
+                total_step += 1
 
         train_losses.append(avg_loss)
 
@@ -66,12 +68,13 @@ def train(model, train_generator, train_len, val_generator, val_len, optimizer, 
         step = 1
         total_loss = 0
 
-        v_gen = val_generator()
+        v_gen = val_batcher()
 
         with tqdm(total=val_len) as t:
             t.set_description('Validation {}'.format(epoch))
 
-            for data in v_gen:
+            for _ in range(val_len):
+                data = val_batcher()
                 loss = val_step(model, data)
                 total_loss += loss
                 avg_loss = total_loss / step
@@ -102,7 +105,7 @@ def train(model, train_generator, train_len, val_generator, val_len, optimizer, 
                 break
         """
 
-def train_step(model, data, optimizer, teach_prob):
+def train_step(model, data, optimizer):
     """
     Trains the model on a single batch of sequence.
     """
@@ -111,7 +114,7 @@ def train_step(model, data, optimizer, teach_prob):
     # Zero out the gradient
     optimizer.zero_grad()
 
-    loss, avg_loss = compute_loss(model, data, teach_prob)
+    loss, avg_loss = compute_loss(model, data)
 
     loss.backward()
 
@@ -125,50 +128,23 @@ def train_step(model, data, optimizer, teach_prob):
 
 def val_step(model, data):
     model.eval()
-    return compute_loss(model, data, 1, volatile=True)[1]
+    return compute_loss(model, data, volatile=True)[1]
 
-def compute_loss(model, data, teach_prob, volatile=False):
+def compute_loss(model, data, volatile=False):
     """
     Trains the model on a single batch of sequence.
     """
     # Convert all tensors into variables
     note_seq, styles = data
     styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
-
-    loss = 0
-    seq_len = note_seq.size()[1]
-
-    # Initialize hidden states
-    states = None
-    prev_note = var(one_hot_batch(note_seq[:, 0].unsqueeze(1), NUM_ACTIONS), volatile=volatile)
     
-    # Iterate through the entire sequence
-    """
-    for i in range(1, seq_len):
-        target = note_seq[:, i]
-
-        output, states = model(prev_note, styles, states)
-
-        # Compute the loss.
-        loss += criterion(output, var(target, volatile=volatile))
-
-        # Choose note to feed based on coin flip (scheduled sampling)
-        # TODO: Compare with and without scheduled sampling
-        if np.random.random() <= teach_prob:
-            prev_note = var(one_hot_batch(target.unsqueeze(1), NUM_ACTIONS), volatile=volatile)
-        else:
-            # Apply softmax
-            output = model.softmax(output)
-            # Sample from the output
-            prev_note = var(to_torch(batch_sample(output.cpu().data.numpy())))
-    """
     # Feed it to the model
     inputs = var(one_hot_seq(note_seq[:, :-1], NUM_ACTIONS), volatile=volatile)
     targets = var(note_seq[:, 1:], volatile=volatile)
-    output, states = model(inputs, styles, states)
+    output, _ = model(inputs, styles, None)
 
     # Compute the loss.
-    loss += criterion(output.view(-1, NUM_ACTIONS), targets.view(-1))
+    loss = criterion(output.view(-1, NUM_ACTIONS), targets.view(-1))
 
     return loss, loss.data[0]
 
@@ -205,12 +181,12 @@ def main():
     print()
     print('Creating data generators...')
     train_data, val_data = validation_split(data)
-    train_generator = lambda: batcher(sampler(train_data))
-    val_generator = lambda: batcher(sampler(val_data))
+    train_batcher = batcher(sampler(train_data))
+    val_batcher = batcher(sampler(val_data))
 
     """
     # Checks if training data sounds right.
-    for i, (train_seq, *_) in enumerate(train_generator()):
+    for i, (train_seq, *_) in enumerate(train_batcher()):
         save_midi('train_seq_{}'.format(i), train_seq[0].cpu().numpy())
     """
 
@@ -218,8 +194,7 @@ def main():
     print()
 
     print('=== Training ===')
-    train(model, train_generator, len(train_data[0]) * TRAIN_CYCLES, val_generator, \
-         len(val_data[0]), optimizer, plot=not args.noplot, gen_rate=args.gen)
+    train(model, train_batcher, TRAIN_CYCLES, val_batcher, VAL_CYCLES, optimizer, plot=not args.noplot, gen_rate=args.gen)
 
 if __name__ == '__main__':
     main()

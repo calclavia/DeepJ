@@ -10,19 +10,20 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=512, num_layers=3, style_units=32):
+    def __init__(self, num_units=650, num_layers=3, style_units=32):
         super().__init__()
         self.num_units = num_units
         self.num_layers = num_layers
         self.style_units = style_units
 
         # RNN
-        self.rnns = [nn.LSTM((NUM_ACTIONS + style_units) if i == 0 else self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
+        # self.rnns = [nn.LSTM((NUM_ACTIONS + style_units) if i == 0 else self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
+        self.rnn = nn.LSTM(NUM_ACTIONS + style_units, self.num_units, num_layers, batch_first=True)
 
         self.output_linear = nn.Linear(self.num_units, NUM_ACTIONS)
 
-        for i, rnn in enumerate(self.rnns):
-            self.add_module('rnn_' + str(i), rnn)
+        # for i, rnn in enumerate(self.rnns):
+            # self.add_module('rnn_' + str(i), rnn)
 
         # Style
         self.style_linear = nn.Linear(NUM_STYLES, self.style_units)
@@ -39,11 +40,12 @@ class DeepJ(nn.Module):
         x = torch.cat((x, style), dim=2)
 
         ## Process RNN ##
-        if states is None:
-            states = [None for _ in range(self.num_layers)]
+        # if states is None:
+            # states = [None for _ in range(self.num_layers)]
 
-        for l, rnn in enumerate(self.rnns):
-            x, states[l] = rnn(x, states[l])
+        x, states = self.rnn(x, states)
+        # for l, rnn in enumerate(self.rnns):
+            # x, states[l] = rnn(x, states[l])
             # Style integration
             # x = x + style[:, l * self.num_units:(l + 1) * self.num_units].unsqueeze(1).expand(-1, seq_len, -1)
 
