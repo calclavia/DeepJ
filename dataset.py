@@ -29,7 +29,7 @@ def load(styles=STYLES):
             try:
                 # Pad the sequence by an empty event
                 seq = load_midi(f)
-                if len(seq) >= TRAIN_CAPACITY // MIN_BATCH_SIZE:
+                if len(seq) >= SEQ_LEN:
                     style_seq.append(torch.from_numpy(seq).long())
                     seq_len_sum += len(seq)
                 else:

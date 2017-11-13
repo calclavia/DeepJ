@@ -57,16 +57,15 @@ class Generation():
 
             prev_event = prev_event.unsqueeze(1)
             probs, new_state = self.model.generate(prev_event, style, state, temperature=self.temperature)
-            probs = probs[0].cpu().data.numpy()
+            probs = probs.squeeze(1)
 
             for _ in range(self.beam_size):
                 # Sample action
-                output = batch_sample(probs)
-                # output = np.argmax(probs, axis=1)
-                event = output[0]
+                output = probs.multinomial().data
+                event = output[0, 0]
                 
                 # Create next beam
-                seq_prob = prev_prob * probs[0, event]
+                seq_prob = prev_prob * probs.data[0, event]
                 # Boost the sequence probability by the average
                 new_beam.append((seq_prob / self.avg_seq_prob, evts + (event,), new_state))
                 sum_seq_prob += seq_prob

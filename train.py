@@ -47,11 +47,7 @@ def train(model, train_batcher, train_len, val_batcher, val_len, optimizer, plot
             t.set_description('Epoch {}'.format(epoch))
             
             for _ in t:
-                # Randomly create a batch size
-                batch_size = random.randint(MIN_BATCH_SIZE, BATCH_SIZE)
-                seq_len = TRAIN_CAPACITY // batch_size
-
-                data = train_batcher(batch_size, seq_len)
+                data = train_batcher()
                 loss = train_step(model, data, optimizer)
 
                 total_loss += loss
