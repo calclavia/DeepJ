@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
 from constants import *
 from util import *
@@ -16,50 +17,37 @@ class DeepJ(nn.Module):
         self.style_units = style_units
 
         # RNN
-        self.rnns = [nn.LSTM(self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
+        # self.rnns = [nn.LSTM((NUM_ACTIONS + style_units) if i == 0 else self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
+        self.rnn = nn.LSTM(NUM_ACTIONS + style_units, self.num_units, num_layers, batch_first=True)
 
-        self.input_linear = nn.Linear(NUM_ACTIONS, self.num_units)
         self.output_linear = nn.Linear(self.num_units, NUM_ACTIONS)
-        self.softmax = nn.Softmax()
 
-        for i, rnn in enumerate(self.rnns):
-            self.add_module('rnn_' + str(i), rnn)
+        # for i, rnn in enumerate(self.rnns):
+            # self.add_module('rnn_' + str(i), rnn)
 
         # Style
         self.style_linear = nn.Linear(NUM_STYLES, self.style_units)
-        self.style_layers = [nn.Linear(self.style_units, self.num_units) for i in range(num_layers)]
-        self.tanh = nn.Tanh()
-
-        for i, layer in enumerate(self.style_layers):
-            self.add_module('style_layers_' + str(i), layer)
+        # self.style_layer = nn.Linear(self.style_units, self.num_units * self.num_layers)
 
     def forward(self, x, style, states=None):
         batch_size = x.size(0)
         seq_len = x.size(1)
 
-        ## Process style ##
         # Distributed style representation
         style = self.style_linear(style)
-        x = self.tanh(self.input_linear(x))
+        # style = F.tanh(self.style_layer(style))
+        style = style.unsqueeze(1).expand(batch_size, seq_len, self.style_units)
+        x = torch.cat((x, style), dim=2)
 
         ## Process RNN ##
-        if states is None:
-            states = [None for _ in range(self.num_layers)]
+        # if states is None:
+            # states = [None for _ in range(self.num_layers)]
 
-        for l, rnn in enumerate(self.rnns):
-            # prev_x = x
-
+        x, states = self.rnn(x, states)
+        # for l, rnn in enumerate(self.rnns):
+            # x, states[l] = rnn(x, states[l])
             # Style integration
-            style_activation = self.tanh(self.style_layers[l](style))
-            style_seq = style_activation.unsqueeze(1)
-            style_seq = style_seq.expand(batch_size, seq_len, self.num_units)
-            x = x + style_seq
-
-            x, states[l] = rnn(x, states[l])
-
-            # Residual connection
-            # if l != 0:
-                # x = x + prev_x
+            # x = x + style[:, l * self.num_units:(l + 1) * self.num_units].unsqueeze(1).expand(-1, seq_len, -1)
 
         x = self.output_linear(x)
         return x, states
@@ -69,6 +57,6 @@ class DeepJ(nn.Module):
         x, states = self.forward(x, style, states)
         seq_len = x.size(1)
         x = x.view(-1, NUM_ACTIONS)
-        x = self.softmax(x / temperature)
+        x = F.softmax(x / temperature)
         x = x.view(-1, seq_len, NUM_ACTIONS)
         return x, states
