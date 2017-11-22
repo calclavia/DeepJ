@@ -3,26 +3,25 @@ MIDI_VELOCITY = 128
 # Number of possible notes
 NUM_NOTES = 128
 # Number of time shift quantizations
-TIME_QUANTIZATION = 64
+TIME_QUANTIZATION = 32
 # Exponential representation of time shifts
-TICK_EXP = 1.08
+TICK_EXP = 1.14
 TICK_MUL = 1
 # The number of ticks represented in each bin
 TICK_BINS = [int(TICK_EXP ** x + TICK_MUL * x) for x in range(TIME_QUANTIZATION)]
 # Ticks per second
-TICKS_PER_SEC = 200
+TICKS_PER_SEC = 100
 # Number of velocity buns
 VEL_QUANTIZATION = 32
 
 NOTE_ON_OFFSET = 0
-NOTE_OFF_OFFSET = NOTE_ON_OFFSET + NUM_NOTES
-TIME_OFFSET = NOTE_OFF_OFFSET + NUM_NOTES
+TIME_OFFSET = NOTE_ON_OFFSET + NUM_NOTES
 VEL_OFFSET = TIME_OFFSET + TIME_QUANTIZATION
 NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 
 # Trainin Parameters
 BATCH_SIZE = 64
-SEQ_LEN = 512
+SEQ_LEN = 1024
 GRADIENT_CLIP = 3
 # The number of train generator cycles per sequence
 TRAIN_CYCLES = 2000

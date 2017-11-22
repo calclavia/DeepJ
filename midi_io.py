@@ -28,31 +28,29 @@ class TrackBuilder():
         # Interpret event data
         if evt >= VEL_OFFSET:
             # A velocity change
-            self.last_velocity = (evt - VEL_OFFSET + 1) * (MIDI_VELOCITY // VEL_QUANTIZATION) - 1
+            self.last_velocity = (evt - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
         elif evt >= TIME_OFFSET:
             # Shifting forward in time
             tick_bin = evt - TIME_OFFSET
             assert tick_bin >= 0 and tick_bin < TIME_QUANTIZATION
             seconds = TICK_BINS[tick_bin] / TICKS_PER_SEC
             self.delta_time += int(mido.second2tick(seconds, self.midi_file.ticks_per_beat, self.tempo))
-        elif evt >= NOTE_OFF_OFFSET:
-            # Turning a note off
-            note = evt - NOTE_OFF_OFFSET
-
-            if note in self.on_notes:
-                # We cannot turn a note off when it was never on
-                self.track.append(mido.Message('note_off', note=note, time=self.delta_time))
-                self.delta_time = 0
-                self.on_notes.remove(note)
-
         elif evt >= NOTE_ON_OFFSET:
-            # Turning a note on
+            # Turning a note on (or off if velocity = 0)
             note = evt - NOTE_ON_OFFSET
             # We can turn a note on twice, indicating a replay
-            self.track.append(mido.Message('note_on', note=note, time=self.delta_time, velocity=self.last_velocity))
-            self.delta_time = 0
-            self.on_notes.add(note)
-
+            if self.last_velocity == 0:
+                # Note off
+                if note in self.on_notes:
+                    # We cannot turn a note off when it was never on
+                    self.track.append(mido.Message('note_off', note=note, time=self.delta_time))
+                    self.on_notes.remove(note)
+                    self.delta_time = 0
+            else:
+                self.track.append(mido.Message('note_on', note=note, time=self.delta_time, velocity=self.last_velocity))
+                self.on_notes.add(note)
+                self.delta_time = 0
+        
     def reset(self):
         self.midi_file = mido.MidiFile()
         self.track = mido.MidiTrack()
@@ -110,7 +108,7 @@ def midi_to_seq(midi_file, track):
                 events.append(evt_index)
                 standard_ticks -= TICK_BINS[tick_bin]
 
-                # Approximate to the nearest tick bin
+                # Approximate to the nearest tick bin instead of precise wrapping
                 if standard_ticks < TICK_BINS[-1]:
                     break
 
@@ -122,24 +120,21 @@ def midi_to_seq(midi_file, track):
             continue
 
         # Ignore control changes
-        if (event_type != 'note_on' and event_type != 'note_off'):
+        if event_type != 'note_on' and event_type != 'note_off':
             continue
 
-        # Velocity = 0 is equivalent to note off
-        if msg.type == 'note_on' and msg.velocity == 0:
-            event_type = 'note_off'
-
         if event_type == 'note_on':
-            velocity = (msg.velocity + 1) // (MIDI_VELOCITY // VEL_QUANTIZATION) - 1
-
-            # See if we need to update velocity
-            if last_velocity != velocity:
-                events.append(VEL_OFFSET + velocity)
-                last_velocity = velocity
-
-            events.append(NOTE_ON_OFFSET + msg.note)
+            velocity = (msg.velocity) // (MIDI_VELOCITY // VEL_QUANTIZATION)
         elif event_type == 'note_off':
-            events.append(NOTE_OFF_OFFSET + msg.note)
+            velocity = 0
+        
+        # If velocity is different, we update it
+        if last_velocity != velocity:
+            events.append(VEL_OFFSET + velocity)
+            last_velocity = velocity
+
+        events.append(NOTE_ON_OFFSET + msg.note)
+
     return np.array(events)
 
 def load_midi(fname):
