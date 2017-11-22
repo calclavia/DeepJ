@@ -3,14 +3,14 @@ MIDI_VELOCITY = 128
 # Number of possible notes
 NUM_NOTES = 128
 # Number of time shift quantizations
-TIME_QUANTIZATION = 100
+TIME_QUANTIZATION = 64
 # Exponential representation of time shifts
-TICK_EXP = 1
+TICK_EXP = 1.08
 TICK_MUL = 1
 # The number of ticks represented in each bin
 TICK_BINS = [int(TICK_EXP ** x + TICK_MUL * x) for x in range(TIME_QUANTIZATION)]
 # Ticks per second
-TICKS_PER_SEC = 100
+TICKS_PER_SEC = 200
 # Number of velocity buns
 VEL_QUANTIZATION = 32
 

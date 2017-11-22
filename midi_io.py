@@ -110,6 +110,10 @@ def midi_to_seq(midi_file, track):
                 events.append(evt_index)
                 standard_ticks -= TICK_BINS[tick_bin]
 
+                # Approximate to the nearest tick bin
+                if standard_ticks < TICK_BINS[-1]:
+                    break
+
         # Ignore meta messages
         if msg.is_meta:
             if msg.type == 'set_tempo':
