@@ -106,41 +106,7 @@ def batcher(sampler):
 def random_subseq(sequence, seq_len):
     """ Randomly creates a subsequence from the sequence """
     index = random.randint(0, len(sequence) - 1 - seq_len)
-
-    def generator():
-        note_ons = set()
-        i = 0
-        current = index
-        
-        while i < seq_len:
-            if current >= len(sequence):
-                # Ran out of events due to skipping
-                # Pad with max silence for end of track
-                yield TIME_OFFSET + TIME_QUANTIZATION - 1
-                i += 1
-                current += 1
-            else:
-                evt = sequence[current]
-
-                if evt < NOTE_OFF_OFFSET + NUM_NOTES:
-                    if evt >= NOTE_OFF_OFFSET:
-                        # This is a note off
-                        note = evt - NOTE_OFF_OFFSET
-                        if note not in note_ons:
-                            # Ignore note offs before note on
-                            current += 1
-                            continue
-                        else:
-                            note_ons.remove(note)
-                    else:
-                        # This is a note on
-                        note_ons.add(evt - NOTE_ON_OFFSET)
-
-                yield evt
-                i += 1
-                current += 1
-
-    return generator()
+    return sequence[index:index + seq_len]
 
 def augment(sequence):
     """
