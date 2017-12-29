@@ -10,7 +10,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=512, num_layers=3, style_units=32):
+    def __init__(self, num_units=512, num_layers=4, style_units=32):
         super().__init__()
         self.num_units = num_units
         self.num_layers = num_layers
@@ -84,11 +84,11 @@ class DilatedRNN(nn.Module):
         # Move the additional parallels into batch dimension
         batch_size = x.size(0)
         seq_len = x.size(1)
-        assert seq_len % self.dilation == 0
+        assert seq_len % self.dilation == 0, seq_len
         x = x.unfold(1, self.dilation, self.dilation)
         x = x.permute(0, 3, 1, 2)
-        x = x.contiguous()
-        x = x.view(batch_size * self.dilation, seq_len // self.dilation, -1)
+        x = x.contiguous().view(batch_size * self.dilation, seq_len // self.dilation, -1)
         x, states = self.rnn(x, states)
+        x = x.contiguous().view(batch_size, seq_len, -1)
         return x, states
         
