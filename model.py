@@ -17,13 +17,15 @@ class DeepJ(nn.Module):
         self.style_units = style_units
 
         # RNN
-        # self.rnns = [nn.LSTM((NUM_ACTIONS + style_units) if i == 0 else self.num_units, self.num_units, batch_first=True) for i in range(num_layers)]
-        self.rnn = nn.LSTM(NUM_ACTIONS + style_units, self.num_units, num_layers, batch_first=True)
+        self.rnns = [
+            DilatedRNN(nn.LSTM((NUM_ACTIONS + style_units) if i == 0 else self.num_units, self.num_units, batch_first=True), 2 ** i)
+            for i in range(num_layers)
+        ]
 
         self.output_linear = nn.Linear(self.num_units, NUM_ACTIONS)
 
-        # for i, rnn in enumerate(self.rnns):
-            # self.add_module('rnn_' + str(i), rnn)
+        for i, rnn in enumerate(self.rnns):
+            self.add_module('rnn_' + str(i), rnn)
 
         # Style
         self.style_linear = nn.Linear(NUM_STYLES, self.style_units)
@@ -40,12 +42,11 @@ class DeepJ(nn.Module):
         x = torch.cat((x, style), dim=2)
 
         ## Process RNN ##
-        # if states is None:
-            # states = [None for _ in range(self.num_layers)]
+        if states is None:
+            states = [None for _ in range(self.num_layers)]
 
-        x, states = self.rnn(x, states)
-        # for l, rnn in enumerate(self.rnns):
-            # x, states[l] = rnn(x, states[l])
+        for l, rnn in enumerate(self.rnns):
+            x, states[l] = rnn(x, states[l])
             # Style integration
             # x = x + style[:, l * self.num_units:(l + 1) * self.num_units].unsqueeze(1).expand(-1, seq_len, -1)
 
@@ -60,3 +61,34 @@ class DeepJ(nn.Module):
         x = F.softmax(x / temperature)
         x = x.view(-1, seq_len, NUM_ACTIONS)
         return x, states
+
+class DilatedRNN(nn.Module):
+    """ https://arxiv.org/pdf/1710.02224.pdf """
+    def __init__(self, wrap_rnn, dilation=1):
+        """
+        Args:
+            wrap_rnn: The RNN module to wrap.
+            dilation: The dilation factor
+        """
+        super().__init__()
+        assert wrap_rnn.batch_first
+        self.rnn = wrap_rnn
+        self.dilation = dilation
+    
+    def forward(self, x, states):
+        """
+        Args:
+            x: A sequence of features [batch, seq_len, features]
+        """
+        # The number of dilation = the number of parallelism that can be achieved.
+        # Move the additional parallels into batch dimension
+        batch_size = x.size(0)
+        seq_len = x.size(1)
+        assert seq_len % self.dilation == 0
+        x = x.unfold(1, self.dilation, self.dilation)
+        x = x.permute(0, 3, 1, 2)
+        x = x.contiguous()
+        x = x.view(batch_size * self.dilation, seq_len // self.dilation, -1)
+        x, states = self.rnn(x, states)
+        return x, states
+        
