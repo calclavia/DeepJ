@@ -10,7 +10,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=512, num_layers=4, style_units=32):
+    def __init__(self, num_units=512, num_layers=3, style_units=32):
         super().__init__()
         self.num_units = num_units
         self.num_layers = num_layers
@@ -18,7 +18,8 @@ class DeepJ(nn.Module):
 
         # RNN
         self.rnns = [
-            DilatedRNN(nn.LSTM((NUM_ACTIONS + style_units) if i == 0 else self.num_units, self.num_units, batch_first=True), 2 ** i)
+            nn.LSTM(NUM_ACTIONS + style_units, num_units, batch_first=True) if i == 0 else 
+            DilatedRNN(nn.LSTM(num_units, num_units, batch_first=True), 2 ** i)
             for i in range(num_layers)
         ]
 
@@ -84,7 +85,6 @@ class DilatedRNN(nn.Module):
         # Move the additional parallels into batch dimension
         batch_size = x.size(0)
         seq_len = x.size(1)
-
         if seq_len == 1:
             # Single step requires us to store which step we are on.
             if states is None:
@@ -101,7 +101,12 @@ class DilatedRNN(nn.Module):
         x = x.unfold(1, self.dilation, self.dilation)
         x = x.permute(0, 3, 1, 2)
         x = x.contiguous().view(batch_size * self.dilation, seq_len // self.dilation, -1)
-        x, states = self.rnn(x, states)
+        # x, states = self.rnn(x, states)
+        # X is now [batch * dilation, seq_len//dilation, features]
+        # We want to restore it back into [batch, seq_len, features]
+        # But we can't simply reshape it, because that messes up the order.
+        x = x.contiguous().view(batch_size, self.dilation, seq_len //self.dilation, -1)
+        x = x.permute(0, 2, 1, 3)
         x = x.contiguous().view(batch_size, seq_len, -1)
         return x, states
         
