@@ -58,7 +58,7 @@ class DeepJ(nn.Module):
         x, states = self.forward(x, style, states)
         seq_len = x.size(1)
         x = x.view(-1, NUM_ACTIONS)
-        x = F.softmax(x / temperature)
+        x = F.softmax(x / temperature, dim=1)
         x = x.view(-1, seq_len, NUM_ACTIONS)
         return x, states
 
@@ -84,6 +84,19 @@ class DilatedRNN(nn.Module):
         # Move the additional parallels into batch dimension
         batch_size = x.size(0)
         seq_len = x.size(1)
+
+        if seq_len == 1:
+            # Single step requires us to store which step we are on.
+            if states is None:
+                # Each memory tensor corresponds to a dilation.
+                states = (0, tuple(None for _ in range(self.dilation)))
+            step, memories = states
+            memory_id = step % self.dilation
+            x, memory = self.rnn(x, memories[memory_id])
+            states = (step + 1, memories[:memory_id] + (memory,) + memories[memory_id + 1:])
+            return x, states
+
+        # Taking in a full sequence
         assert seq_len % self.dilation == 0, seq_len
         x = x.unfold(1, self.dilation, self.dilation)
         x = x.permute(0, 3, 1, 2)
