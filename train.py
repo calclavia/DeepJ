@@ -154,9 +154,6 @@ def main():
     model = DeepJ()
 
     if torch.cuda.is_available():
-        # TODO: Windows Hack
-        if torch.backends.cudnn.version() is None:
-            torch.backends.cudnn.version = lambda: 6000
         model.cuda()
 
     if args.path:
