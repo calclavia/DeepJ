@@ -156,6 +156,10 @@ def main():
     if torch.cuda.is_available():
         model.cuda()
 
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    print('Number of trainable parameters: {}'.format(params))
+
     if args.path:
         model.load_state_dict(torch.load(args.path))
         print('Restored model from checkpoint.')
