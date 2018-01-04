@@ -5,7 +5,7 @@ Recent advances in deep neural networks has enabled algorithms to compose music 
 - Python 3.5
 
 Clone Python MIDI (https://github.com/vishnubob/python-midi)
-'cd python-midi'
+`cd python-midi`
 then install using
 `python3 setup.py install`.
 
