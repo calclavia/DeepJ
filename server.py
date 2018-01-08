@@ -74,7 +74,7 @@ def stream():
     else:
         gen_style = None
 
-    seq_len = max(min(int(request.args.get('length', 500)), 100000), 0)
+    seq_len = max(min(int(request.args.get('length', 1000)), 10000), 1000)
 
     if 'seed' in request.args:
         # TODO: This may not work for multithreading?
@@ -89,7 +89,7 @@ def stream():
     mid_fname = os.path.join(folder, '{}.mid'.format(uuid))
 
     logger.info('Generating MIDI')
-    seq = Generation(model, style=gen_style, default_temp=0.95).generate(seq_len=seq_len, show_progress=False)         
+    seq = Generation(model, style=gen_style, default_temp=0.9).generate(seq_len=seq_len, show_progress=False)         
     track_builder = TrackBuilder(iter(seq), tempo=mido.bpm2tempo(90))
     track_builder.run()
     midi_file = track_builder.export()
@@ -110,7 +110,7 @@ def stream():
     ], stdout=subprocess.PIPE)
 
     # Convert to MP3
-    lame_proc = subprocess.Popen(['lame', '-q', '2', '-r', '-'], stdin=fsynth_proc.stdout, stdout=subprocess.PIPE)
+    lame_proc = subprocess.Popen(['lame', '-q', '5', '-r', '-'], stdin=fsynth_proc.stdout, stdout=subprocess.PIPE)
 
     logger.info('Streaming data')
     data, err = lame_proc.communicate()

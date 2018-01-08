@@ -12,6 +12,16 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.0.5/howler.core.min.js"></script>
         <script type="text/javascript" src="https://cdn.rawgit.com/JulianLaval/canvas-particle-network/7cfd75c6/particle-network.min.js"></script>
         <script type="text/javascript" src="{{ url_for('static', filename='index.js') }}"></script>
+
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=UA-40019379-4"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-40019379-4');
+        </script>
     </head>
     <body>
         <div id="particle-canvas"></div>
@@ -46,6 +56,7 @@
             -->
             <div class="caption">
                 <p>DeepJ is an artificial intelligence that composes classical music in real time.</p>
+                <small>Due to high traffic volume, music may take some time to generate.</small>
             </div>
         </div>
     </body>
