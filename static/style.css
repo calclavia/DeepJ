@@ -222,3 +222,6 @@ input[type=range]:focus::-ms-fill-upper {
     }
   }
   
+  a, a:hover {
+      color: #5382ca;
+  }
