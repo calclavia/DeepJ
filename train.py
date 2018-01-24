@@ -114,7 +114,7 @@ def train_step(model, data, optimizer):
 
     # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
     # Reference: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
-    torch.nn.utils.clip_grad_norm(model.parameters(), GRADIENT_CLIP)
+    # torch.nn.utils.clip_grad_norm(model.parameters(), GRADIENT_CLIP)
 
     optimizer.step()
 
@@ -155,6 +155,10 @@ def main():
 
     if torch.cuda.is_available():
         model.cuda()
+
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    print('Number of trainable parameters: {}'.format(params))
 
     if args.path:
         model.load_state_dict(torch.load(args.path))
