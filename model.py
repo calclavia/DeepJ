@@ -47,9 +47,11 @@ class DeepJ(nn.Module):
             states = [None for _ in range(self.num_layers)]
 
         for l, rnn in enumerate(self.rnns):
+            prev_x = x
             x, states[l] = rnn(x, states[l])
-            # Style integration
-            # x = x + style[:, l * self.num_units:(l + 1) * self.num_units].unsqueeze(1).expand(-1, seq_len, -1)
+
+            if l > 0:
+                x = prev_x + x
 
         x = self.output_linear(x)
         return x, states
