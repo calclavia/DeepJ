@@ -41,6 +41,10 @@ def main():
 
     t = tqdm(zip(*data), total=len(data[0]))
     for seq, style in t:
+        # Trim sequence to be power of 2
+        trim_len = 2 ** int(np.log2(seq.size(0))) + 1
+        seq = seq[:trim_len]
+        
         # Feed entire sequence in and get the log probability of the correct tokens
         styles = var(to_torch(one_hot(style, NUM_STYLES)), volatile=True).unsqueeze(0)
 
