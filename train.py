@@ -63,8 +63,6 @@ def train(model, train_batcher, train_len, val_batcher, val_len, optimizer, plot
         step = 1
         total_loss = 0
 
-        v_gen = val_batcher()
-
         with tqdm(range(val_len)) as t:
             t.set_description('Validation {}'.format(epoch))
 
