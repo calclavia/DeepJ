@@ -136,7 +136,7 @@ def compute_loss(model, data, volatile=False):
     output, _ = model(inputs, styles, None)
 
     # Compute the loss.
-    loss = criterion(output.view(-1, NUM_ACTIONS), targets.view(-1))
+    loss = criterion(output.view(-1, NUM_ACTIONS), targets.contiguous().view(-1))
 
     return loss, loss.data[0]
 
