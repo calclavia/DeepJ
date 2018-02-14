@@ -3,7 +3,13 @@ import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+import matplotlib
+if os.environ.get('DISPLAY','') == '':
+    print('no display found. Using non-interactive Agg backend')
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 import numpy as np
 import argparse
