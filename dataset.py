@@ -10,6 +10,7 @@ import math
 import random
 from tqdm import tqdm
 import multiprocessing
+import itertools
 
 from constants import *
 from midi_io import load_midi
@@ -87,8 +88,19 @@ def sampler(data):
     def sample(seq_len):
         # Pick random sequence
         seq_id = random.randint(0, len(seqs) - 1)
+        seq = seqs[seq_id]
+        # Pick random start index
+        start_index = random.randint(0, len(seq) - 1 - seq_len * 2)
+        seq = seq[start_index:]
+        # Apply random augmentations
+        seq = augment(seq)
+        # Take first N elements. After augmentation seq len changes.
+        seq = itertools.islice(seq, seq_len)
+        seq = gen_to_tensor(seq)
+        assert seq.size() == (seq_len,), seq.size()
+
         return (
-            gen_to_tensor(augment(random_subseq(seqs[seq_id], seq_len))),
+            seq,
             # Need to retain the tensor object. Hence slicing is used.
             torch.LongTensor(style_tags[seq_id:seq_id+1])
         )
@@ -103,15 +115,41 @@ def batcher(sampler, batch_size, seq_len=SEQ_LEN):
         return [torch.stack(x) for x in zip(*batch)]
     return batch 
 
-def random_subseq(sequence, seq_len):
-    """ Randomly creates a subsequence from the sequence """
-    index = random.randint(0, len(sequence) - 1 - seq_len)
-    return sequence[index:index + seq_len]
+def stretch_sequence(sequence, stretch_scale):
+    """ Iterate through sequence and stretch each time shift event by a factor """
+    # Accumulated time in seconds
+    time_sum = 0
+    seq_len = 0
+    for i, evt in enumerate(sequence):
+        if evt >= TIME_OFFSET and evt < VEL_OFFSET:
+            # This is a time shift event
+            # Convert time event to number of seconds
+            # Then, accumulate the time
+            time_sum += convert_time_evt_to_sec(evt)
+        else:
+            if i > 0:
+                # Once there is a non time shift event, we take the
+                # buffered time and add it with time stretch applied.
+                for x in seconds_to_events(time_sum * stretch_scale):
+                    yield x
+                # Reset tracking variables
+                time_sum = 0
+            seq_len += 1
+            yield evt
 
-def augment(sequence):
-    """
-    Takes a sequence of events and randomly perform augmentations.
-    """
+    # Edge case where last events are time shift events
+    if time_sum > 0:
+        for x in seconds_to_events(time_sum * stretch_scale):
+            seq_len += 1
+            yield x
+
+    # Pad sequence with empty events if seq len not enough
+    if seq_len < SEQ_LEN:
+        for x in range(SEQ_LEN - seq_len):
+            yield TIME_OFFSET
+            
+def transpose(sequence):
+    """ A generator that represents the sequence. """
     # Transpose by 4 semitones at most
     transpose = random.randint(-4, 4)
 
@@ -120,3 +158,11 @@ def augment(sequence):
 
     # Perform transposition (consider only notes)
     return (evt + transpose if evt < TIME_OFFSET else evt for evt in sequence)
+
+def augment(sequence):
+    """
+    Takes a sequence of events and randomly perform augmentations.
+    """
+    sequence = transpose(sequence)
+    sequence = stretch_sequence(sequence, random.uniform(1.0, 1.25))
+    return sequence
