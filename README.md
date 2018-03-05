@@ -18,3 +18,19 @@ pip install -r requirements.txt
 ```
 
 The dataset is not provided in this repository. To train a custom model, you will need to include a MIDI dataset in the `data/` folder.
+
+## Usage
+To train a new model, run the following command:
+```
+python train.py
+```
+
+To generate music, run the following command:
+```
+python generate.py
+```
+
+Use the help command to see CLI arguments:
+```
+python generate.py --help
+```
