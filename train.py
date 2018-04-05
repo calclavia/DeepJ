@@ -18,7 +18,7 @@ import random
 from dataset import *
 from constants import *
 from util import *
-from model import DeepJ
+from model import DeepJ, AutoEncoder
 from midi_io import save_midi
 
 criterion = nn.CrossEntropyLoss()
@@ -135,7 +135,8 @@ def compute_loss(model, data, volatile=False):
     # Feed it to the model
     inputs = var(one_hot_seq(note_seq[:, :-1], NUM_ACTIONS), volatile=volatile)
     targets = var(note_seq[:, 1:], volatile=volatile)
-    output, _ = model(inputs, styles, None)
+    # output, _ = model(inputs, styles, None)
+    output = model(inputs)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
@@ -155,7 +156,7 @@ def main():
     args.fp16 = not args.no_fp16
 
     print('=== Loading Model ===')
-    model = DeepJ()
+    model = AutoEncoder()
 
     if torch.cuda.is_available():
         model.cuda()

@@ -6,6 +6,65 @@ from constants import *
 from util import *
 import numpy as np
 
+class EncoderRNN(nn.Module):
+    def __init__(self, hidden_size, num_layers):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.encoder = nn.LSTM(NUM_ACTIONS, hidden_size, num_layers, batch_first=True)
+        self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
+
+    def forward(self, x):
+        x, hidden = self.encoder(x)
+        x = self.output_linear(x)
+        return x
+
+class DecoderRNN(nn.Module):
+    def __init__(self, hidden_size, num_layers):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.decoder = nn.LSTM(NUM_ACTIONS, hidden_size, num_layers, batch_first=True)
+        self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
+
+    def forward(self, x):
+        x, hidden = self.decoder(x)
+        x = self.output_linear(x)
+        return x
+
+class AutoEncoder(nn.Module):
+    def __init__(self, hidden_size=512, num_layers=4):
+        super().__init__()
+        self.encoder = EncoderRNN(hidden_size, num_layers)
+        self.decoder = DecoderRNN(hidden_size, num_layers)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+# class AutoEncoder(nn.Module):
+#     """
+#     A simple autoencoder
+#     """
+#     def __init__(self, num_units=512, num_layers=4):
+#         super().__init__()
+#         self.num_units = num_units
+#         self.num_layers = num_layers
+#         self.encoder = nn.LSTM(NUM_ACTIONS, num_units, num_layers, batch_first=True)
+#         self.decoder = nn.LSTM(NUM_ACTIONS, num_units, num_layers, batch_first=True)
+#         self.output_linear_enc = nn.Linear(self.num_units, NUM_ACTIONS)
+#         self.output_linear_dec = nn.Linear(self.num_units, NUM_ACTIONS)
+    
+#     def forward(self, x, states):
+#         x, states = self.encoder(x)
+#         x = self.output_linear_enc(x)
+#         x, states = self.decoder(x)
+#         x = self.output_linear_dec(x)
+#         return x, states
+
 class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
