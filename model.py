@@ -16,9 +16,10 @@ class EncoderRNN(nn.Module):
         self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
 
     def forward(self, x):
-        x, hidden = self.encoder(x)
+        x, states = self.encoder(x)
         x = self.output_linear(x)
-        return x
+        # Extract last vector of NN as the latent vector (no temporal dimension)
+        return x[:,-1:]
 
 class DecoderRNN(nn.Module):
     def __init__(self, hidden_size, num_layers):
@@ -30,8 +31,9 @@ class DecoderRNN(nn.Module):
         self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
 
     def forward(self, x):
-        x, hidden = self.decoder(x)
+        x, states = self.decoder(x)
         x = self.output_linear(x)
+        # x = x.expand(-1, 1024, -1)
         return x
 
 class AutoEncoder(nn.Module):
@@ -45,25 +47,35 @@ class AutoEncoder(nn.Module):
         x = self.decoder(x)
         return x
 
-# class AutoEncoder(nn.Module):
-#     """
-#     A simple autoencoder
-#     """
-#     def __init__(self, num_units=512, num_layers=4):
-#         super().__init__()
-#         self.num_units = num_units
-#         self.num_layers = num_layers
-#         self.encoder = nn.LSTM(NUM_ACTIONS, num_units, num_layers, batch_first=True)
-#         self.decoder = nn.LSTM(NUM_ACTIONS, num_units, num_layers, batch_first=True)
-#         self.output_linear_enc = nn.Linear(self.num_units, NUM_ACTIONS)
-#         self.output_linear_dec = nn.Linear(self.num_units, NUM_ACTIONS)
+    def generate(self, x, states):
+        # Create random latent vector
+        x = self.decoder(x)
+        seq_len = x.size(1)
+        x = x.view(-1, NUM_ACTIONS)
+        x = F.softmax(x / temperature, dim=1)
+        x = x.view(-1, seq_len, NUM_ACTIONS)
+        return x, states
+
+class AutoEncoder2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(NUM_ACTIONS, 64),
+            nn.ReLU(True),
+            nn.Linear(64, 32),
+            nn.ReLU(True)
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(32, 64),
+            nn.ReLU(True),
+            nn.Linear(64, NUM_ACTIONS),
+            nn.Tanh()
+        )
     
-#     def forward(self, x, states):
-#         x, states = self.encoder(x)
-#         x = self.output_linear_enc(x)
-#         x, states = self.decoder(x)
-#         x = self.output_linear_dec(x)
-#         return x, states
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
 
 class DeepJ(nn.Module):
     """

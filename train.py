@@ -18,7 +18,7 @@ import random
 from dataset import *
 from constants import *
 from util import *
-from model import DeepJ, AutoEncoder
+from model import DeepJ, AutoEncoder, AutoEncoder2
 from midi_io import save_midi
 
 criterion = nn.CrossEntropyLoss()
@@ -141,7 +141,7 @@ def compute_loss(model, data, volatile=False):
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
     # Otherwise, it will result in 0 gradient.
-    loss = criterion(output.view(-1, NUM_ACTIONS).float(), targets.contiguous().view(-1))
+    loss = criterion(output.contiguous().view(-1, NUM_ACTIONS).float(), targets.contiguous().view(-1))
 
     return loss, loss.data[0]
 
