@@ -7,75 +7,49 @@ from util import *
 import numpy as np
 
 class EncoderRNN(nn.Module):
-    def __init__(self, hidden_size, num_layers):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+    def __init__(self, input_size, hidden_size):
+        super(EncoderRNN, self).__init__()
+        # self.hidden_size = hidden_size
+        # self.num_layers = num_layers
 
-        self.encoder = nn.LSTM(NUM_ACTIONS, hidden_size, num_layers, batch_first=True)
-        self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
+        self.encoder = nn.LSTM(input_size, hidden_size, batch_first=True)
+        # self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
 
-    def forward(self, x):
-        x, states = self.encoder(x)
-        x = self.output_linear(x)
+    def forward(self, x, hidden=None):
+        x, hidden = self.encoder(x, hidden)
+        # x = self.output_linear(x)
         # Extract last vector of NN as the latent vector (no temporal dimension)
-        return x[:,-1:]
+        # return x[:,-1:]
+        return x, hidden
+
 
 class DecoderRNN(nn.Module):
-    def __init__(self, hidden_size, num_layers):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+    def __init__(self, hidden_size, output_size):
+        super(DecoderRNN, self).__init__()
+        # self.hidden_size = hidden_size
+        # self.num_layers = num_layers
 
-        self.decoder = nn.LSTM(NUM_ACTIONS, hidden_size, num_layers, batch_first=True)
-        self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
+        self.decoder = nn.LSTM(hidden_size, hidden_size, batch_first=True)
+        self.out = nn.Linear(hidden_size, output_size)
 
-    def forward(self, x):
-        x, states = self.decoder(x)
-        x = self.output_linear(x)
-        # x = x.expand(-1, 1024, -1)
-        return x
+    def forward(self, x, hidden=None):
+        x, hidden = self.decoder(x, hidden)
+        x = self.out(x)
+        return x, hidden
+
 
 class AutoEncoder(nn.Module):
-    def __init__(self, hidden_size=512, num_layers=4):
-        super().__init__()
-        self.encoder = EncoderRNN(hidden_size, num_layers)
-        self.decoder = DecoderRNN(hidden_size, num_layers)
+    def __init__(self, hidden_size=512):
+        super(AutoEncoder, self).__init__()
+        self.encoder = EncoderRNN(NUM_ACTIONS, hidden_size)
+        self.decoder = DecoderRNN(hidden_size, NUM_ACTIONS)
 
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+    def forward(self, x, hidden=None):
+        # Encoder output is the latent vector
+        encoder_output, encoder_hidden = self.encoder(x, hidden)
+        decoder_output, decoder_hidden = self.decoder(encoder_output, encoder_hidden)
+        return x, decoder_hidden
 
-    def generate(self, x, states):
-        # Create random latent vector
-        x = self.decoder(x)
-        seq_len = x.size(1)
-        x = x.view(-1, NUM_ACTIONS)
-        x = F.softmax(x / temperature, dim=1)
-        x = x.view(-1, seq_len, NUM_ACTIONS)
-        return x, states
-
-class AutoEncoder2(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(NUM_ACTIONS, 64),
-            nn.ReLU(True),
-            nn.Linear(64, 32),
-            nn.ReLU(True)
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(32, 64),
-            nn.ReLU(True),
-            nn.Linear(64, NUM_ACTIONS),
-            nn.Tanh()
-        )
-    
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
 
 class DeepJ(nn.Module):
     """
@@ -135,6 +109,7 @@ class DeepJ(nn.Module):
         x = F.softmax(x / temperature, dim=1)
         x = x.view(-1, seq_len, NUM_ACTIONS)
         return x, states
+
 
 class DilatedRNN(nn.Module):
     """ https://arxiv.org/pdf/1710.02224.pdf """
