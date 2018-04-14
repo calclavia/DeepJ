@@ -22,7 +22,7 @@ from util import *
 from model import DeepJ, AutoEncoder
 from midi_io import save_midi
 
-criterion = nn.MSELoss()
+criterion = nn.CrossEntropyLoss()
 
 def plot_loss(training_loss, validation_loss, name):
     # Draw graph
@@ -134,15 +134,14 @@ def compute_loss(model, data, volatile=False):
     # styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
 
     # Feed it to the model
-    inputs = var(one_hot_seq(note_seq[:, :-1], NUM_ACTIONS), volatile=volatile)
-    # targets = var(note_seq[:, 1:], volatile=volatile)
-    # output, _ = model(inputs, styles, None)
+    inputs = var(one_hot_seq(note_seq, NUM_ACTIONS), volatile=volatile)
+    targets = var(note_seq, volatile=volatile)
     output, _ = model(inputs, None)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
     # Otherwise, it will result in 0 gradient.
-    loss = criterion(output.contiguous().view(-1).float(), inputs.contiguous().view(-1).float())
+    loss = criterion(output.view(-1, NUM_ACTIONS).float(), targets.contiguous().view(-1))
 
     return loss, loss.data[0]
 

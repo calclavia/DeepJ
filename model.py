@@ -9,14 +9,14 @@ import numpy as np
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size):
         super(EncoderRNN, self).__init__()
-        # self.hidden_size = hidden_size
+        self.hidden_size = hidden_size
         # self.num_layers = num_layers
 
-        self.encoder = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
         # self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
 
     def forward(self, x, hidden=None):
-        x, hidden = self.encoder(x, hidden)
+        x, hidden = self.lstm(x, hidden)
         # x = self.output_linear(x)
         # Extract last vector of NN as the latent vector (no temporal dimension)
         # return x[:,-1:]
@@ -26,14 +26,14 @@ class EncoderRNN(nn.Module):
 class DecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size):
         super(DecoderRNN, self).__init__()
-        # self.hidden_size = hidden_size
+        self.hidden_size = hidden_size
         # self.num_layers = num_layers
 
-        self.decoder = nn.LSTM(hidden_size, hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(hidden_size, hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, hidden=None):
-        x, hidden = self.decoder(x, hidden)
+        x, hidden = self.lstm(x, hidden)
         x = self.out(x)
         return x, hidden
 
@@ -47,7 +47,8 @@ class AutoEncoder(nn.Module):
     def forward(self, x, hidden=None):
         # Encoder output is the latent vector
         encoder_output, encoder_hidden = self.encoder(x, hidden)
-        decoder_output, decoder_hidden = self.decoder(encoder_output, encoder_hidden)
+        decoder_hidden = encoder_hidden
+        decoder_output, decoder_hidden = self.decoder(encoder_output, decoder_hidden)
         return x, decoder_hidden
 
 
