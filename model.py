@@ -7,7 +7,7 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, hidden_size=1024, latent_size=256):
+    def __init__(self, hidden_size=1024, latent_size=128):
         super().__init__()
         self.latent_size = latent_size
         self.embd = nn.Embedding(NUM_ACTIONS, hidden_size)

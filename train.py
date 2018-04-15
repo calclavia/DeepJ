@@ -24,7 +24,7 @@ from midi_io import save_midi
 
 criterion = nn.CrossEntropyLoss()
 
-def plot_loss(training_loss, validation_loss, name):
+def plot_graph(training_loss, validation_loss, name):
     # Draw graph
     plt.clf()
     plt.plot(training_loss)
@@ -40,50 +40,53 @@ def train(args, model, train_batcher, train_len, val_batcher, val_len, optimizer
     total_step = 1
 
     # Keep tracks of all losses in each epoch
-    train_losses = []
-    val_losses = []
+    train_metrics = []
+    val_metrics = []
 
     # Epoch loop
     while True:
         # Training
         step = 1
-        total_loss = 0
+        total_metrics = 0
 
         with tqdm(range(train_len)) as t:
             t.set_description('Epoch {}'.format(epoch))
             
             for _ in t:
                 data = train_batcher()
-                loss = train_step(model, data, optimizer)
+                metrics = train_step(model, data, optimizer)
 
-                total_loss += loss
-                avg_loss = total_loss / step
-                t.set_postfix(loss=avg_loss)
+                total_metrics += metrics
+                avg_metrics = total_metrics / step
+                t.set_postfix(ce=avg_metrics[0], kl=avg_metrics[1], loss=sum(avg_metrics))
 
                 step += 1
                 total_step += 1
 
-        train_losses.append(avg_loss)
+        train_metrics.append(avg_metrics)
 
         # Validation
         step = 1
-        total_loss = 0
+        total_metrics = 0
 
         with tqdm(range(val_len)) as t:
             t.set_description('Validation {}'.format(epoch))
 
             for _ in t:
                 data = val_batcher()
-                loss = val_step(model, data)
-                total_loss += loss
-                avg_loss = total_loss / step
-                t.set_postfix(loss=avg_loss)
+                metrics = val_step(model, data)
+                total_metrics += metrics
+                avg_metrics = total_metrics / step
+                t.set_postfix(ce=avg_metrics[0], kl=avg_metrics[1], loss=sum(avg_metrics))
+
                 step += 1
             
-        val_losses.append(avg_loss)
+        val_metrics.append(avg_metrics)
 
         if plot:
-            plot_loss(train_losses, val_losses, 'loss.png')
+            plot_graph([sum(m) for m in train_metrics], [sum(m) for m in val_metrics], 'loss.png')
+            for i, name in enumerate(['ce_loss.png', 'kl_loss.png']):
+                plot_graph(list(zip(*train_metrics))[i], list(zip(*val_metrics))[i], name)
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
@@ -96,7 +99,7 @@ def train_step(model, data, optimizer):
     """
     model.train()
 
-    loss, avg_loss = compute_loss(model, data)
+    loss, metrics = compute_loss(model, data)
     
     # Scale the loss
     loss = loss * SCALE_FACTOR
@@ -119,7 +122,7 @@ def train_step(model, data, optimizer):
 
     # Copy the parameters back into the model
     copy_in_params(model, param_copy)
-    return avg_loss
+    return metrics
 
 def val_step(model, data):
     model.eval()
@@ -141,13 +144,13 @@ def compute_loss(model, data, volatile=False):
     # Note that we need to convert this back into a float because it is a large summation.
     # Otherwise, it will result in 0 gradient.
     # https://github.com/timbmg/Sentence-VAE/blob/master/train.py#L68
-    cel_loss = criterion(output.view(-1, NUM_ACTIONS).float(), note_seq[:, 1:].contiguous().view(-1))
+    ce_loss = criterion(output.view(-1, NUM_ACTIONS).float(), note_seq[:, 1:].contiguous().view(-1))
     mean = mean.float()
     logvar = logvar.float()
-    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
-    loss = cel_loss + kl_loss / batch_size
+    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp()) / batch_size
+    loss = ce_loss + kl_loss
 
-    return loss, loss.data[0]
+    return loss, np.array([ce_loss.data[0], kl_loss.data[0]])
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
