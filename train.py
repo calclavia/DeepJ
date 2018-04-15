@@ -134,14 +134,13 @@ def compute_loss(model, data, volatile=False):
     # styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
 
     # Feed it to the model
-    inputs = var(one_hot_seq(note_seq, NUM_ACTIONS), volatile=volatile)
-    targets = var(note_seq, volatile=volatile)
-    output, _ = model(inputs, None)
+    note_seq = var(note_seq, volatile=volatile)
+    output, _ = model(note_seq, None)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
     # Otherwise, it will result in 0 gradient.
-    loss = criterion(output.view(-1, NUM_ACTIONS).float(), targets.contiguous().view(-1))
+    loss = criterion(output.view(-1, NUM_ACTIONS).float(), note_seq[:, 1:].contiguous().view(-1))
 
     return loss, loss.data[0]
 
@@ -163,8 +162,8 @@ def main():
 
         if args.fp16:
             # Wrap forward method
-            fwd = model.forward
-            model.forward = lambda x, style, states: fwd(x.half(), style.half(), states)
+            # fwd = model.forward
+            # model.forward = lambda x, states: fwd(x.half(), states)
             model.half()
 
     if args.path:

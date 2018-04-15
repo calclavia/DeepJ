@@ -8,26 +8,20 @@ import numpy as np
 
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size):
-        super(EncoderRNN, self).__init__()
+        super().__init__()
         self.hidden_size = hidden_size
-        # self.num_layers = num_layers
 
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(hidden_size, hidden_size, batch_first=True)
         # self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
 
     def forward(self, x, hidden=None):
         x, hidden = self.lstm(x, hidden)
-        # x = self.output_linear(x)
-        # Extract last vector of NN as the latent vector (no temporal dimension)
-        # return x[:,-1:]
         return x, hidden
-
 
 class DecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size):
-        super(DecoderRNN, self).__init__()
+        super().__init__()
         self.hidden_size = hidden_size
-        # self.num_layers = num_layers
 
         self.lstm = nn.LSTM(hidden_size, hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, output_size)
@@ -40,16 +34,18 @@ class DecoderRNN(nn.Module):
 
 class AutoEncoder(nn.Module):
     def __init__(self, hidden_size=512):
-        super(AutoEncoder, self).__init__()
+        super().__init__()
+        self.embd = nn.Embedding(NUM_ACTIONS, hidden_size)
         self.encoder = EncoderRNN(NUM_ACTIONS, hidden_size)
         self.decoder = DecoderRNN(hidden_size, NUM_ACTIONS)
 
     def forward(self, x, hidden=None):
+        # Project to dense representation
+        x = self.embd(x)
         # Encoder output is the latent vector
-        encoder_output, encoder_hidden = self.encoder(x, hidden)
-        decoder_hidden = encoder_hidden
-        decoder_output, decoder_hidden = self.decoder(encoder_output, decoder_hidden)
-        return x, decoder_hidden
+        _, encoder_hidden = self.encoder(x, hidden)
+        decoder_output, decoder_hidden = self.decoder(x[:, :-1], encoder_hidden)
+        return decoder_output, decoder_hidden
 
 
 class DeepJ(nn.Module):
