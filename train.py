@@ -19,7 +19,7 @@ import random
 from dataset import *
 from constants import *
 from util import *
-from model import DeepJ, AutoEncoder
+from model import DeepJ
 from midi_io import save_midi
 
 criterion = nn.CrossEntropyLoss()
@@ -131,16 +131,21 @@ def compute_loss(model, data, volatile=False):
     """
     # Convert all tensors into variables
     note_seq, styles = data
-    # styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
 
     # Feed it to the model
     note_seq = var(note_seq, volatile=volatile)
-    output, _ = model(note_seq, None)
+    batch_size = note_seq.size(0)
+    output, mean, logvar = model(note_seq, None)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
     # Otherwise, it will result in 0 gradient.
-    loss = criterion(output.view(-1, NUM_ACTIONS).float(), note_seq[:, 1:].contiguous().view(-1))
+    # https://github.com/timbmg/Sentence-VAE/blob/master/train.py#L68
+    cel_loss = criterion(output.view(-1, NUM_ACTIONS).float(), note_seq[:, 1:].contiguous().view(-1))
+    mean = mean.float()
+    logvar = logvar.float()
+    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+    loss = cel_loss + kl_loss / batch_size
 
     return loss, loss.data[0]
 
@@ -155,7 +160,7 @@ def main():
     args.fp16 = not args.no_fp16
 
     print('=== Loading Model ===')
-    model = AutoEncoder()
+    model = DeepJ()
 
     if torch.cuda.is_available():
         model.cuda()

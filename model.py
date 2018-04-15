@@ -6,151 +6,74 @@ from constants import *
 from util import *
 import numpy as np
 
-class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size):
+class DeepJ(nn.Module):
+    def __init__(self, hidden_size=1024, latent_size=256):
         super().__init__()
-        self.hidden_size = hidden_size
-
-        self.lstm = nn.LSTM(hidden_size, hidden_size, batch_first=True)
-        # self.output_linear = nn.Linear(hidden_size, NUM_ACTIONS)
-
-    def forward(self, x, hidden=None):
-        x, hidden = self.lstm(x, hidden)
-        return x, hidden
-
-class DecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size):
-        super().__init__()
-        self.hidden_size = hidden_size
-
-        self.lstm = nn.LSTM(hidden_size, hidden_size, batch_first=True)
-        self.out = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x, hidden=None):
-        x, hidden = self.lstm(x, hidden)
-        x = self.out(x)
-        return x, hidden
-
-
-class AutoEncoder(nn.Module):
-    def __init__(self, hidden_size=512):
-        super().__init__()
+        self.latent_size = latent_size
         self.embd = nn.Embedding(NUM_ACTIONS, hidden_size)
-        self.encoder = EncoderRNN(NUM_ACTIONS, hidden_size)
-        self.decoder = DecoderRNN(hidden_size, NUM_ACTIONS)
+        self.encoder = EncoderRNN(hidden_size, hidden_size, latent_size)
+        self.decoder = DecoderRNN(hidden_size, latent_size, hidden_size, NUM_ACTIONS)
 
     def forward(self, x, hidden=None):
+        batch_size = x.size(0)
         # Project to dense representation
         x = self.embd(x)
         # Encoder output is the latent vector
-        _, encoder_hidden = self.encoder(x, hidden)
-        decoder_output, decoder_hidden = self.decoder(x[:, :-1], encoder_hidden)
-        return decoder_output, decoder_hidden
+        mean, logvar, _ = self.encoder(x, hidden)
+        std = torch.exp(0.5 * logvar)
+        
+        # Generate random latent vector
+        z = Variable(torch.randn([batch_size, self.latent_size]))
+        z = z.type(type(x.data))
 
+        if x.is_cuda:
+            z = z.cuda()
 
-class DeepJ(nn.Module):
-    """
-    The DeepJ neural network model architecture.
-    """
-    def __init__(self, num_units=512, num_layers=4, style_units=32):
+        z = z * std + mean
+
+        decoder_output, _ = self.decoder(x[:, :-1], z)
+        return decoder_output, mean, logvar
+
+class EncoderRNN(nn.Module):
+    def __init__(self, input_size, hidden_size, latent_size, num_layers=1):
         super().__init__()
-        self.num_units = num_units
+        self.hidden_size = hidden_size
+        self.latent_size = latent_size
+        # TODO: Use bidirectional? Might not matter...
+        self.rnn = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        self.latent_projection = nn.Linear(hidden_size * num_layers, latent_size * 2)
+
+    def forward(self, x, hidden=None):
+        """
+        Takes in a sequence of inputs and encodes them into mean and log variance.
+        Return: (Mean, SD, Hidden)
+        """
+        _, hidden = self.rnn(x, hidden)
+        
+        # Project hidden state to latent vector
+        x = hidden.view(-1, self.hidden_size)
+        x = self.latent_projection(x)
+
+        return x[:, :self.latent_size], x[:, self.latent_size:], hidden
+
+class DecoderRNN(nn.Module):
+    def __init__(self, input_size, latent_size, hidden_size, output_size, num_layers=1):
+        super().__init__()
+        self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.style_units = style_units
 
-        # RNN
-        self.rnns = [
-            nn.GRU(NUM_ACTIONS + style_units, num_units, 2, batch_first=True) if i == 0 else 
-            DilatedRNN(nn.GRU(num_units, num_units, batch_first=True), 2 ** i)
-            for i in range(num_layers)
-        ]
+        self.latent_projection = nn.Linear(latent_size, hidden_size * num_layers)
+        self.rnn = nn.GRU(input_size, hidden_size, batch_first=True)
+        self.out = nn.Linear(hidden_size, output_size)
 
-        self.output_linear = nn.Linear(self.num_units, NUM_ACTIONS)
+    def forward(self, x, latent=None, hidden=None):
+        assert (latent is None and hidden is not None) or (hidden is None and latent is not None)
+        # Project the latent vector to a size consumable by the GRU's memory
+        if hidden is None:
+            latent = self.latent_projection(latent)
+            latent = latent.view(self.num_layers, -1, self.hidden_size)
+            hidden = latent
 
-        for i, rnn in enumerate(self.rnns):
-            self.add_module('rnn_' + str(i), rnn)
-
-        # Style
-        self.style_linear = nn.Linear(NUM_STYLES, self.style_units)
-        # self.style_layer = nn.Linear(self.style_units, self.num_units * self.num_layers)
-
-    def forward(self, x, style, states=None):
-        batch_size = x.size(0)
-        seq_len = x.size(1)
-
-        # Distributed style representation
-        style = self.style_linear(style)
-        # style = F.tanh(self.style_layer(style))
-        style = style.unsqueeze(1).expand(batch_size, seq_len, self.style_units)
-        x = torch.cat((x, style), dim=2)
-
-        ## Process RNN ##
-        if states is None:
-            states = [None for _ in range(self.num_layers)]
-
-        for l, rnn in enumerate(self.rnns):
-            prev_x = x
-            x, states[l] = rnn(x, states[l])
-
-            if l > 0:
-                x = prev_x + x
-
-        x = self.output_linear(x)
-        return x, states
-
-    def generate(self, x, style, states, temperature=1):
-        """ Returns the probability of outputs """
-        x, states = self.forward(x, style, states)
-        seq_len = x.size(1)
-        x = x.view(-1, NUM_ACTIONS)
-        x = F.softmax(x / temperature, dim=1)
-        x = x.view(-1, seq_len, NUM_ACTIONS)
-        return x, states
-
-
-class DilatedRNN(nn.Module):
-    """ https://arxiv.org/pdf/1710.02224.pdf """
-    def __init__(self, wrap_rnn, dilation=1):
-        """
-        Args:
-            wrap_rnn: The RNN module to wrap.
-            dilation: The dilation factor
-        """
-        super().__init__()
-        assert wrap_rnn.batch_first
-        self.rnn = wrap_rnn
-        self.dilation = dilation
-    
-    def forward(self, x, states):
-        """
-        Args:
-            x: A sequence of features [batch, seq_len, features]
-        """
-        # The number of dilation = the number of parallelism that can be achieved.
-        # Move the additional parallels into batch dimension
-        batch_size = x.size(0)
-        seq_len = x.size(1)
-        if seq_len == 1:
-            # Single step requires us to store which step we are on.
-            if states is None:
-                # Each memory tensor corresponds to a dilation.
-                states = (0, tuple(None for _ in range(self.dilation)))
-            step, memories = states
-            memory_id = step % self.dilation
-            x, memory = self.rnn(x, memories[memory_id])
-            states = (step + 1, memories[:memory_id] + (memory,) + memories[memory_id + 1:])
-            return x, states
-
-        # Taking in a full sequence
-        assert seq_len % self.dilation == 0, seq_len
-        x = x.unfold(1, self.dilation, self.dilation)
-        x = x.permute(0, 3, 1, 2)
-        x = x.contiguous().view(batch_size * self.dilation, seq_len // self.dilation, -1)
-        x, states = self.rnn(x, states)
-        # X is now [batch * dilation, seq_len//dilation, features]
-        # We want to restore it back into [batch, seq_len, features]
-        # But we can't simply reshape it, because that messes up the order.
-        x = x.contiguous().view(batch_size, self.dilation, seq_len // self.dilation, -1)
-        x = x.permute(0, 2, 1, 3)
-        x = x.contiguous().view(batch_size, seq_len, -1)
-        return x, states
+        x, hidden = self.rnn(x, hidden)
+        x = self.out(x)
+        return x, hidden

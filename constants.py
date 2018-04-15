@@ -24,7 +24,7 @@ SEQ_LEN = 1024 + 1
 GRADIENT_CLIP = 10
 SCALE_FACTOR = 2 ** 10
 # The number of train generator cycles per sequence
-TRAIN_CYCLES = 1000
+TRAIN_CYCLES = 100
 VAL_CYCLES = int(TRAIN_CYCLES * 0.05)
 
 # Style
