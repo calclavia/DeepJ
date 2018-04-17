@@ -7,7 +7,7 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, hidden_size=512, num_layers=3, latent_size=32):
+    def __init__(self, hidden_size=1024, num_layers=2, latent_size=512):
         super().__init__()
         self.latent_size = latent_size
         self.embd = nn.Embedding(NUM_ACTIONS, hidden_size)
@@ -39,8 +39,7 @@ class EncoderRNN(nn.Module):
         super().__init__()
         self.hidden_size = hidden_size
         self.latent_size = latent_size
-        # TODO: Use bidirectional? Might not matter...
-        self.rnn = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        self.rnn = nn.GRU(input_size, hidden_size // 2, num_layers, batch_first=True, bidirectional=True)
         self.latent_projection = nn.Linear(hidden_size * num_layers, latent_size * 2)
 
     def forward(self, x, hidden=None):
@@ -64,6 +63,7 @@ class DecoderRNN(nn.Module):
 
         self.latent_projection = nn.Linear(latent_size, hidden_size * num_layers)
         self.rnn = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        # TODO: Shared output projection has been shown to improve model.
         self.out = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, latent=None, hidden=None):
