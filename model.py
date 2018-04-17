@@ -7,12 +7,12 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, hidden_size=1024, latent_size=128):
+    def __init__(self, hidden_size=512, num_layers=3, latent_size=32):
         super().__init__()
         self.latent_size = latent_size
         self.embd = nn.Embedding(NUM_ACTIONS, hidden_size)
-        self.encoder = EncoderRNN(hidden_size, hidden_size, latent_size)
-        self.decoder = DecoderRNN(hidden_size, latent_size, hidden_size, NUM_ACTIONS)
+        self.encoder = EncoderRNN(hidden_size, hidden_size, latent_size, num_layers)
+        self.decoder = DecoderRNN(hidden_size, latent_size, hidden_size, NUM_ACTIONS, num_layers)
 
     def forward(self, x, hidden=None):
         batch_size = x.size(0)
@@ -51,7 +51,7 @@ class EncoderRNN(nn.Module):
         _, hidden = self.rnn(x, hidden)
         
         # Project hidden state to latent vector
-        x = hidden.view(-1, self.hidden_size)
+        x = torch.cat(list(hidden), dim=1)
         x = self.latent_projection(x)
 
         return x[:, :self.latent_size], x[:, self.latent_size:], hidden
@@ -63,7 +63,7 @@ class DecoderRNN(nn.Module):
         self.num_layers = num_layers
 
         self.latent_projection = nn.Linear(latent_size, hidden_size * num_layers)
-        self.rnn = nn.GRU(input_size, hidden_size, batch_first=True)
+        self.rnn = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
         self.out = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, latent=None, hidden=None):
@@ -71,7 +71,8 @@ class DecoderRNN(nn.Module):
         # Project the latent vector to a size consumable by the GRU's memory
         if hidden is None:
             latent = self.latent_projection(latent)
-            latent = latent.view(self.num_layers, -1, self.hidden_size)
+            latent = latent.view(-1, self.num_layers, self.hidden_size)
+            latent = latent.permute(1, 0, 2).contiguous()
             hidden = latent
 
         x, hidden = self.rnn(x, hidden)
