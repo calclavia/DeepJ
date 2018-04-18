@@ -7,13 +7,13 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, input_size=512, encoder_size=1024, decoder_size=512, latent_size=512):
+    def __init__(self, input_size=512, encoder_size=512, decoder_size=512, latent_size=512):
         super().__init__()
         self.input_size = input_size
         self.latent_size = latent_size
         self.embd = nn.Embedding(NUM_ACTIONS, input_size)
-        self.encoder = EncoderRNN(input_size, encoder_size, latent_size, 3)
-        self.decoder = DecoderRNN(input_size, latent_size, decoder_size, NUM_ACTIONS, 3)
+        self.encoder = EncoderRNN(input_size, encoder_size, latent_size, 4)
+        self.decoder = DecoderRNN(self.embd, input_size, latent_size, decoder_size, NUM_ACTIONS, 3)
 
     def forward(self, x, hidden=None):
         batch_size = x.size(0)
@@ -37,7 +37,7 @@ class DeepJ(nn.Module):
 
 
 class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, latent_size, num_layers=1):
+    def __init__(self, input_size, hidden_size, latent_size, num_layers):
         super().__init__()
         self.hidden_size = hidden_size
         self.latent_size = latent_size
@@ -59,15 +59,20 @@ class EncoderRNN(nn.Module):
 
 
 class DecoderRNN(nn.Module):
-    def __init__(self, input_size, latent_size, hidden_size, output_size, num_layers=1):
+    def __init__(self, embd, input_size, latent_size, hidden_size, output_size, num_layers):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
         self.latent_projection = nn.Linear(latent_size, hidden_size * num_layers)
         self.rnn = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
-        # TODO: Shared output projection has been shown to improve model.
-        self.out = nn.Linear(hidden_size, output_size)
+        
+        # Tie output embedding with input embd weights to improve regularization
+        # https://arxiv.org/abs/1608.05859 https://arxiv.org/abs/1611.01462
+        self.decoder = nn.Linear(hidden_size, output_size)
+        self.decoder.weight = embd.weight
+
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x, latent=None, hidden=None):
         assert (latent is None and hidden is not None) or (hidden is None and latent is not None)
@@ -78,6 +83,9 @@ class DecoderRNN(nn.Module):
             latent = latent.permute(1, 0, 2).contiguous()
             hidden = latent
 
+        # Auto-regressive input dropout to encourage the use of global hidden state.
+        x = self.dropout(x)
+
         x, hidden = self.rnn(x, hidden)
-        x = self.out(x)
+        x = self.decoder(x)
         return x, hidden
