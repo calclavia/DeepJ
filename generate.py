@@ -20,29 +20,24 @@ class Generation():
     def __init__(self, model):
         self.model = model
 
-    def generate(self, seq_len=1000, show_progress=True):
+    def generate(self, seq_len, show_progress=True):
         self.model.eval()
         r = trange(seq_len) if show_progress else range(seq_len)
 
         seq = []
-        projection = nn.Linear(NUM_ACTIONS, self.model.input_size)
-        # Generate first input for decoder
-        x = Variable(torch.zeros(1, 1, self.model.decoder.hidden_size))
-        # Generate random latent vector
-        z = Variable(torch.rand(1, self.model.latent_size))
-
-        decoder_output, decoder_hidden = self.model.decoder(x, z)
-        # Append chosen event to sequence
-        output_max = torch.max(F.softmax(decoder_output, dim=2), 2)
-        seq.append(output_max[1].squeeze(0).data.numpy()[0])
-
+        # Sample latent vector
+        z = Variable(torch.randn(1, self.model.latent_size))
+        memory = None
+        # Generate starting first token. Input for decoder.
+        x = Variable(torch.LongTensor([[0]]))
+        
         for _ in r:
-            x = projection(decoder_output)
-            z = decoder_hidden[-1]
-            decoder_output, decoder_hidden = self.model.decoder(x, z)
+            logits, memory = self.model.decoder(self.model.embd(x), latent=z, hidden=memory)
+            # Remove latent vector
+            z = None
             # Append chosen event to sequence
-            output_max = torch.max(F.softmax(decoder_output, dim=2), 2)
-            seq.append(output_max[1].squeeze(0).data.numpy()[0])
+            x = torch.max(F.softmax(logits, dim=2), 2)[1]
+            seq.append(x.squeeze(0).data.numpy()[0])
 
         return np.array(seq)
 
