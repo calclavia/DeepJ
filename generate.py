@@ -13,23 +13,30 @@ from constants import *
 from util import *
 from model import DeepJ
 
-class Generation():
+class MusicGenerator():
     """
     Represents a music generation sequence
     """
     def __init__(self, model):
         self.model = model
 
-    def generate(self, seq_len, show_progress=True):
+    def generate(self, seq_len, encode_seq=None, show_progress=True):
         self.model.eval()
         r = trange(seq_len) if show_progress else range(seq_len)
 
         seq = []
-        # Sample latent vector
-        z = Variable(torch.randn(1, self.model.latent_size))
+        
+        if encode_seq is not None:
+            # Use latent vector produced by encoder
+            x = Variable(encode_seq, volatile=True).unsqueeze(0)
+            x = self.model.embd(x)
+            z, _, _ = self.model.encoder(x, None)
+        else:
+            # Sample latent vector
+            z = Variable(torch.randn(1, self.model.latent_size), volatile=True)
         memory = None
         # Generate starting first token. Input for decoder.
-        x = Variable(torch.LongTensor([[0]]))
+        x = Variable(torch.LongTensor([[0]]), volatile=True)
         
         for _ in r:
             logits, memory = self.model.decoder(self.model.embd(x), latent=z, hidden=memory)
@@ -46,7 +53,6 @@ class Generation():
         Export into a MIDI file.
         """
         seq = self.generate(seq_len, show_progress=show_progress)
-        save_midi(name, seq)
 
 
 def main():
@@ -55,6 +61,7 @@ def main():
     parser.add_argument('--model', help='Path to model file')
     parser.add_argument('--length', default=5000, type=int, help='Length of generation')
     parser.add_argument('--synth', default=False, action='store_true', help='Synthesize output in MP3')
+    parser.add_argument('--encode', default=None, type=str, help='Forces the latent vector to encode a sequence')
     args = parser.parse_args()
     
     print('=== Loading Model ===')
@@ -67,13 +74,20 @@ def main():
         model.load_state_dict(torch.load(args.model))
     else:
         print('WARNING: No model loaded! Please specify model path.')
+    
+    encode_seq = None
+    if args.encode:
+        print('Loading sequence to encode...')
+        encode_seq = load_midi(args.encode)
+        encode_seq = torch.from_numpy(encode_seq).long()
 
     print('=== Generating ===')
 
     fname = args.fname
     print('File: {}'.format(fname))
-    generation = Generation(model)
-    generation.export(name=fname, seq_len=args.length)
+    generator = MusicGenerator(model)
+    seq = generator.generate(args.length, encode_seq)
+    save_midi(fname, seq)
 
     if args.synth:
         data = synthesize(os.path.join(SAMPLES_DIR, fname + '.mid'))
