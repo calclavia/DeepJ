@@ -13,7 +13,7 @@ x = load_midi('data/baroque/Bach/Duet in E Minor BWV802.mid')
 x = torch.from_numpy(x).unsqueeze(0)
 # Slice based on the same seq len it's trained on
 # x = x[:, :SEQ_LEN]
-x = var(x, volatile=True)
+x = var(x, volatile=True).long()
 
 x = model.embd(x)
 mean, logvar, _ = model.encoder(x, None)
