@@ -7,12 +7,12 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, hidden_size=1024, num_layers=2, latent_size=512):
+    def __init__(self, input_size=512, encoder_size=2048, decoder_size=512, latent_size=512):
         super().__init__()
         self.latent_size = latent_size
-        self.embd = nn.Embedding(NUM_ACTIONS, hidden_size)
-        self.encoder = EncoderRNN(hidden_size, hidden_size, latent_size, num_layers)
-        self.decoder = DecoderRNN(hidden_size, latent_size, hidden_size, NUM_ACTIONS, num_layers)
+        self.embd = nn.Embedding(NUM_ACTIONS, input_size)
+        self.encoder = EncoderRNN(input_size, encoder_size, latent_size, 2)
+        self.decoder = DecoderRNN(input_size, latent_size, decoder_size, NUM_ACTIONS, 1)
 
     def forward(self, x, hidden=None):
         batch_size = x.size(0)

@@ -148,7 +148,7 @@ def compute_loss(model, data, volatile=False):
     mean = mean.float()
     logvar = logvar.float()
     kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp()) / batch_size
-    loss = ce_loss + kl_loss
+    loss = ce_loss + KL_BETA * kl_loss
 
     return loss, np.array([ce_loss.data[0], kl_loss.data[0]])
 
