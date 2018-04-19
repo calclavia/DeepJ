@@ -7,7 +7,7 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, input_size=512, encoder_size=512, decoder_size=512, latent_size=512):
+    def __init__(self, input_size=512, encoder_size=512, decoder_size=512, latent_size=1024):
         super().__init__()
         self.input_size = input_size
         self.latent_size = latent_size
