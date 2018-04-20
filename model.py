@@ -7,13 +7,13 @@ from util import *
 import numpy as np
 
 class DeepJ(nn.Module):
-    def __init__(self, input_size=512, encoder_size=512, decoder_size=512, latent_size=1024):
+    def __init__(self, input_size=512, encoder_size=512, decoder_size=512, latent_size=512):
         super().__init__()
         self.input_size = input_size
         self.latent_size = latent_size
         self.embd = nn.Embedding(NUM_ACTIONS, input_size)
         self.encoder = EncoderRNN(input_size, encoder_size, latent_size, 4)
-        self.decoder = DecoderRNN(self.embd, input_size, latent_size, decoder_size, NUM_ACTIONS, 3)
+        self.decoder = DecoderRNN(self.embd, input_size, latent_size, decoder_size, NUM_ACTIONS, 4)
 
     def forward(self, x, hidden=None):
         batch_size = x.size(0)
