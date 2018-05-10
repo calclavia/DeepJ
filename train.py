@@ -54,11 +54,11 @@ def train(args, model, train_batcher, train_len, val_batcher, val_len, optimizer
             
             for _ in t:
                 data = train_batcher()
-                metrics = train_step(model, data, optimizer)
+                metrics = train_step(model, data, optimizer, total_step)
 
                 total_metrics += metrics
                 avg_metrics = total_metrics / step
-                t.set_postfix(ce=avg_metrics[0], kl=avg_metrics[1], loss=sum(avg_metrics))
+                t.set_postfix(ce=avg_metrics[0], kl=avg_metrics[1], kl_loss=avg_metrics[2], loss=sum((avg_metrics[0], avg_metrics[2])))
 
                 step += 1
                 total_step += 1
@@ -74,17 +74,17 @@ def train(args, model, train_batcher, train_len, val_batcher, val_len, optimizer
 
             for _ in t:
                 data = val_batcher()
-                metrics = val_step(model, data)
+                metrics = val_step(model, data, total_step)
                 total_metrics += metrics
                 avg_metrics = total_metrics / step
-                t.set_postfix(ce=avg_metrics[0], kl=avg_metrics[1], loss=sum(avg_metrics))
+                t.set_postfix(ce=avg_metrics[0], kl=avg_metrics[1], kl_loss=avg_metrics[2], loss=sum((avg_metrics[0], avg_metrics[2])))
 
                 step += 1
             
         val_metrics.append(avg_metrics)
 
         if plot:
-            plot_graph([sum(m) for m in train_metrics], [sum(m) for m in val_metrics], 'loss.png')
+            plot_graph([sum((m[0], m[2])) for m in train_metrics], [sum((m[0], m[2])) for m in val_metrics], 'loss.png')
             for i, name in enumerate(['ce_loss.png', 'kl_loss.png']):
                 plot_graph(list(zip(*train_metrics))[i], list(zip(*val_metrics))[i], name)
 
@@ -93,13 +93,13 @@ def train(args, model, train_batcher, train_len, val_batcher, val_len, optimizer
 
         epoch += 1
 
-def train_step(model, data, optimizer):
+def train_step(model, data, optimizer, total_step):
     """
     Trains the model on a single batch of sequence.
     """
     model.train()
 
-    loss, metrics = compute_loss(model, data)
+    loss, metrics = compute_loss(model, data, total_step)
     
     # Scale the loss
     loss = loss * SCALE_FACTOR
@@ -117,18 +117,18 @@ def train_step(model, data, optimizer):
 
     # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
     # Reference: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
-    torch.nn.utils.clip_grad_norm(model.parameters(), GRADIENT_CLIP)
+    # torch.nn.utils.clip_grad_norm_(param_copy, GRADIENT_CLIP)
     optimizer.step()
 
     # Copy the parameters back into the model
     copy_in_params(model, param_copy)
     return metrics
 
-def val_step(model, data):
+def val_step(model, data, total_step):
     model.eval()
-    return compute_loss(model, data, volatile=True)[1]
+    return compute_loss(model, data, total_step, volatile=True)[1]
 
-def compute_loss(model, data, volatile=False):
+def compute_loss(model, data, total_step, volatile=False):
     """
     Trains the model on a single batch of sequence.
     """
@@ -136,7 +136,10 @@ def compute_loss(model, data, volatile=False):
     note_seq, styles = data
 
     # Feed it to the model
-    note_seq = var(note_seq, volatile=volatile)
+    if not volatile:
+        note_seq = note_seq.requires_grad_()
+
+    note_seq = note_seq.cuda()
     batch_size = note_seq.size(0)
     output, mean, logvar = model(note_seq, None)
 
@@ -145,17 +148,26 @@ def compute_loss(model, data, volatile=False):
     # Otherwise, it will result in 0 gradient.
     # https://github.com/timbmg/Sentence-VAE/blob/master/train.py#L68
     ce_loss = criterion(output.view(-1, NUM_ACTIONS).float(), note_seq[:, 1:].contiguous().view(-1))
+
     mean = mean.float()
     logvar = logvar.float()
-    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp()) / batch_size
-    loss = ce_loss + KL_BETA * kl_loss
+    kl = - 0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp()) / batch_size
+    kl_weight = KL_BETA * min(total_step / KL_ANNEAL_STEPS, 1)
+    # Free bits
+    zero = torch.tensor(0.0)
+    
+    if kl.is_cuda:
+        zero = zero.cuda()
 
-    return loss, np.array([ce_loss.data[0], kl_loss.data[0]])
+    kl_loss = kl_weight * torch.max(kl - KL_TOLERANCE, zero)
+    loss = ce_loss + kl_loss
+
+    return loss, np.array([ce_loss.item(), kl.item(), kl_loss.item()])
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--path', help='Load existing model?')
-    parser.add_argument('--batch-size', default=64, type=int, help='Size of the batch')
+    parser.add_argument('--batch-size', default=BATCH_SIZE, type=int, help='Size of the batch')
     parser.add_argument('--lr', default=1e-3, type=float, help='Learning rate')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     parser.add_argument('--no-fp16', default=False, action='store_true', help='Disable FP16 training')
@@ -163,16 +175,13 @@ def main():
     args.fp16 = not args.no_fp16
 
     print('=== Loading Model ===')
-    model = DeepJ()
+    model = DeepJ().cuda()
 
-    if torch.cuda.is_available():
-        model.cuda()
-
-        if args.fp16:
-            # Wrap forward method
-            # fwd = model.forward
-            # model.forward = lambda x, states: fwd(x.half(), states)
-            model.half()
+    if args.fp16:
+        # Wrap forward method
+        # fwd = model.forward
+        # model.forward = lambda x, states: fwd(x.half(), states)
+        model.half()
 
     if args.path:
         model.load_state_dict(torch.load(args.path))

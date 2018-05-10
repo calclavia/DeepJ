@@ -29,20 +29,19 @@ class MusicGenerator():
         
         if encode_seq is not None:
             # Use latent vector produced by encoder
-            x = Variable(encode_seq, volatile=True).unsqueeze(0)
+            x = encode_seq.unsqueeze(0)
             x = self.model.embd(x)
             z, _, _ = self.model.encoder(x, None)
         else:
             # Sample latent vector
-            z = Variable(torch.randn(1, self.model.latent_size), volatile=True)
+            z = torch.randn(1, self.model.latent_size)
 
         if latent is not None:
             # Use provided custom latent vector
-            z = Variable(latent, volatile=True).unsqueeze(0)
-
+            z = latent.unsqueeze(0)
         memory = None
         # Generate starting first token. Input for decoder.
-        x = Variable(torch.LongTensor([[0]]), volatile=True)
+        x = torch.LongTensor([[0]])
         
         for _ in r:
             logits, memory = self.model.decoder(self.model.embd(x), latent=z, hidden=memory)
@@ -54,7 +53,7 @@ class MusicGenerator():
                 x = torch.max(probs, 2)[1]
             else:
                 probs = F.softmax(logits / temperature, dim=2)
-                x = probs.squeeze(0).multinomial()
+                x = probs.squeeze(0).multinomial(1)
             seq.append(x.squeeze(0).data.numpy()[0])
 
         return np.array(seq)
@@ -70,7 +69,7 @@ def main():
     parser = argparse.ArgumentParser(description='Generates music.')
     parser.add_argument('model', help='Path to model file')
     parser.add_argument('--fname', default='sample', help='Name of the output file')
-    parser.add_argument('--length', default=5000, type=int, help='Length of generation')
+    parser.add_argument('--length', default=SEQ_LEN, type=int, help='Length of generation')
     parser.add_argument('--synth', default=False, action='store_true', help='Synthesize output in MP3')
     parser.add_argument('--encode', default=None, type=str, help='Forces the latent vector to encode a sequence')
     parser.add_argument('--temperature', default=0, type=float, help='Temperature of generation. 0 temperature = deterministic')

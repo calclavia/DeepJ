@@ -20,10 +20,16 @@ VEL_OFFSET = TIME_OFFSET + TIME_QUANTIZATION
 NUM_ACTIONS = VEL_OFFSET + VEL_QUANTIZATION
 
 # Trainin Parameters
-SEQ_LEN = 1024 + 1
+SEQ_LEN = 512 + 1
 GRADIENT_CLIP = 10
 SCALE_FACTOR = 2 ** 10
-KL_BETA = 0.1
+KL_BETA = 0.2
+KL_ANNEAL_STEPS = 500 * 100
+# Bits to exclude from KL loss per dimension.
+FREE_BITS = 64
+LN_2 = 0.69314718056
+KL_TOLERANCE = FREE_BITS * LN_2
+BATCH_SIZE = 128
 
 # The number of train generator cycles per sequence
 TRAIN_CYCLES = 500

@@ -90,7 +90,7 @@ def sampler(data):
         seq_id = random.randint(0, len(seqs) - 1)
         seq = seqs[seq_id]
         # Pick random start index
-        start_index = random.randint(0, len(seq) - 1 - seq_len * 2)
+        start_index = random.randint(0, len(seq) - 1 - int(seq_len * 1.5))
         seq = seq[start_index:]
         # Apply random augmentations
         seq = augment(seq)
