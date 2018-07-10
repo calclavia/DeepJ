@@ -133,7 +133,7 @@ def compute_loss(model, data, volatile=False):
     styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
 
     # Feed it to the model
-    inputs = var(one_hot_seq(note_seq[:, :-1], NUM_ACTIONS), volatile=volatile)
+    inputs = var(note_seq[:, :-1], volatile=volatile)
     targets = var(note_seq[:, 1:], volatile=volatile)
     output, _ = model(inputs, styles, None)
 
@@ -163,7 +163,7 @@ def main():
         if args.fp16:
             # Wrap forward method
             fwd = model.forward
-            model.forward = lambda x, style, states: fwd(x.half(), style.half(), states)
+            model.forward = lambda x, style, states: fwd(x, style.half(), states)
             model.half()
 
     if args.path:
