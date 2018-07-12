@@ -42,7 +42,7 @@ class Generation():
         Generates the next set of beams
         """
         # Create variables
-        style = var(to_torch(self.style), volatile=True).unsqueeze(0)
+        style = torch.tensor(self.style, dtype=torch.float).unsqueeze(0)
 
         new_beam = []
         sum_seq_prob = 0
@@ -50,18 +50,18 @@ class Generation():
         # Iterate through the beam
         for prev_prob, evts, state in self.beam:
             if len(evts) > 0:
-                prev_event = var(to_torch(one_hot(evts[-1], NUM_ACTIONS)), volatile=True).unsqueeze(0)
+                prev_event = torch.tensor(evts[-1])
             else:
-                prev_event = var(torch.zeros((1, NUM_ACTIONS)), volatile=True)
+                prev_event = torch.tensor(0)
 
-            prev_event = prev_event.unsqueeze(1)
+            prev_event = prev_event.unsqueeze(0).unsqueeze(1)
             probs, new_state = self.model.generate(prev_event, style, state, temperature=self.temperature)
             probs = probs.squeeze(1)
 
             for _ in range(self.beam_size):
                 # Sample action
-                output = probs.multinomial().data
-                event = output[0, 0]
+                output = probs.multinomial(1)
+                event = output.item()
                 
                 # Create next beam
                 seq_prob = prev_prob * probs.data[0, event]
@@ -138,16 +138,17 @@ def main():
 
     print('=== Generating ===')
 
-    for style in styles:
-        fname = args.fname + str(list(style))
-        print('File: {}'.format(fname))
-        generation = Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam, adaptive=args.adaptive)
-        generation.export(name=fname, seq_len=args.length)
+    with torch.no_grad():
+        for style in styles:
+            fname = args.fname + str(list(style))
+            print('File: {}'.format(fname))
+            generation = Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam, adaptive=args.adaptive)
+            generation.export(name=fname, seq_len=args.length)
 
-        if args.synth:
-            data = synthesize(os.path.join(SAMPLES_DIR, fname + '.mid'))
-            with open(os.path.join(SAMPLES_DIR, fname + '.mp3'), 'wb') as f:
-                f.write(data)
+            if args.synth:
+                data = synthesize(os.path.join(SAMPLES_DIR, fname + '.mid'))
+                with open(os.path.join(SAMPLES_DIR, fname + '.mp3'), 'wb') as f:
+                    f.write(data)
 
 if __name__ == '__main__':
     main()
