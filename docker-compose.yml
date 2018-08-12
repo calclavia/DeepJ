@@ -8,3 +8,6 @@ services:
       - .:/src/
     environment:
       - LC_CTYPE=C.UTF-8
+    working_dir: /src
+    shm_size: '16gb'
+    tty: true
