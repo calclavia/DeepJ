@@ -19,18 +19,17 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
-from midi_io import save_midi
 
 criterion = nn.CrossEntropyLoss()
 
-def plot_loss(training_loss, validation_loss, name):
+def plot_graph(training_loss, validation_loss, name):
     # Draw graph
     plt.clf()
     plt.plot(training_loss)
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(args, model, train_batcher, train_len, val_batcher, val_len, optimizer, plot=True):
+def train(args, model, train_loader, val_loader, optimizer, plot=True):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -39,63 +38,64 @@ def train(args, model, train_batcher, train_len, val_batcher, val_len, optimizer
     total_step = 1
 
     # Keep tracks of all losses in each epoch
-    train_losses = []
-    val_losses = []
+    train_metrics = []
+    val_metrics = []
 
     # Epoch loop
     while True:
         # Training
         step = 1
-        total_loss = 0
+        total_metrics = 0
 
-        with tqdm(range(train_len)) as t:
+        with tqdm(train_loader) as t:
             t.set_description('Epoch {}'.format(epoch))
             
-            for _ in t:
-                data = train_batcher()
-                loss = train_step(model, data, optimizer)
+            for data in t:
+                metrics = train_step(model, data, optimizer, total_step)
 
-                total_loss += loss
-                avg_loss = total_loss / step
-                t.set_postfix(loss=avg_loss)
+                total_metrics += metrics
+                avg_metrics = total_metrics / step
+                t.set_postfix(loss=avg_metrics[0])
 
                 step += 1
                 total_step += 1
 
-        train_losses.append(avg_loss)
+        train_metrics.append(avg_metrics)
 
         # Validation
         step = 1
-        total_loss = 0
+        total_metrics = 0
 
-        with tqdm(range(val_len)) as t:
+        with tqdm(val_loader) as t:
             t.set_description('Validation {}'.format(epoch))
 
-            for _ in t:
-                data = val_batcher()
-                loss = val_step(model, data)
-                total_loss += loss
-                avg_loss = total_loss / step
-                t.set_postfix(loss=avg_loss)
+            for data  in t:
+                metrics = val_step(model, data, total_step)
+                total_metrics += metrics
+                avg_metrics = total_metrics / step
+                t.set_postfix(loss=avg_metrics[0])
+
                 step += 1
             
-        val_losses.append(avg_loss)
+        val_metrics.append(avg_metrics)
 
         if plot:
-            plot_loss(train_losses, val_losses, 'loss.png')
+            plot_graph([m[0] for m in train_metrics], [m[0] for m in val_metrics], 'loss.png')
+            # for i, name in enumerate(['ce_loss.png', 'kl_loss.png']):
+            #     plot_graph(list(zip(*train_metrics))[i], list(zip(*val_metrics))[i], name)
 
         # Save model
-        torch.save(model.state_dict(), OUT_DIR + '/model_' + str(epoch) + '.pt')
+        torch.save(model.state_dict(), OUT_DIR + '/model' + '.pt')
 
         epoch += 1
 
-def train_step(model, data, optimizer):
+def train_step(model, data, optimizer, total_step):
     """
     Trains the model on a single batch of sequence.
     """
     model.train()
 
-    loss, avg_loss = compute_loss(model, data)
+    loss, metrics = compute_metrics(model, data, total_step)
     
     # Scale the loss
     loss = loss * SCALE_FACTOR
@@ -113,36 +113,37 @@ def train_step(model, data, optimizer):
 
     # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
     # Reference: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
-    torch.nn.utils.clip_grad_norm_(model.parameters(), GRADIENT_CLIP)
+    torch.nn.utils.clip_grad_norm_(param_copy, GRADIENT_CLIP)
     optimizer.step()
 
     # Copy the parameters back into the model
     copy_in_params(model, param_copy)
-    return avg_loss
+    return metrics
 
-def val_step(model, data):
+def val_step(model, data, total_step):
     model.eval()
-    return compute_loss(model, data, volatile=True)[1]
+    with torch.no_grad():
+        return compute_metrics(model, data, total_step)[1]
 
-def compute_loss(model, data, volatile=False):
+def compute_metrics(model, data, total_step):
     """
     Trains the model on a single batch of sequence.
     """
     # Convert all tensors into variables
-    note_seq, styles = data
-    styles = var(one_hot_batch(styles, NUM_STYLES), volatile=volatile)
+    seqs = data
 
     # Feed it to the model
-    inputs = var(note_seq[:, :-1], volatile=volatile)
-    targets = var(note_seq[:, 1:], volatile=volatile)
-    output, _ = model(inputs, styles, None)
+    seqs = seqs.cuda()
+    seq_inputs = seqs[:, :-1]
+    seq_targets = seqs[:, 1:]
+
+    logits, _ = model(seq_inputs)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
     # Otherwise, it will result in 0 gradient.
-    loss = criterion(output.view(-1, NUM_ACTIONS).float(), targets.contiguous().view(-1))
-
-    return loss, loss.data.item()
+    loss = criterion(logits.contiguous().view(-1, VOCAB_SIZE).float(), seq_targets.contiguous().view(-1).data)
+    return loss, np.array([loss.item()])
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
@@ -155,16 +156,13 @@ def main():
     args.fp16 = not args.no_fp16
 
     print('=== Loading Model ===')
-    model = DeepJ()
+    model = DeepJ().cuda()
 
-    if torch.cuda.is_available():
-        model.cuda()
-
-        if args.fp16:
-            # Wrap forward method
-            fwd = model.forward
-            model.forward = lambda x, style, states: fwd(x, style.half(), states)
-            model.half()
+    if args.fp16:
+        # Wrap forward method
+        # fwd = model.forward
+        # model.forward = lambda x, states: fwd(x.half(), states)
+        model.half()
 
     if args.path:
         model.load_state_dict(torch.load(args.path))
@@ -189,22 +187,16 @@ def main():
     print('=== Dataset ===')
     os.makedirs(OUT_DIR, exist_ok=True)
     print('Loading data...')
-    data = process(load())
+    train_loader, val_loader = get_tv_loaders(args)
     print()
-    print('Creating data generators...')
-    train_data, val_data = validation_split(data)
-    train_batcher = batcher(sampler(train_data), args.batch_size)
-    val_batcher = batcher(sampler(val_data), args.batch_size)
-
+    
     # Checks if training data sounds right.
+    # from midi_io import save_midi
     # for i, seq in enumerate(train_batcher()[0]):
     #     save_midi('train_seq_{}'.format(i), seq.cpu().numpy())
 
-    print('Training Sequences:', len(train_data[0]), 'Validation Sequences:', len(val_data[0]))
-    print()
-
     print('=== Training ===')
-    train(args, model, train_batcher, TRAIN_CYCLES, val_batcher, VAL_CYCLES, optimizer, plot=not args.noplot)
+    train(args, model, train_loader, val_loader, optimizer, plot=not args.noplot)
 
 if __name__ == '__main__':
     main()

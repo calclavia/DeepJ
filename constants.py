@@ -19,7 +19,7 @@ TOKEN_IDS = [
 SEQ_LEN = 1024 + 1
 GRADIENT_CLIP = 10
 SCALE_FACTOR = 2 ** 10
-VOCAB_SIZE = 10000
+VOCAB_SIZE = 2048
 # The number of train generator cycles per sequence
 TRAIN_CYCLES = 1000
 VAL_CYCLES = int(TRAIN_CYCLES * 0.05)

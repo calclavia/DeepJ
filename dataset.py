@@ -1,9 +1,12 @@
 """
 Preprocesses MIDI files
 """
+import os
 import math
 import numpy as np
 import torch
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Dataset
 
 import numpy
 import math
@@ -12,51 +15,96 @@ from tqdm import tqdm
 import multiprocessing
 import itertools
 
-from constants import *
-from midi_io import load_midi
+import midi_io
 from util import *
+import constants as const
 
-def load(styles=STYLES):
-    """
-    Loads all music styles into a list of compositions
-    """
-    style_seqs = []
-    for style in styles:
-        # Parallel process all files into a list of music sequences
-        style_seq = []
-        seq_len_sum = 0
+import sentencepiece as spm
 
-        for f in tqdm(get_all_files([style])):
+class MusicDataset(Dataset):
+    def __init__(self, data_files):
+        """    
+        Loads all MIDI files from provided files.
+        """
+        self.sp = spm.SentencePieceProcessor()
+        self.sp.Load("out/token.model")
+        self.seqs = []
+        ignore_count = 0
+        
+        for f in tqdm(data_files):
             try:
-                # Pad the sequence by an empty event
-                seq = load_midi(f)
-                if len(seq) >= SEQ_LEN:
-                    style_seq.append(torch.from_numpy(seq).long())
-                    seq_len_sum += len(seq)
-                else:
-                    print('Ignoring {} because it is too short {}.'.format(f, len(seq)))
+                # Cache encoding
+                cache_path = os.path.join(CACHE_DIR, f + '.tokenized.npy')
+                try:
+                    seq = np.load(cache_path)
+                except:
+                    seq = midi_io.load_midi(f)
+                    seq = [self.sp['<s>']] + self.sp.EncodeAsIds(midi_io.tokens_to_str(seq)) + [self.sp['</s>']]
+                    seq = np.array(seq, dtype='int64')
+
+                    # Perform caching
+                    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                    np.save(cache_path, seq)
+
+                self.seqs.append(torch.from_numpy(seq))
             except Exception as e:
                 print('Unable to load {}'.format(f), e)
-        
-        style_seqs.append(style_seq)
-        print('Loading {} MIDI file(s) with average event count {}'.format(len(style_seq), seq_len_sum / len(style_seq)))
-    return style_seqs
+                ignore_count += 1
 
-def process(style_seqs):
-    """
-    Process data. Takes a list of styles and flattens the data, returning the necessary tags.
-    """
-    # Flatten into compositions list
-    seqs = [s for y in style_seqs for s in y]
-    style_tags = torch.LongTensor([s for s, y in enumerate(style_seqs) for x in y])
-    return seqs, style_tags
+        print('{} files ignored.'.format(ignore_count))
+        print('Loaded {} MIDI file(s) with average length {}'.format(len(self.seqs), sum(len(s) for s in self.seqs) / len(self.seqs)))
 
-def validation_split(data, split=0.05):
+    def __len__(self):
+        return len(self.seqs)
+
+    def __getitem__(self, idx):
+        seq = self.seqs[idx]
+
+        # Random subsequence
+        start_index = random.randint(0, len(seq) - 1 - const.SEQ_LEN)
+        seq = seq[start_index:start_index+const.SEQ_LEN]
+        return seq
+
+def collate_fn(data):
+    """
+    Creates mini-batch tensors from the list of data.
+    
+    We should build custom collate_fn rather than using default collate_fn, 
+    because merging caption (including padding) is not supported in default.
+    Args:
+        data: list of sequences (LongTensor of shape (seq_len))
+    Returns:
+        seqs: tensor of shape (batch_size, seq_len).
+    """
+    # Sort a data list by sequence length (descending order).
+    seqs = data
+    seqs.sort(key=lambda x: len(x), reverse=True)
+    lengths = np.array([len(x) for x in seqs])
+    seqs = pad_sequence(seqs, batch_first=True, padding_value=const.EOS)
+    return seqs, lengths
+
+def get_tv_loaders(args):
+    data_files = get_all_files(const.STYLES)
+    train_files, val_files = validation_split(data_files)
+    print('Training Files:', len(train_files), 'Validation Files:', len(val_files))
+    return get_loader(args, train_files), get_loader(args, val_files)
+
+def get_loader(args, files):
+    print('Setup dataset...')
+    ds = MusicDataset(files)
+    print('Done.')
+    return torch.utils.data.DataLoader(
+        dataset=ds, 
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=4,
+        # collate_fn=collate_fn
+    )
+
+def validation_split(seqs, split=0.2):
     """
     Splits the data iteration list into training and validation indices
     """
-    seqs, style_tags = data
-
     # Shuffle sequences randomly
     r = list(range(len(seqs)))
     random.shuffle(r)
@@ -71,98 +119,4 @@ def validation_split(data, split=0.05):
     train_seqs = [seqs[i] for i in train_indicies]
     val_seqs = [seqs[i] for i in val_indicies]
 
-    train_style_tags = [style_tags[i] for i in train_indicies]
-    val_style_tags = [style_tags[i] for i in val_indicies]
-    
-    return (train_seqs, train_style_tags), (val_seqs, val_style_tags)
-
-def sampler(data):
-    """
-    Generates sequences of data.
-    """
-    seqs, style_tags = data
-
-    if len(seqs) == 0:
-        raise 'Insufficient training data.'
-
-    def sample(seq_len):
-        # Pick random sequence
-        seq_id = random.randint(0, len(seqs) - 1)
-        seq = seqs[seq_id]
-        # Pick random start index
-        start_index = random.randint(0, len(seq) - 1 - seq_len * 2)
-        seq = seq[start_index:]
-        # Apply random augmentations
-        seq = augment(seq)
-        # Take first N elements. After augmentation seq len changes.
-        seq = itertools.islice(seq, seq_len)
-        seq = gen_to_tensor(seq)
-        assert seq.size() == (seq_len,), seq.size()
-
-        return (
-            seq,
-            # Need to retain the tensor object. Hence slicing is used.
-            torch.LongTensor(style_tags[seq_id:seq_id+1])
-        )
-    return sample
-
-def batcher(sampler, batch_size, seq_len=SEQ_LEN):
-    """
-    Bundles samples into batches
-    """
-    def batch():
-        batch = [sampler(seq_len) for i in range(batch_size)]
-        return [torch.stack(x) for x in zip(*batch)]
-    return batch 
-
-def stretch_sequence(sequence, stretch_scale):
-    """ Iterate through sequence and stretch each time shift event by a factor """
-    # Accumulated time in seconds
-    time_sum = 0
-    seq_len = 0
-    for i, evt in enumerate(sequence):
-        if evt >= TIME_OFFSET and evt < VEL_OFFSET:
-            # This is a time shift event
-            # Convert time event to number of seconds
-            # Then, accumulate the time
-            time_sum += convert_time_evt_to_sec(evt)
-        else:
-            if i > 0:
-                # Once there is a non time shift event, we take the
-                # buffered time and add it with time stretch applied.
-                for x in seconds_to_events(time_sum * stretch_scale):
-                    yield x
-                # Reset tracking variables
-                time_sum = 0
-            seq_len += 1
-            yield evt
-
-    # Edge case where last events are time shift events
-    if time_sum > 0:
-        for x in seconds_to_events(time_sum * stretch_scale):
-            seq_len += 1
-            yield x
-
-    # Pad sequence with empty events if seq len not enough
-    if seq_len < SEQ_LEN:
-        for x in range(SEQ_LEN - seq_len):
-            yield TIME_OFFSET
-            
-def transpose(sequence):
-    """ A generator that represents the sequence. """
-    # Transpose by 4 semitones at most
-    transpose = random.randint(-4, 4)
-
-    if transpose == 0:
-        return sequence
-
-    # Perform transposition (consider only notes)
-    return (evt + transpose if evt < TIME_OFFSET else evt for evt in sequence)
-
-def augment(sequence):
-    """
-    Takes a sequence of events and randomly perform augmentations.
-    """
-    sequence = transpose(sequence)
-    sequence = stretch_sequence(sequence, random.uniform(1.0, 1.25))
-    return sequence
+    return train_seqs, val_seqs
