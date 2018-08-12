@@ -10,83 +10,53 @@ from util import *
 import subprocess
 import urllib.request
 
-class TrackBuilder():
-    def __init__(self, event_seq, tempo=mido.bpm2tempo(120)):
-        self.event_seq = event_seq
-        
-        self.last_velocity = 0
-        self.delta_time = 0
-        self.tempo = mido.bpm2tempo(120)
-        self.track_tempo = tempo
-        
-        self.reset()
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        evt = next(self.event_seq)
-
-        # Interpret event data
-        if evt >= VEL_OFFSET:
-            # A velocity change
-            self.last_velocity = (evt - VEL_OFFSET) * (MIDI_VELOCITY // VEL_QUANTIZATION)
-        elif evt >= TIME_OFFSET:
-            # Shifting forward in time
-            tick_bin = evt - TIME_OFFSET
-            assert tick_bin >= 0 and tick_bin < TIME_QUANTIZATION
-            seconds = TICK_BINS[tick_bin] / TICKS_PER_SEC
-            self.delta_time += int(mido.second2tick(seconds, self.midi_file.ticks_per_beat, self.tempo))
-        elif evt >= NOTE_ON_OFFSET:
-            # Turning a note on (or off if velocity = 0)
-            note = evt - NOTE_ON_OFFSET
-            # We can turn a note on twice, indicating a replay
-            if self.last_velocity == 0:
-                # Note off
-                if note in self.on_notes:
-                    # We cannot turn a note off when it was never on
-                    self.track.append(mido.Message('note_off', note=note, time=self.delta_time))
-                    self.on_notes.remove(note)
-                    self.delta_time = 0
-            else:
-                self.track.append(mido.Message('note_on', note=note, time=self.delta_time, velocity=self.last_velocity))
-                self.on_notes.add(note)
-                self.delta_time = 0
-        
-    def reset(self):
-        self.midi_file = mido.MidiFile()
-        self.track = mido.MidiTrack()
-        self.track.append(mido.MetaMessage('set_tempo', tempo=self.track_tempo))
-        # Tracks on notes
-        self.on_notes = set()
-    
-    def run(self):
-        for _ in self:
-            pass
-    
-    def export(self):
-        """
-        Export buffer track to MIDI file
-        """
-        self.midi_file.tracks.append(self.track)
-        return_file = self.midi_file
-        self.reset()
-        return return_file
-
-def seq_to_midi(event_seq):
+def tokens_to_midi(tokens):
     """
     Takes an event sequence and encodes it into MIDI file
     """
-    track_builder = TrackBuilder(iter(event_seq))
-    track_builder.run()
-    return track_builder.export()
+    midi_file = mido.MidiFile()
+    track = mido.MidiTrack()
 
-def midi_to_seq(midi_file, track):
+    tempo = mido.bpm2tempo(100)
+    track_tempo = tempo
+    track.append(mido.MetaMessage('set_tempo', tempo=track_tempo))
+
+    # TODO: Allow flexible starting note
+    cur_note = 36
+    # TODO: Introduce velocity
+    last_velocity = 100
+    delta_time = 0
+    
+    for token in tokens:
+        token_type = TOKEN_IDS[token]
+        # delta_time in mido ticks
+        ticks = int(mido.second2tick(delta_time / TICKS_PER_SEC, midi_file.ticks_per_beat, tempo))
+
+        if token_type == 'wait':
+            delta_time += 1
+        elif token_type == 'note_inc':
+            cur_note += 1
+        elif token_type == 'note_dec':
+            cur_note -= 1
+        elif token_type == 'note_on':
+            track.append(mido.Message('note_on', note=cur_note, time=ticks, velocity=last_velocity))
+            delta_time = 0  
+        elif token_type == 'note_off':
+            track.append(mido.Message('note_off', note=cur_note, time=ticks))
+            delta_time = 0
+        else:
+            raise Exception('Invalid token', token)
+
+    midi_file.tracks.append(track)
+    return midi_file
+
+def midi_to_tokens(midi_file, track):
     """
-    Converts a MIDO track object into an event sequence
+    Converts a MIDO track object into a raw string representation
     """
-    events = []
+    tokens = []
     tempo = None
+    last_note = None
     last_velocity = None
     
     for msg in track:
@@ -94,8 +64,9 @@ def midi_to_seq(midi_file, track):
         
         # Parse delta time
         if msg.time != 0:
+            # TODO: Use a more invariant time representation? Use ticks directly?
             seconds = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
-            events += list(seconds_to_events(seconds))
+            tokens += [TOKEN_IDS.index('wait')] * int(seconds * TICKS_PER_SEC)
 
         # Ignore meta messages
         if msg.is_meta:
@@ -108,52 +79,50 @@ def midi_to_seq(midi_file, track):
         if event_type != 'note_on' and event_type != 'note_off':
             continue
 
+        if last_note is None:
+            last_note = msg.note
+
+        note_diff = msg.note - last_note
+        last_note = msg.note
+        tokens += [TOKEN_IDS.index('note_inc' if note_diff > 0 else 'note_dec')] * abs(note_diff)
+
         if event_type == 'note_on':
-            velocity = (msg.velocity) // (MIDI_VELOCITY // VEL_QUANTIZATION)
+            # velocity = (msg.velocity) // (MIDI_VELOCITY // VEL_QUANTIZATION)
+            tokens.append(TOKEN_IDS.index('note_on'))
         elif event_type == 'note_off':
-            velocity = 0
-        
+            # velocity = 0
+            tokens.append(TOKEN_IDS.index('note_off'))
+
         # If velocity is different, we update it
-        if last_velocity != velocity:
-            events.append(VEL_OFFSET + velocity)
-            last_velocity = velocity
+        # if last_velocity != velocity:
+            # TODO: Reimplement velocity
+            # events.append(VEL_OFFSET + velocity)
+            # last_velocity = velocity
 
-        events.append(NOTE_ON_OFFSET + msg.note)
+    return np.array(tokens, dtype='u4')
 
-    return np.array(events)
+def tokens_to_str(tokens):
+    return ''.join(map(str, tokens))
 
-def load_midi(fname):
+def str_to_tokens(string):
+    return np.array(list(map(int, string)), dtype='u4')
+
+def load_midi(fname, no_cache=False):
     cache_path = os.path.join(CACHE_DIR, fname + '.npy')
     try:
+        if no_cache:
+            raise Exception()
         seq = np.load(cache_path)
     except Exception as e:
         # Load
         mid = mido.MidiFile(fname)
         track = mido.merge_tracks(mid.tracks)
-        seq = midi_to_seq(mid, track)
+        seq = midi_to_tokens(mid, track)
 
         # Perform caching
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         np.save(cache_path, seq)
     return seq
-
-def save_midi(fname, event_seq):
-    """
-    Takes a list of all notes generated per track and writes it to file
-    """
-    os.makedirs(SAMPLES_DIR, exist_ok=True)
-    fpath = SAMPLES_DIR + '/' + fname + '.mid'
-    midi_file = seq_to_midi(event_seq)
-    print('Writing file', fpath)
-    midi_file.save(fpath)
-    
-def save_midi_file(file, event_seq):
-    """
-    Takes a list of all notes generated per track and writes it to file
-    """
-    os.makedirs(SAMPLES_DIR, exist_ok=True)
-    midi_file = seq_to_midi(event_seq)
-    midi_file.save(file=file)
 
 def synthesize(mid_fname, gain=3.3):
     """
@@ -180,15 +149,22 @@ def synthesize(mid_fname, gain=3.3):
     lame_proc = subprocess.Popen(['lame', '-q', '5', '-r', '-'], stdin=fsynth_proc.stdout, stdout=subprocess.PIPE)
     return lame_proc.communicate()[0]
 
-
 if __name__ == '__main__':
-    # Test
-    # seq = load_midi('data/baroque/bach/Goldberg Variations No 114.mid')
-    seq = load_midi('data/classical/Beethoven/Sonata Op 53 1st mvmt.mid')
-    import matplotlib.pyplot as plt
-    print('Event Frequency')
-    plt.hist(seq, NUM_ACTIONS)
-    plt.grid(True)
-    plt.show()
-    print('Sequence Length', len(seq))
-    save_midi('midi_test', seq)
+    import sentencepiece as spm
+    sp = spm.SentencePieceProcessor()
+    sp.Load("out/token.model")
+    # Encode
+    tokens = load_midi('data/classical/Beethoven/Sonata Op 53 1st mvmt.mid', no_cache=True)
+    token_str = tokens_to_str(tokens)
+    print('Token string len', len(token_str))
+    token_ids = sp.EncodeAsIds(token_str)
+    print('Token ID Length', len(token_ids))
+    print(token_ids[:20])
+
+    # Decode
+    d_token_str = sp.DecodeIds(token_ids)
+    assert token_str == d_token_str
+    d_tokens = str_to_tokens(d_token_str)
+    assert (tokens == d_tokens).all()
+    midi = tokens_to_midi(d_tokens)
+    midi.save('out/en_dec.mid')
