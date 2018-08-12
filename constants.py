@@ -2,8 +2,8 @@
 MIDI_VELOCITY = 128
 # Number of possible notes
 NUM_NOTES = 128
-# Ticks per second
-TICKS_PER_SEC = 100
+# Number of MIDI ticks per beat (PPQ)
+TICKS_PER_BEAT = 96
 # Number of velocity buns
 VEL_QUANTIZATION = 32
 

@@ -15,11 +15,11 @@ def tokens_to_midi(tokens):
     Takes an event sequence and encodes it into MIDI file
     """
     midi_file = mido.MidiFile()
+    midi_file.ticks_per_beat = TICKS_PER_BEAT
     track = mido.MidiTrack()
 
-    tempo = mido.bpm2tempo(100)
-    track_tempo = tempo
-    track.append(mido.MetaMessage('set_tempo', tempo=track_tempo))
+    tempo = mido.bpm2tempo(120)
+    track.append(mido.MetaMessage('set_tempo', tempo=tempo))
 
     # TODO: Allow flexible starting note
     cur_note = 36
@@ -30,7 +30,7 @@ def tokens_to_midi(tokens):
     for token in tokens:
         token_type = TOKEN_IDS[token]
         # delta_time in mido ticks
-        ticks = int(mido.second2tick(delta_time / TICKS_PER_SEC, midi_file.ticks_per_beat, tempo))
+        ticks = delta_time
 
         if token_type == 'wait':
             delta_time += 1
@@ -59,14 +59,15 @@ def midi_to_tokens(midi_file, track):
     last_note = None
     last_velocity = None
     
+    # TODO: Reorder notes for least sequence length. Low -> High
     for msg in track:
         event_type = msg.type
         
         # Parse delta time
         if msg.time != 0:
-            # TODO: Use a more invariant time representation? Use ticks directly?
-            seconds = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
-            tokens += [TOKEN_IDS.index('wait')] * int(seconds * TICKS_PER_SEC)
+            # Convert into our ticks representation
+            ticks = int((msg.time / midi_file.ticks_per_beat) * TICKS_PER_BEAT)
+            tokens += [TOKEN_IDS.index('wait')] * ticks
 
         # Ignore meta messages
         if msg.is_meta:
@@ -99,13 +100,13 @@ def midi_to_tokens(midi_file, track):
             # events.append(VEL_OFFSET + velocity)
             # last_velocity = velocity
 
-    return np.array(tokens, dtype='u4')
+    return np.array(tokens, dtype='B')
 
 def tokens_to_str(tokens):
     return ''.join(map(str, tokens))
 
 def str_to_tokens(string):
-    return np.array(list(map(int, string)), dtype='u4')
+    return np.array(list(map(int, string)), dtype='B')
 
 def load_midi(fname, no_cache=False):
     cache_path = os.path.join(CACHE_DIR, fname + '.npy')
