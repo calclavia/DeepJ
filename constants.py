@@ -2,24 +2,25 @@
 MIDI_VELOCITY = 128
 # Number of possible notes
 NUM_NOTES = 128
-# Number of MIDI ticks per beat (PPQ)
-TICKS_PER_BEAT = 96
+
+TICKS_PER_SEC = 50
 # Number of velocity buns
 VEL_QUANTIZATION = 32
 
-TOKEN_IDS = [
-    'note_on',      # Toggles a note on
-    'note_off',     # Toggles a note off
-    'note_inc',     # Moves note pointer up one note
-    'note_dec',     # Moves note pointer down one note
-    'wait',         # Wait one time step
-]
+# 0
+TOKEN_WAIT = 0
+# 1 -> 129
+TOKEN_NOTE = 1
+# 129 -> 161
+TOKEN_VEL = TOKEN_NOTE + NUM_NOTES
+NUM_TOKENS = TOKEN_VEL + VEL_QUANTIZATION
+UNICODE_OFFSET = 0x4E00
 
 # Trainin Parameters
 SEQ_LEN = 1024 + 1
 GRADIENT_CLIP = 10
 SCALE_FACTOR = 2 ** 10
-VOCAB_SIZE = 2048
+VOCAB_SIZE = 1000
 # The number of train generator cycles per sequence
 TRAIN_CYCLES = 1000
 VAL_CYCLES = int(TRAIN_CYCLES * 0.05)

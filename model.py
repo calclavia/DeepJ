@@ -10,7 +10,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=1024, num_layers=3):
+    def __init__(self, num_units=1024, num_layers=3, dropout=0.1):
         super().__init__()
         self.num_units = num_units
         self.num_layers = num_layers
@@ -18,7 +18,7 @@ class DeepJ(nn.Module):
         self.encoder = nn.Embedding(VOCAB_SIZE, num_units)
 
         # RNN
-        self.rnn = nn.LSTM(num_units, num_units, num_layers, batch_first=True)
+        self.rnn = nn.LSTM(num_units, num_units, num_layers, batch_first=True, dropout=dropout)
 
         self.decoder = nn.Linear(self.num_units, VOCAB_SIZE)
         self.decoder.weight = self.encoder.weight
