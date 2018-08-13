@@ -81,8 +81,6 @@ def train(args, model, train_loader, val_loader, optimizer, plot=True):
 
         if plot:
             plot_graph([m[0] for m in train_metrics], [m[0] for m in val_metrics], 'loss.png')
-            # for i, name in enumerate(['ce_loss.png', 'kl_loss.png']):
-            #     plot_graph(list(zip(*train_metrics))[i], list(zip(*val_metrics))[i], name)
 
         # Save model
         torch.save(model.state_dict(), OUT_DIR + '/model' + '.pt')

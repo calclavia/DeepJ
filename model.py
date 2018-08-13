@@ -32,11 +32,9 @@ class DeepJ(nn.Module):
         x = self.decoder(x)
         return x, memory
 
-    def generate(self, x, style, memory, temperature=1):
+    def generate(self, x, memory, temperature=1):
         """ Returns the probability of outputs """
-        x, memory = self.forward(x, style, memory)
+        x, memory = self.forward(x, memory)
         seq_len = x.size(1)
-        x = x.view(-1, VOCAB_SIZE)
         x = F.softmax(x / temperature, dim=2)
-        x = x.view(-1, seq_len, VOCAB_SIZE)
         return x, memory

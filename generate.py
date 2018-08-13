@@ -37,13 +37,13 @@ class Generation():
         self.step_count = 0
         self.adaptive_temp = adaptive
 
+        self.sp = spm.SentencePieceProcessor()
+        self.sp.Load("out/token.model")
+
     def step(self):
         """
         Generates the next set of beams
         """
-        # Create variables
-        style = torch.tensor(self.style, dtype=torch.float).unsqueeze(0)
-
         new_beam = []
         sum_seq_prob = 0
 
@@ -52,10 +52,10 @@ class Generation():
             if len(evts) > 0:
                 prev_event = torch.tensor(evts[-1])
             else:
-                prev_event = torch.tensor(0)
+                prev_event = torch.tensor(self.sp['<s>'])
 
             prev_event = prev_event.unsqueeze(0).unsqueeze(1)
-            probs, new_state = self.model.generate(prev_event, style, state, temperature=self.temperature)
+            probs, new_state = self.model.generate(prev_event, state, temperature=self.temperature)
             probs = probs.squeeze(1)
 
             for _ in range(self.beam_size):
@@ -92,13 +92,6 @@ class Generation():
         best = max(self.beam, key=lambda x: x[0])
         best_seq = best[1]
         return np.array(best_seq)
-
-    def export(self, name='output', seq_len=1000, show_progress=True):
-        """
-        Export into a MIDI file.
-        """
-        seq = self.generate(seq_len, show_progress=show_progress)
-        save_midi(name, seq)
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -143,7 +136,9 @@ def main():
             fname = args.fname + str(list(style))
             print('File: {}'.format(fname))
             generation = Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam, adaptive=args.adaptive)
-            generation.export(name=fname, seq_len=args.length)
+            seq = generation.generate(seq_len=args.length)
+            midi_file = tokens_to_midi(str_to_tokens(generation.sp.DecodeIds(seq.tolist())))
+            midi_file.save('out/samples' + fname + '.mid')
 
             if args.synth:
                 data = synthesize(os.path.join(SAMPLES_DIR, fname + '.mid'))

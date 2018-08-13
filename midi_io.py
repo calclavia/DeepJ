@@ -35,9 +35,9 @@ def tokens_to_midi(tokens):
         if token_type == 'wait':
             delta_time += 1
         elif token_type == 'note_inc':
-            cur_note += 1
+            cur_note = min(cur_note + 1, NUM_NOTES)
         elif token_type == 'note_dec':
-            cur_note -= 1
+            cur_note = max(cur_note - 1, 0)
         elif token_type == 'note_on':
             track.append(mido.Message('note_on', note=cur_note, time=ticks, velocity=last_velocity))
             delta_time = 0  
@@ -106,7 +106,7 @@ def tokens_to_str(tokens):
     return ''.join(map(str, tokens))
 
 def str_to_tokens(string):
-    return np.array(list(map(int, string)), dtype='B')
+    return np.array(list(map(int, string.strip())), dtype='B')
 
 def load_midi(fname, no_cache=False):
     cache_path = os.path.join(CACHE_DIR, fname + '.npy')
@@ -123,6 +123,7 @@ def load_midi(fname, no_cache=False):
         # Perform caching
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         np.save(cache_path, seq)
+
     return seq
 
 def synthesize(mid_fname, gain=3.3):
