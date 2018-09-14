@@ -135,7 +135,7 @@ def compute_metrics(model, data, total_step):
     seq_inputs = seqs[:, :-1]
     seq_targets = seqs[:, 1:]
 
-    logits, _ = model(seq_inputs)
+    logits, _ = model.forward_train(seq_inputs)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.

@@ -20,7 +20,7 @@ UNICODE_OFFSET = 0x4E00
 SEQ_LEN = 1024 + 1
 GRADIENT_CLIP = 10
 SCALE_FACTOR = 2 ** 10
-VOCAB_SIZE = 1000
+VOCAB_SIZE = 1024
 # The number of train generator cycles per sequence
 TRAIN_CYCLES = 1000
 VAL_CYCLES = int(TRAIN_CYCLES * 0.05)
