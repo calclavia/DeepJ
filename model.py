@@ -40,7 +40,7 @@ class mLSTMCell(nn.Module):
         self.b_hh = nn.Parameter(torch.Tensor(self.gate_size))
 
         # self.ln_gate = LayerNorm(self.gate_size)
-        # self.ln_out = LayerNorm(self.hidden_size)
+        self.ln_out = LayerNorm(self.hidden_size)
 
         self.act = torch.tanh#F.relu
 
@@ -73,49 +73,49 @@ class mLSTMCell(nn.Module):
         outgate = sig_gates[:, -self.hidden_size:]
 
         cy = (forgetgate * cx) + (ingate * cellgate)
-        # hy = outgate * self.act(self.ln_out(cy))
-        hy = outgate * self.act(cy)
+        hy = outgate * self.act(self.ln_out(cy))
+        # hy = outgate * self.act(cy)
         return hy, torch.stack((hy, cy), dim=0)
 
 class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=const.NUM_UNITS):
+    def __init__(self, num_units=const.NUM_UNITS, num_layers=3):
         super().__init__()
         self.num_units = num_units
 
         self.encoder = nn.Embedding(VOCAB_SIZE, num_units)
-        self.decoder = nn.Linear(num_units, VOCAB_SIZE)
 
         # RNN
-        self.rnn = mLSTMCell(num_units, num_units)
+        self.rnns = nn.ModuleList([mLSTMCell(num_units, num_units) for _ in range(num_layers)])
 
-    # def decoder(self, x):
-    #     # Decoder and encoder weights are tied
-    #     return F.linear(x, self.encoder.weight)
+    def decoder(self, x):
+        # Decoder and encoder weights are tied
+        return F.linear(x, self.encoder.weight)
 
-    def forward_train(self, x,  memory=None):
+    def forward_rnns(self, x, memory):
+        if memory is None:
+            memory = tuple(None for _ in self.rnns)
+
+        new_memory = []
+
+        for rnn, m in zip(self.rnns, memory):
+            x, m = rnn(x, m)
+            new_memory.append(m)
+
+        return x, torch.stack(new_memory, dim=0)
+
+    def forward(self, x, memory=None):
         assert len(x.size()) == 2
         x = self.encoder(x)
 
         ys = []
         for t in range(x.size(1)):
-            y, memory = self.rnn(x[:, t], memory)
+            y, memory = self.forward_rnns(x[:, t], memory)
             ys.append(y)
         
         x = torch.stack(ys, dim=1)
 
         x = self.decoder(x)
-        return x, memory
-
-    def forward(self, x, memory=None, temperature=1):
-        """ Returns the probability of outputs.  """
-        assert len(x.size()) == 1
-
-        x = self.encoder(x)
-        x, memory = self.rnn(x, memory)
-        x = self.decoder(x)
-
-        x = torch.softmax(x / temperature, dim=-1)
         return x, memory

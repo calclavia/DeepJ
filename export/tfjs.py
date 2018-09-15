@@ -22,7 +22,7 @@ def main():
     print('TF graph:', list(tf_rep.tensor_dict.items()))
 
     state_size = const.NUM_UNITS
-    x = np.zeros((1,), dtype=np.int64)
+    x = np.zeros((1, 1), dtype=np.int64)
     memory = np.zeros((2, 1, state_size))
     # temperature = 1
     results = tf_rep.run((x, memory))

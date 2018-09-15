@@ -20,6 +20,8 @@ from constants import *
 from util import *
 from model import DeepJ
 
+from apex.fp16_utils import FP16_Optimizer
+
 criterion = nn.CrossEntropyLoss()
 
 def plot_graph(training_loss, validation_loss, name):
@@ -33,6 +35,8 @@ def train(args, model, train_loader, val_loader, optimizer, plot=True):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
+    model_save = model
+    model = nn.DataParallel(model)
     # Number of training steps per epoch
     epoch = 1
     total_step = 1
@@ -83,7 +87,7 @@ def train(args, model, train_loader, val_loader, optimizer, plot=True):
             plot_graph([m[0] for m in train_metrics], [m[0] for m in val_metrics], 'loss.png')
 
         # Save model
-        torch.save(model.state_dict(), OUT_DIR + '/model' + '.pt')
+        torch.save(model_save.state_dict(), OUT_DIR + '/model' + '.pt')
 
         epoch += 1
 
@@ -94,28 +98,12 @@ def train_step(model, data, optimizer, total_step):
     model.train()
 
     loss, metrics = compute_metrics(model, data, total_step)
-    
-    # Scale the loss
-    loss = loss * SCALE_FACTOR
 
     # Zero out the gradient
-    model.zero_grad()
-    loss.backward()
-    param_copy = model.param_copy
-    set_grad(param_copy, list(model.parameters()))
-
-    # Unscale the gradient
-    if SCALE_FACTOR != 1:
-        for param in param_copy:
-            param.grad.data /= SCALE_FACTOR
-
-    # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-    # Reference: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
-    torch.nn.utils.clip_grad_norm_(param_copy, GRADIENT_CLIP)
+    optimizer.zero_grad()
+    optimizer.backward(loss)
+    optimizer.clip_master_grads(GRADIENT_CLIP)
     optimizer.step()
-
-    # Copy the parameters back into the model
-    copy_in_params(model, param_copy)
     return metrics
 
 def val_step(model, data, total_step):
@@ -135,7 +123,7 @@ def compute_metrics(model, data, total_step):
     seq_inputs = seqs[:, :-1]
     seq_targets = seqs[:, 1:]
 
-    logits, _ = model.forward_train(seq_inputs)
+    logits, _ = model(seq_inputs)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
@@ -146,8 +134,8 @@ def compute_metrics(model, data, total_step):
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--path', help='Load existing model?')
-    parser.add_argument('--batch-size', default=128, type=int, help='Size of the batch')
-    parser.add_argument('--lr', default=1e-3, type=float, help='Learning rate')
+    parser.add_argument('--batch-size', default=64, type=int, help='Size of the batch')
+    parser.add_argument('--lr', default=2e-4, type=float, help='Learning rate')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     parser.add_argument('--no-fp16', default=False, action='store_true', help='Disable FP16 training')
     args = parser.parse_args()
@@ -157,9 +145,6 @@ def main():
     model = DeepJ().cuda()
 
     if args.fp16:
-        # Wrap forward method
-        # fwd = model.forward
-        # model.forward = lambda x, states: fwd(x.half(), states)
         model.half()
 
     if args.path:
@@ -167,18 +152,15 @@ def main():
         print('Restored model from checkpoint.')
 
     # Construct optimizer
-    param_copy = [param.clone().type(torch.cuda.FloatTensor).detach() for param in model.parameters()]
-    for param in param_copy:
-        param.requires_grad = True
-    optimizer = optim.Adam(param_copy, lr=args.lr, eps=1e-4)
-    model.param_copy = param_copy
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
 
-    params = sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    num_params = sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 
     print('GPU: {}'.format(torch.cuda.is_available()))
     print('Batch Size: {}'.format(args.batch_size))
     print('FP16: {}'.format(args.fp16))
-    print('# of Parameters: {}'.format(params))
+    print('# of Parameters: {}'.format(num_params))
 
     print()
 

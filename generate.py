@@ -38,7 +38,8 @@ class Generation():
         prev_event = torch.tensor(self.outputs[-1])
         
         prev_event = prev_event.unsqueeze(0)
-        probs, self.state = self.model(prev_event, self.state, temperature=self.temperature)
+        logits, self.state = self.model(prev_event, self.state)
+        probs = torch.softmax(logits / self.temperature, dim=-1)
 
         # Sample action
         output = probs.multinomial(1)
@@ -46,7 +47,7 @@ class Generation():
         
         self.outputs.append(event)
 
-    def generate(self, seq_len=1000, show_progress=True):
+    def generate(self, seq_len, show_progress=True):
         self.model.eval()
         r = trange(seq_len) if show_progress else range(seq_len)
 

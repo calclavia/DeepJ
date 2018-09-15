@@ -111,7 +111,8 @@ def get_loader(args, files):
         dataset=ds, 
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=1,
+        drop_last=True
         # collate_fn=collate_fn
     )
 
