@@ -2,7 +2,9 @@ import argparse
 import onnx
 import numpy as np
 import tensorflow as tf
+import constants as const
 from onnx_tf.backend import prepare
+from subprocess import call
 
 def main():
     parser = argparse.ArgumentParser(description='Exports a model from ONNX format to Tensorflow JS.')
@@ -19,7 +21,7 @@ def main():
     print('TF output names:', [tf_rep.tensor_dict[output] for output in tf_rep.outputs])
     print('TF graph:', list(tf_rep.tensor_dict.items()))
 
-    state_size = 1024
+    state_size = const.NUM_UNITS
     x = np.zeros((1,), dtype=np.int64)
     memory = np.zeros((2, 1, state_size))
     # temperature = 1
@@ -28,6 +30,11 @@ def main():
     print('Dummy output (TF):', results)
 
     tf_rep.export_graph('/tmp/model.pb')
+    print('Done.')
+
+    print('Exporting to TFJS...')
+    call(["tensorflowjs_converter", "/tmp/model.pb", "/tmp/tfjs", "--input_format", "tf_frozen_model", "--output_node_names", "Softmax,concat"])
+    call(["tar", "-czvf", "out/tfjs.tar.gz", "-C", "/tmp/tfjs/", "."])
     print('Done.')
 
 if __name__ == '__main__':

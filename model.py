@@ -82,7 +82,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=1024):
+    def __init__(self, num_units=const.NUM_UNITS):
         super().__init__()
         self.num_units = num_units
 
