@@ -188,10 +188,11 @@ def main():
     train_loader, val_loader = get_tv_loaders(args)
     print()
     
-    # Checks if training data sounds right.
-    # from midi_io import save_midi
-    # for i, seq in enumerate(train_batcher()[0]):
-    #     save_midi('train_seq_{}'.format(i), seq.cpu().numpy())
+    # Outputs a training sample to check if training data sounds right.
+    from midi_io import tokens_to_midi
+    for i, seq in enumerate(train_loader):
+        tokens_to_midi(seq[0].cpu().numpy()).save('out/train_seq_{}'.format(i))
+        break
 
     print('=== Training ===')
     train(args, model, train_loader, val_loader, optimizer, plot=not args.noplot)

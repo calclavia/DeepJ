@@ -18,22 +18,16 @@ class Generation():
     Represents a music generation sequence
     """
 
-    def __init__(self, model, style=None, default_temp=1, beam_size=1, adaptive=False):
+    def __init__(self, model, style=None, default_temp=1):
         self.model = model
-
-        self.beam_size = beam_size
-
         self.style = style
 
         # Temperature of generation
         self.default_temp = default_temp
         self.temperature = self.default_temp
 
-        self.sp = spm.SentencePieceProcessor()
-        self.sp.Load("out/token.model")
-
         # Model parametrs
-        self.outputs = [self.sp['<s>']]
+        self.outputs = [const.TOKEN_EOS]
         self.state = None
 
     def step(self):
@@ -42,7 +36,7 @@ class Generation():
         """
         # Iterate through the beam
         prev_event = torch.tensor(self.outputs[-1])
-
+        
         prev_event = prev_event.unsqueeze(0)
         probs, self.state = self.model(prev_event, self.state, temperature=self.temperature)
 
@@ -59,6 +53,9 @@ class Generation():
         for _ in r:
             self.step()
 
+            if self.outputs[-1] == const.TOKEN_EOS:
+                break
+
         return np.array(self.outputs)
 
 def main():
@@ -68,8 +65,6 @@ def main():
     parser.add_argument('--length', default=5000, type=int, help='Length of generation')
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Specify the styles to mix together. By default will generate all possible styles.')
     parser.add_argument('--temperature', default=1, type=float, help='Temperature of generation')
-    parser.add_argument('--beam', default=1, type=int, help='Beam size')
-    parser.add_argument('--adaptive', default=False, action='store_true', help='Adaptive temperature')
     parser.add_argument('--synth', default=False, action='store_true', help='Synthesize output in MP3')
     args = parser.parse_args()
 
@@ -85,8 +80,6 @@ def main():
     print('=== Loading Model ===')
     print('Path: {}'.format(args.model))
     print('Temperature: {}'.format(args.temperature))
-    print('Beam: {}'.format(args.beam))
-    print('Adaptive Temperature: {}'.format(args.adaptive))
     print('Styles: {}'.format(styles))
     settings['force_cpu'] = True
     
@@ -103,10 +96,10 @@ def main():
         for style in styles:
             fname = args.fname + str(list(style))
             print('File: {}'.format(fname))
-            generation = Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam, adaptive=args.adaptive)
+            generation = Generation(model, style=style, default_temp=args.temperature)
             seq = generation.generate(seq_len=args.length)
             print(seq)
-            midi_file = tokens_to_midi(str_to_tokens(generation.sp.DecodeIds(seq.tolist())))
+            midi_file = tokens_to_midi(seq.tolist())
             midi_file.save('out/samples/' + fname + '.mid')
 
             if args.synth:

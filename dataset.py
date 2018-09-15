@@ -39,14 +39,14 @@ class MusicDataset(Dataset):
                     seq = np.load(cache_path)
                 except:
                     seq = midi_io.load_midi(f)
-                    seq = [self.sp['<s>']] + self.sp.EncodeAsIds(midi_io.tokens_to_str(seq)) + [self.sp['</s>']]
+                    seq = [const.TOKEN_EOS] + seq + [const.TOKEN_EOS]
                     seq = np.array(seq, dtype='int64')
 
                     # Perform caching
                     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
                     np.save(cache_path, seq)
 
-                self.seqs.append(torch.from_numpy(seq))
+                self.seqs.append(seq)
             except Exception as e:
                 print('Unable to load {}'.format(f), e)
                 ignore_count += 1
@@ -63,7 +63,21 @@ class MusicDataset(Dataset):
         # Random subsequence
         start_index = random.randint(0, len(seq) - 1 - const.SEQ_LEN)
         seq = seq[start_index:start_index+const.SEQ_LEN]
-        return seq
+
+        # Random transposition
+        seq = transpose(seq)
+        return torch.LongTensor(list(seq))
+            
+def transpose(sequence, amount=5):
+    """ A generator that represents the sequence. """
+    # Transpose by *amount* semitones at most
+    transpose = random.randint(-amount, amount)
+
+    if transpose == 0:
+        return sequence
+
+    # Perform transposition (consider only notes)
+    return (min(max(evt + transpose, TOKEN_NOTE), TOKEN_VEL) if evt >= TOKEN_NOTE and evt < TOKEN_VEL else evt for evt in sequence)
 
 def collate_fn(data):
     """
@@ -97,7 +111,7 @@ def get_loader(args, files):
         dataset=ds, 
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=0,
         # collate_fn=collate_fn
     )
 

@@ -39,10 +39,10 @@ class mLSTMCell(nn.Module):
         self.b_ih = nn.Parameter(torch.Tensor(self.gate_size))
         self.b_hh = nn.Parameter(torch.Tensor(self.gate_size))
 
-        self.ln_gate = LayerNorm(self.gate_size)
-        self.ln_out = LayerNorm(self.hidden_size)
+        # self.ln_gate = LayerNorm(self.gate_size)
+        # self.ln_out = LayerNorm(self.hidden_size)
 
-        self.act = F.relu
+        self.act = torch.tanh#F.relu
 
         self.reset_parameters()
     
@@ -64,7 +64,7 @@ class mLSTMCell(nn.Module):
         gates = F.linear(input, self.w_ih, self.b_ih) + F.linear(m, self.w_hh, self.b_hh)
 
         # TODO: Layer norm should be applied separately per gate
-        gates = self.ln_gate(gates)
+        # gates = self.ln_gate(gates)
 
         sig_gates = torch.sigmoid(gates[:, :-self.hidden_size])
         cellgate = self.act(gates[:, -self.hidden_size:])
@@ -73,7 +73,8 @@ class mLSTMCell(nn.Module):
         outgate = sig_gates[:, -self.hidden_size:]
 
         cy = (forgetgate * cx) + (ingate * cellgate)
-        hy = outgate * self.act(self.ln_out(cy))
+        # hy = outgate * self.act(self.ln_out(cy))
+        hy = outgate * self.act(cy)
         return hy, torch.stack((hy, cy), dim=0)
 
 class DeepJ(nn.Module):
@@ -86,7 +87,6 @@ class DeepJ(nn.Module):
 
         self.encoder = nn.Embedding(VOCAB_SIZE, num_units)
         self.decoder = nn.Linear(num_units, VOCAB_SIZE)
-        self.ln = LayerNorm(VOCAB_SIZE)
 
         # RNN
         self.rnn = mLSTMCell(num_units, num_units)
@@ -106,7 +106,7 @@ class DeepJ(nn.Module):
         
         x = torch.stack(ys, dim=1)
 
-        x = self.ln(self.decoder(x))
+        x = self.decoder(x)
         return x, memory
 
     def forward(self, x, memory=None, temperature=1):
@@ -117,5 +117,5 @@ class DeepJ(nn.Module):
         x, memory = self.rnn(x, memory)
         x = self.decoder(x)
 
-        x = F.softmax(x / temperature, dim=-1)
+        x = torch.softmax(x / temperature, dim=-1)
         return x, memory

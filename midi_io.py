@@ -21,20 +21,23 @@ def tokens_to_midi(tokens):
     track.append(mido.MetaMessage('set_tempo', tempo=tempo))
 
     last_velocity = 0
-    delta_time = 0
+    delta_ticks = 0
     
     for token in tokens:
-        if token == TOKEN_WAIT:
-            delta_time += 1
+        if token == TOKEN_EOS:
+            pass
+            # Do nothing
+        elif token >= TOKEN_WAIT and token < TOKEN_NOTE:
+            delta_ticks += token - TOKEN_WAIT
         elif token >= TOKEN_NOTE and token < TOKEN_VEL:
             note = token - TOKEN_NOTE
-            ticks = round(mido.second2tick(delta_time / TICKS_PER_SEC, midi_file.ticks_per_beat, tempo))
+            ticks = int(round(mido.second2tick(delta_ticks / TICKS_PER_SEC, midi_file.ticks_per_beat, tempo)))
 
             if last_velocity == 0:
                 track.append(mido.Message('note_off', note=note, time=ticks))
             else:
                 track.append(mido.Message('note_on', note=note, time=ticks, velocity=last_velocity))
-            delta_time = 0
+            delta_ticks = 0
         elif token >= TOKEN_VEL and token < NUM_TOKENS:
             last_velocity = (token - TOKEN_VEL) * (MIDI_VELOCITY // VEL_QUANTIZATION)
         else:
@@ -47,9 +50,16 @@ def midi_to_tokens(midi_file, track):
     """
     Converts a MIDO track object into a raw string representation
     """
+    tick_buffer = 0
     tokens = []
     tempo = None
     last_velocity = None
+
+    def release_tick_buffer():
+        nonlocal tokens, tick_buffer
+        while tick_buffer > 0:
+            tokens += [TOKEN_WAIT + min(TIME_QUANTIZATION, tick_buffer)]
+            tick_buffer -= min(TIME_QUANTIZATION, tick_buffer)
     
     # TODO: Reorder notes for least sequence length. Low -> High
     for msg in track:
@@ -59,7 +69,8 @@ def midi_to_tokens(midi_file, track):
         if msg.time != 0:
             # Convert into our ticks representation
             seconds = mido.tick2second(msg.time, midi_file.ticks_per_beat, tempo)
-            tokens += [TOKEN_WAIT] * round(seconds * TICKS_PER_SEC)
+            ticks = int(round(seconds * TICKS_PER_SEC))
+            tick_buffer += ticks
 
         # Ignore meta messages
         if msg.is_meta:
@@ -79,18 +90,20 @@ def midi_to_tokens(midi_file, track):
 
         # If velocity is different, we update it
         if last_velocity != velocity:
+            release_tick_buffer()
             tokens.append(TOKEN_VEL + velocity)
             last_velocity = velocity
 
+        release_tick_buffer()
         tokens.append(TOKEN_NOTE + msg.note)
 
     return np.array(tokens)
 
-def tokens_to_str(tokens):
-    return ''.join(map(chr, tokens + UNICODE_OFFSET))
+# def tokens_to_str(tokens):
+#     return ''.join(map(chr, tokens + UNICODE_OFFSET))
 
-def str_to_tokens(string):
-    return np.array(list(filter(lambda x: x >= UNICODE_OFFSET, map(ord, string.strip())))) - UNICODE_OFFSET
+# def str_to_tokens(string):
+#     return np.array(list(filter(lambda x: x >= UNICODE_OFFSET, map(ord, string.strip())))) - UNICODE_OFFSET
 
 def load_midi(fname, no_cache=False):
     cache_path = os.path.join(CACHE_DIR, fname + '.npy')
@@ -142,16 +155,17 @@ if __name__ == '__main__':
     # Encode
     tokens = load_midi('data/classical/Beethoven/Sonata Op 53 1st mvmt.mid', no_cache=True)
     # tokens = load_midi('data/baroque/Bach/Chaconna in D Minor.mid', no_cache=True)
-    token_str = tokens_to_str(tokens)
-    print('Token string len', len(token_str), token_str[:20])
-    token_ids = sp.EncodeAsIds(token_str)
-    print('Token ID Length', len(token_ids))
-    print(token_ids[:20], 'Num unknowns:', sum(1 for t in token_ids if t == 0))
+    # token_str = tokens_to_str(tokens)
+    # print('Token string len', len(token_str), token_str[:20])
+    # token_ids = sp.EncodeAsIds(token_str)
+    print('Token Length', len(tokens))
+    # print(token_ids[:20], 'Num unknowns:', sum(1 for t in token_ids if t == 0))
 
     # Decode
-    d_token_str = sp.DecodeIds(token_ids)
+    # d_token_str = sp.DecodeIds(token_ids)
     # assert token_str == d_token_str, (len(token_str), len(d_token_str))
-    d_tokens = str_to_tokens(d_token_str)
+    # d_tokens = str_to_tokens(d_token_str)
     # assert (tokens == d_tokens)
-    midi = tokens_to_midi(d_tokens)
+    # midi = tokens_to_midi(d_tokens)
+    midi = tokens_to_midi(tokens)
     midi.save('out/en_dec.mid')
