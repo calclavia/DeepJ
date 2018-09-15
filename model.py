@@ -7,7 +7,7 @@ from util import *
 import numpy as np
 from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
 
-def fwd_mLSTMCell(input, hidden, w_ih, w_hh, w_mih, w_mhh, b_ih=None, b_hh=None):
+def fwd_mLSTMCell(hidden_size, input, hidden, w_ih, w_hh, w_mih, w_mhh, b_ih=None, b_hh=None):
     """
     mLSTMCell
     """
@@ -23,12 +23,21 @@ def fwd_mLSTMCell(input, hidden, w_ih, w_hh, w_mih, w_mhh, b_ih=None, b_hh=None)
     m = F.linear(input, w_mih) * F.linear(hx, w_mhh)
     gates = F.linear(input, w_ih, b_ih) + F.linear(m, w_hh, b_hh)
 
-    ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
+    # Original implementation using chunk:
+    # ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
 
-    ingate = torch.sigmoid(ingate)
-    forgetgate = torch.sigmoid(forgetgate)
-    cellgate = torch.tanh(cellgate)
-    outgate = torch.sigmoid(outgate)
+    # ingate = torch.sigmoid(ingate)
+    # forgetgate = torch.sigmoid(forgetgate)
+    # outgate = torch.sigmoid(outgate)
+    # cellgate = torch.tanh(cellgate)
+
+    # More efficient implementation
+    sig_gates = torch.sigmoid(gates[:, :-hidden_size])
+    cellgate = torch.tanh(gates[:, -hidden_size:])
+
+    ingate = sig_gates[:, :hidden_size]
+    forgetgate = sig_gates[:, hidden_size:hidden_size * 2]
+    outgate = sig_gates[:, -hidden_size:]
     
     cy = (forgetgate * cx) + (ingate * cellgate)
     hy = outgate * torch.tanh(cy)
@@ -66,7 +75,7 @@ class mLSTMCell(nn.Module):
         if hidden is None:
             hidden = torch.zeros((2, input.size(0), self.hidden_size), dtype=input.dtype, device=input.device)
 
-        hy, cy = fwd_mLSTMCell(input, hidden, self.w_ih, self.w_hh, self.w_mih, self.w_mhh, self.b_ih, self.b_hh)
+        hy, cy = fwd_mLSTMCell(self.hidden_size, input, hidden, self.w_ih, self.w_hh, self.w_mih, self.w_mhh, self.b_ih, self.b_hh)
         return hy, torch.stack((hy, cy), dim=0)
 
 class DeepJ(nn.Module):

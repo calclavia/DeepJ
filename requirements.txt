@@ -8,4 +8,4 @@ sentencepiece
 git+https://github.com/NVIDIA/apex
 tensorflow
 # Note: Install onnx first from Conda Forge
-onnx-tf
+git+https://github.com/onnx/onnx-tensorflow/commit/2ae92232074e9849ed0292542451ad6b9edf24ee
