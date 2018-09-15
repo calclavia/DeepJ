@@ -20,7 +20,7 @@ def tokens_to_midi(tokens):
     tempo = mido.bpm2tempo(120)
     track.append(mido.MetaMessage('set_tempo', tempo=tempo))
 
-    last_velocity = None
+    last_velocity = 0
     delta_time = 0
     
     for token in tokens:
@@ -29,6 +29,7 @@ def tokens_to_midi(tokens):
         elif token >= TOKEN_NOTE and token < TOKEN_VEL:
             note = token - TOKEN_NOTE
             ticks = round(mido.second2tick(delta_time / TICKS_PER_SEC, midi_file.ticks_per_beat, tempo))
+
             if last_velocity == 0:
                 track.append(mido.Message('note_off', note=note, time=ticks))
             else:

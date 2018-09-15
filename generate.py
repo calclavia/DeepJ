@@ -29,58 +29,31 @@ class Generation():
         self.default_temp = default_temp
         self.temperature = self.default_temp
 
-        # Model parametrs
-        self.beam = [
-            (1, tuple(), None)
-        ]
-        self.avg_seq_prob = 1
-        self.step_count = 0
-        self.adaptive_temp = adaptive
-
         self.sp = spm.SentencePieceProcessor()
         self.sp.Load("out/token.model")
+
+        # Model parametrs
+        self.outputs = [self.sp['<s>']]
+        self.state = None
 
     def step(self):
         """
         Generates the next set of beams
         """
-        new_beam = []
-        sum_seq_prob = 0
-
         # Iterate through the beam
-        for prev_prob, evts, state in self.beam:
-            if len(evts) > 0:
-                prev_event = torch.tensor(evts[-1])
-            else:
-                prev_event = torch.tensor(self.sp['<s>'])
+        prev_event = torch.tensor(self.outputs[-1])
 
-            prev_event = prev_event.unsqueeze(0).unsqueeze(1)
-            probs, new_state = self.model.generate(prev_event, state, temperature=self.temperature)
-            probs = probs.squeeze(1)
+        prev_event = prev_event.unsqueeze(0)
+        probs, self.state = self.model(prev_event, self.state, temperature=self.temperature)
 
-            for _ in range(self.beam_size):
-                # Sample action
-                output = probs.multinomial(1)
-                event = output.item()
-                
-                # Create next beam
-                seq_prob = prev_prob * probs.data[0, event]
-                # Boost the sequence probability by the average
-                new_beam.append((seq_prob / self.avg_seq_prob, evts + (event,), new_state))
-                sum_seq_prob += seq_prob
+        # Sample action
+        output = probs.multinomial(1)
+        event = output.item()
 
-        self.avg_seq_prob = sum_seq_prob / len(new_beam)
-        # Find the top most probable sequences
-        self.beam = heapq.nlargest(self.beam_size, new_beam, key=lambda x: x[0])
-
-        if self.adaptive_temp and self.step_count > 50:
-            r = repetitiveness(self.beam[0][1][-50:])
-            if r < 0.1:
-                self.temperature = self.default_temp
-            else:
-                self.temperature += 0.05
+        if event >= 1000:
+            event = 0
         
-        self.step_count += 1
+        self.outputs.append(event)
 
     def generate(self, seq_len=1000, show_progress=True):
         self.model.eval()
@@ -89,17 +62,15 @@ class Generation():
         for _ in r:
             self.step()
 
-        best = max(self.beam, key=lambda x: x[0])
-        best_seq = best[1]
-        return np.array(best_seq)
+        return np.array(self.outputs)
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
+    parser.add_argument('model', help='Path to model file')
     parser.add_argument('--fname', default='output', help='Name of the output file')
-    parser.add_argument('--model', help='Path to model file')
     parser.add_argument('--length', default=5000, type=int, help='Length of generation')
     parser.add_argument('--style', default=None, type=int, nargs='+', help='Specify the styles to mix together. By default will generate all possible styles.')
-    parser.add_argument('--temperature', default=0.9, type=float, help='Temperature of generation')
+    parser.add_argument('--temperature', default=1, type=float, help='Temperature of generation')
     parser.add_argument('--beam', default=1, type=int, help='Beam size')
     parser.add_argument('--adaptive', default=False, action='store_true', help='Adaptive temperature')
     parser.add_argument('--synth', default=False, action='store_true', help='Synthesize output in MP3')
@@ -137,8 +108,9 @@ def main():
             print('File: {}'.format(fname))
             generation = Generation(model, style=style, default_temp=args.temperature, beam_size=args.beam, adaptive=args.adaptive)
             seq = generation.generate(seq_len=args.length)
+            print(seq)
             midi_file = tokens_to_midi(str_to_tokens(generation.sp.DecodeIds(seq.tolist())))
-            midi_file.save('out/samples' + fname + '.mid')
+            midi_file.save('out/samples/' + fname + '.mid')
 
             if args.synth:
                 data = synthesize(os.path.join(SAMPLES_DIR, fname + '.mid'))

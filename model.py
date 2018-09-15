@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from constants import *
+import constants as const
 from util import *
 import numpy as np
 from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
@@ -23,21 +23,10 @@ def fwd_mLSTMCell(hidden_size, input, hidden, w_ih, w_hh, w_mih, w_mhh, b_ih=Non
     m = F.linear(input, w_mih) * F.linear(hx, w_mhh)
     gates = F.linear(input, w_ih, b_ih) + F.linear(m, w_hh, b_hh)
 
-    # Original implementation using chunk:
-    # ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
-
-    # ingate = torch.sigmoid(ingate)
-    # forgetgate = torch.sigmoid(forgetgate)
-    # outgate = torch.sigmoid(outgate)
-    # cellgate = torch.tanh(cellgate)
-
-    # More efficient implementation
-    sig_gates = torch.sigmoid(gates[:, :-hidden_size])
-    cellgate = torch.tanh(gates[:, -hidden_size:])
-
-    ingate = sig_gates[:, :hidden_size]
-    forgetgate = sig_gates[:, hidden_size:hidden_size * 2]
-    outgate = sig_gates[:, -hidden_size:]
+    ingate = torch.sigmoid(gates[:, :hidden_size])
+    forgetgate = torch.sigmoid(gates[:, hidden_size:hidden_size * 2])
+    cellgate = torch.tanh(gates[:, hidden_size * 2:hidden_size*3])
+    outgate = torch.sigmoid(gates[:, -hidden_size:])
     
     cy = (forgetgate * cx) + (ingate * cellgate)
     hy = outgate * torch.tanh(cy)

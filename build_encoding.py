@@ -5,6 +5,7 @@ import sentencepiece as spm
 
 def build_vocab(vocab_size=const.VOCAB_SIZE, chunk_size=2 ** 13):
     print('Dumpling MIDI samples...')
+    print('Max seq length', chunk_size)
     with open('/tmp/token.txt', 'w') as f:
         for fname in tqdm(get_all_files(const.STYLES)):
             seq = load_midi(fname)
