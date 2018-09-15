@@ -12,7 +12,7 @@ def main():
 
     print('Loading Pytorch model')
     model = DeepJ()
-    # model.load_state_dict(torch.load(args.model, map_location='cpu'))
+    model.load_state_dict(torch.load(args.model, map_location='cpu'))
 
     evt_input = torch.zeros((1,), dtype=torch.long)
     dummy_output, states = model(evt_input, None)

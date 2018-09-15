@@ -21,10 +21,7 @@ SEQ_LEN = 1024 + 1
 GRADIENT_CLIP = 10
 SCALE_FACTOR = 2 ** 10
 VOCAB_SIZE = 1024
-# The number of train generator cycles per sequence
-TRAIN_CYCLES = 1000
 NUM_UNITS = 1024
-VAL_CYCLES = int(TRAIN_CYCLES * 0.05)
 
 # Style
 STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']

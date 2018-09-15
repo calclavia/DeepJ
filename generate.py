@@ -49,9 +49,6 @@ class Generation():
         # Sample action
         output = probs.multinomial(1)
         event = output.item()
-
-        if event >= 1000:
-            event = 0
         
         self.outputs.append(event)
 

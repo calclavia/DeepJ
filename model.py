@@ -7,30 +7,20 @@ from util import *
 import numpy as np
 from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
 
-def fwd_mLSTMCell(hidden_size, input, hidden, w_ih, w_hh, w_mih, w_mhh, b_ih=None, b_hh=None):
-    """
-    mLSTMCell
-    """
-    hx, cx = hidden
+class LayerNorm(nn.Module):
+    "Construct a layernorm module in the OpenAI style (epsilon inside the square root)."
 
-    if input.is_cuda:
-        igates = F.linear(input, w_ih)
-        m = F.linear(input, w_mih) * F.linear(hx, w_mhh)
-        hgates = F.linear(m, w_hh)
-        state = fusedBackend.LSTMFused.apply
-        return state(igates, hgates, cx, b_ih, b_hh)
+    def __init__(self, n_state, e=1e-5):
+        super(LayerNorm, self).__init__()
+        self.g = nn.Parameter(torch.ones(n_state))
+        self.b = nn.Parameter(torch.zeros(n_state))
+        self.e = e
 
-    m = F.linear(input, w_mih) * F.linear(hx, w_mhh)
-    gates = F.linear(input, w_ih, b_ih) + F.linear(m, w_hh, b_hh)
-
-    ingate = torch.sigmoid(gates[:, :hidden_size])
-    forgetgate = torch.sigmoid(gates[:, hidden_size:hidden_size * 2])
-    cellgate = torch.tanh(gates[:, hidden_size * 2:hidden_size*3])
-    outgate = torch.sigmoid(gates[:, -hidden_size:])
-    
-    cy = (forgetgate * cx) + (ingate * cellgate)
-    hy = outgate * torch.tanh(cy)
-    return hy, cy
+    def forward(self, x):
+        u = x.mean(-1, keepdim=True)
+        s = (x - u).pow(2).mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.e)
+        return self.g * x + self.b
 
 class mLSTMCell(nn.Module):
     def __init__(self, input_size, hidden_size):
@@ -49,6 +39,11 @@ class mLSTMCell(nn.Module):
         self.b_ih = nn.Parameter(torch.Tensor(self.gate_size))
         self.b_hh = nn.Parameter(torch.Tensor(self.gate_size))
 
+        self.ln_gate = LayerNorm(self.gate_size)
+        self.ln_out = LayerNorm(self.hidden_size)
+
+        self.act = F.relu
+
         self.reset_parameters()
     
     def reset_parameters(self):
@@ -64,7 +59,21 @@ class mLSTMCell(nn.Module):
         if hidden is None:
             hidden = torch.zeros((2, input.size(0), self.hidden_size), dtype=input.dtype, device=input.device)
 
-        hy, cy = fwd_mLSTMCell(self.hidden_size, input, hidden, self.w_ih, self.w_hh, self.w_mih, self.w_mhh, self.b_ih, self.b_hh)
+        hx, cx = hidden
+        m = F.linear(input, self.w_mih) * F.linear(hx, self.w_mhh)
+        gates = F.linear(input, self.w_ih, self.b_ih) + F.linear(m, self.w_hh, self.b_hh)
+
+        # TODO: Layer norm should be applied separately per gate
+        gates = self.ln_gate(gates)
+
+        sig_gates = torch.sigmoid(gates[:, :-self.hidden_size])
+        cellgate = self.act(gates[:, -self.hidden_size:])
+        ingate = sig_gates[:, :self.hidden_size]
+        forgetgate = sig_gates[:, self.hidden_size:self.hidden_size * 2]
+        outgate = sig_gates[:, -self.hidden_size:]
+
+        cy = (forgetgate * cx) + (ingate * cellgate)
+        hy = outgate * self.act(self.ln_out(cy))
         return hy, torch.stack((hy, cy), dim=0)
 
 class DeepJ(nn.Module):
@@ -76,8 +85,15 @@ class DeepJ(nn.Module):
         self.num_units = num_units
 
         self.encoder = nn.Embedding(VOCAB_SIZE, num_units)
+        self.decoder = nn.Linear(num_units, VOCAB_SIZE)
+        self.ln = LayerNorm(VOCAB_SIZE)
+
         # RNN
         self.rnn = mLSTMCell(num_units, num_units)
+
+    # def decoder(self, x):
+    #     # Decoder and encoder weights are tied
+    #     return F.linear(x, self.encoder.weight)
 
     def forward_train(self, x,  memory=None):
         assert len(x.size()) == 2
@@ -90,12 +106,8 @@ class DeepJ(nn.Module):
         
         x = torch.stack(ys, dim=1)
 
-        x = self.decoder(x)
+        x = self.ln(self.decoder(x))
         return x, memory
-    
-    def decoder(self, x):
-        # Decoder and encoder weights are tied
-        return F.linear(x, self.encoder.weight)
 
     def forward(self, x, memory=None, temperature=1):
         """ Returns the probability of outputs.  """
