@@ -99,5 +99,32 @@ class DeepJ(nn.Module):
         else:
             x, memory = self.forward_rnns(x, memory)
 
+        hidden = x
         x = self.decoder(x)
-        return x, memory
+        return x, memory, hidden
+
+class Discriminator(nn.Module):
+    def __init__(self, num_units=const.NUM_UNITS, num_layers=1):
+        super().__init__()
+        self.num_units = num_units
+
+        # RNN
+        self.rnn = nn.GRU(num_units, num_units, num_layers, batch_first=True, bidirectional=True)
+        
+        self.h1 = nn.Linear(num_units * 2, num_units)
+        self.attn = nn.Linear(num_units, 1)
+        self.h2 = nn.Linear(num_units, num_units)
+
+        self.output = nn.Linear(num_units, 1)
+
+    def forward(self, x):
+        x, _ = self.rnn(x)
+        x = F.relu(self.h1(x))
+        x = F.relu(self.h2(x))
+
+        # Self-attention over time
+        attn_weights = torch.softmax(self.attn(x).float(), dim=1)
+        x = (x.float() * attn_weights).sum(dim=1).to(x)
+
+        x = self.output(x)
+        return x.squeeze(-1)

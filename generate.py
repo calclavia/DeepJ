@@ -12,7 +12,33 @@ from dataset import *
 from constants import *
 from util import *
 from model import DeepJ
+    
+def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, temperature=1):
+    """
+    Generates samples up to max length
+    """
+    outputs = []
+    memory = None
 
+    for _ in range(max_len):
+        if len(outputs) == 0:
+            prev_token = start_token
+        else:
+            prev_token = outputs[-1][0]
+        
+        logits, memory, hidden = model(prev_token, memory)
+        probs = torch.softmax(logits / temperature, dim=-1)
+
+        # Sample action
+        sampled_token = probs.multinomial(1).detach().squeeze(-1)
+        
+        outputs.append((sampled_token, hidden))
+        
+        # TODO: Re-enable this?
+        # if sampled_token == const.TOKEN_EOS:
+        #     break
+    return zip(*outputs)
+    
 class Generation():
     """
     Represents a music generation sequence
