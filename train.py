@@ -133,7 +133,7 @@ def compute_metrics(model, data, total_step):
 
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
-    parser.add_argument('--path', help='Load existing model?')
+    parser.add_argument('--load', help='Load existing model?')
     parser.add_argument('--batch-size', default=64, type=int, help='Size of the batch')
     parser.add_argument('--lr', default=3e-4, type=float, help='Learning rate')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
@@ -142,8 +142,8 @@ def main():
     print('=== Loading Model ===')
     model = DeepJ().cuda().half()
 
-    if args.path:
-        model.load_state_dict(torch.load(args.path))
+    if args.load:
+        model.load_state_dict(torch.load(args.load))
         print('Restored model from checkpoint.')
 
     # Construct optimizer
