@@ -22,6 +22,8 @@ SCALE_FACTOR = 2 ** 10
 VOCAB_SIZE = NUM_TOKENS#1024
 NUM_UNITS = 512
 
+RANDOM_TRANSPOSE = 8
+
 # Style
 STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']
 NUM_STYLES = len(STYLES)

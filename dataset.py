@@ -55,9 +55,10 @@ class MusicDataset(Dataset):
         print('Loaded {} MIDI file(s) with average length {}'.format(len(self.seqs), sum(len(s) for s in self.seqs) / len(self.seqs)))
 
     def __len__(self):
-        return len(self.seqs)
+        return len(self.seqs) * RANDOM_TRANSPOSE
 
     def __getitem__(self, idx):
+        idx = idx // RANDOM_TRANSPOSE
         seq = self.seqs[idx]
 
         # Random subsequence
@@ -68,7 +69,7 @@ class MusicDataset(Dataset):
         seq = transpose(seq)
         return torch.LongTensor(list(seq))
             
-def transpose(sequence, amount=5):
+def transpose(sequence, amount=RANDOM_TRANSPOSE):
     """ A generator that represents the sequence. """
     # Transpose by *amount* semitones at most
     transpose = random.randint(-amount, amount)

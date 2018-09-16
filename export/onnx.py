@@ -1,7 +1,18 @@
 import argparse
 import torch, torch.onnx
+import torch.nn as nn
 import constants as const
 from model import DeepJ
+
+class SoftmaxWrapper(nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, *args):
+        x, memory = self.module(*args)
+        x = torch.softmax(x, dim=-1)
+        return x, memory
 
 def main():
     parser = argparse.ArgumentParser(description='Exports a model to ONNX format.')
@@ -13,8 +24,9 @@ def main():
     print('Loading Pytorch model')
     model = DeepJ()
     model.load_state_dict(torch.load(args.model, map_location='cpu'))
+    model = SoftmaxWrapper(model)
 
-    evt_input = torch.zeros((1, 1), dtype=torch.long)
+    evt_input = torch.zeros((1,), dtype=torch.long)
     dummy_output, states = model(evt_input, None)
     
     print('Dummy output:', dummy_output)
