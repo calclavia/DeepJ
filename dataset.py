@@ -26,8 +26,6 @@ class MusicDataset(Dataset):
         """    
         Loads all MIDI files from provided files.
         """
-        self.sp = spm.SentencePieceProcessor()
-        self.sp.Load("out/token.model")
         self.seqs = []
         ignore_count = 0
         
