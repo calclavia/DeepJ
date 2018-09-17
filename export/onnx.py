@@ -10,7 +10,7 @@ class SoftmaxWrapper(nn.Module):
         self.module = module
 
     def forward(self, *args):
-        x, memory = self.module(*args)
+        x, memory, _ = self.module(*args)
         x = torch.softmax(x, dim=-1)
         return x, memory
 
@@ -24,7 +24,7 @@ def main():
     print('Loading Pytorch model')
     model = DeepJ()
     model.load_state_dict(torch.load(args.model, map_location='cpu'))
-    model = SoftmaxWrapper(model)
+    model = SoftmaxWrapper(model).float().eval()
 
     evt_input = torch.zeros((1,), dtype=torch.long)
     dummy_output, states = model(evt_input, None)

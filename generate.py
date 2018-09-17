@@ -13,7 +13,7 @@ from constants import *
 from util import *
 from model import DeepJ
     
-def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, temperature=1):
+def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, temperature=1, auto_break=False):
     """
     Generates samples up to max length
     """
@@ -34,56 +34,10 @@ def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, te
         
         outputs.append((sampled_token, hidden))
         
-        # TODO: Re-enable this?
-        # if sampled_token == const.TOKEN_EOS:
-        #     break
+        if auto_break and sampled_token == const.TOKEN_EOS:
+            break
+
     return zip(*outputs)
-    
-class Generation():
-    """
-    Represents a music generation sequence
-    """
-
-    def __init__(self, model, style=None, default_temp=1):
-        self.model = model
-        self.style = style
-
-        # Temperature of generation
-        self.default_temp = default_temp
-        self.temperature = self.default_temp
-
-        # Model parametrs
-        self.outputs = [const.TOKEN_EOS]
-        self.state = None
-
-    def step(self):
-        """
-        Generates the next set of beams
-        """
-        # Iterate through the beam
-        prev_event = torch.tensor(self.outputs[-1])
-        
-        prev_event = prev_event.unsqueeze(0)
-        logits, self.state = self.model(prev_event, self.state)
-        probs = torch.softmax(logits / self.temperature, dim=-1)
-
-        # Sample action
-        output = probs.multinomial(1)
-        event = output.item()
-        
-        self.outputs.append(event)
-
-    def generate(self, seq_len, show_progress=True):
-        self.model.eval()
-        r = trange(seq_len) if show_progress else range(seq_len)
-
-        for _ in r:
-            self.step()
-
-            if self.outputs[-1] == const.TOKEN_EOS:
-                break
-
-        return np.array(self.outputs)
 
 def main():
     parser = argparse.ArgumentParser(description='Generates music.')
@@ -123,10 +77,9 @@ def main():
         for style in styles:
             fname = args.fname + str(list(style))
             print('File: {}'.format(fname))
-            generation = Generation(model, style=style, default_temp=args.temperature)
-            seq = generation.generate(seq_len=args.length)
-            print(seq)
-            midi_file = tokens_to_midi(seq.tolist())
+            seq, *_ = generate(model, max_len=args.length, temperature=args.temperature, auto_break=True)
+            seq = [x.item() for x in seq]
+            midi_file = tokens_to_midi(seq)
             midi_file.save('out/samples/' + fname + '.mid')
 
             if args.synth:
