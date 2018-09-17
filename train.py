@@ -33,12 +33,12 @@ def plot_graph(training_loss, validation_loss, name):
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(args, model, d_model, train_loader, val_loader, optimizer, plot=True):
+def train(args, model, d_model, train_loader, val_loader, optimizer, d_optimizer, plot=True):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
     model_save = model
-    model = nn.DataParallel(model)
+
     # Number of training steps per epoch
     epoch = 1
     total_step = 1
@@ -55,12 +55,14 @@ def train(args, model, d_model, train_loader, val_loader, optimizer, plot=True):
 
         with tqdm(train_loader) as t:
             t.set_description('Epoch {}'.format(epoch))
+            avg_d_acc = 0
             
             for data in t:
-                metrics = train_step(model, d_model, data, optimizer, total_step)
+                metrics = train_step(model, d_model, data, optimizer, d_optimizer, avg_d_acc, total_step)
 
                 total_metrics += metrics
                 avg_metrics = total_metrics / step
+                avg_d_acc = avg_metrics[2]
                 t.set_postfix(mle_loss=avg_metrics[0], g_loss=avg_metrics[1], d_acc=avg_metrics[2])
 
                 step += 1
@@ -93,11 +95,12 @@ def train(args, model, d_model, train_loader, val_loader, optimizer, plot=True):
 
         epoch += 1
 
-def train_step(model, d_model, data, optimizer, total_step):
+def train_step(model, d_model, data, optimizer, d_optimizer, avg_d_acc, total_step):
     """
     Trains the model on a single batch of sequence.
     """
     model.train()
+    d_model.train()
 
     # Convert all tensors into variables
     seqs = data
@@ -110,7 +113,7 @@ def train_step(model, d_model, data, optimizer, total_step):
     ## Train the discriminator
     # Generate in teacher Forcing Mode
     logits, _, hidden_tf = model(seq_inputs)
-
+    
     # Gereate in free-running mode
     _, hidden_fr = generate(model, start_token=seq_inputs[:, 0])
     hidden_fr = torch.stack(hidden_fr, dim=1)
@@ -122,33 +125,40 @@ def train_step(model, d_model, data, optimizer, total_step):
     d_logits = d_model(d_inputs).float()
     d_acc = ((d_logits > 0).long() == d_targets).float().mean()
 
-    d_loss = bce_loss(d_logits, d_targets.float())
+    if avg_d_acc < 0.99:
+        d_loss = bce_loss(d_logits, d_targets.float())
 
-    # Back-propagate
-    optimizer.zero_grad()
-    optimizer.backward(d_loss)
-    optimizer.clip_master_grads(GRADIENT_CLIP)
-    optimizer.step()
+        # Back-propagate
+        d_optimizer.zero_grad()
+        d_optimizer.backward(d_loss)
+        d_optimizer.clip_master_grads(GRADIENT_CLIP)
+        d_optimizer.step()
 
     ## Train the generator
+    # Compute the loss.
+    # Note that we need to convert this back into a float because it is a large summation.
+    mle_loss = cce_loss(logits.contiguous().view(-1, VOCAB_SIZE).float(), seq_targets.contiguous().view(-1).data)
+    g_loss = mle_loss
+
     # Freeze discriminator weights
     for p in d_model.parameters():
         p.requires_grad = False
 
-    # Compute the loss.
-    # Note that we need to convert this back into a float because it is a large summation.
-    mle_loss = cce_loss(logits.contiguous().view(-1, VOCAB_SIZE).float(), seq_targets.contiguous().view(-1).data)
-    
-    # Fool the discriminator
-    d_inputs = torch.cat((hidden_fr, hidden_tf), dim=0)
+    if avg_d_acc > 0.75:
+        # Fool the discriminator
+        d_inputs = torch.cat((hidden_fr, hidden_tf), dim=0)
 
-    d_logits = d_model(d_inputs).float()
+        d_logits = d_model(d_inputs).float()
+        d_preds = torch.sigmoid(d_logits)
 
-    fr_d_preds = torch.sigmoid(d_logits[:hidden_fr.size(0)])
-    tf_d_preds = torch.sigmoid(d_logits[-hidden_tf.size(0):])
-    fool_loss = -torch.mean(torch.log(fr_d_preds) + torch.log(1 - tf_d_preds))
+        fr_d_preds = d_preds[:hidden_fr.size(0)]
+        tf_d_preds = d_preds[-hidden_tf.size(0):]
+        fool_loss = -torch.mean(torch.log(fr_d_preds) + torch.log(1 - tf_d_preds))
+        
+        # Use a boundary-seeking objective to have the discrminator = 0.5
+        # fool_loss = 0.5 * torch.mean((torch.log(d_preds) - torch.log(1 - d_preds)) ** 2)
 
-    g_loss = mle_loss + fool_loss
+        g_loss = g_loss + fool_loss
 
     # Back-propagate
     optimizer.zero_grad()
@@ -189,16 +199,16 @@ def main():
     args = parser.parse_args()
 
     print('=== Loading Model ===')
-    model = DeepJ().cuda().half()
-    d_model = Discriminator().cuda().half()
+    model = DeepJ().cuda()#.half()
+    d_model = Discriminator().cuda()#.half()
 
     if args.load:
         model.load_state_dict(torch.load(args.load))
         print('Restored model from checkpoint.')
 
     # Construct optimizer
-    optimizer = optim.Adam(list(model.parameters()) + list(d_model.parameters()), lr=args.lr)
-    optimizer = FP16_Optimizer(optimizer, static_loss_scale=256)
+    optimizer = FP16_Optimizer(optim.Adam(model.parameters(), lr=args.lr), static_loss_scale=2**10)
+    d_optimizer = FP16_Optimizer(optim.Adam(d_model.parameters(), lr=args.lr), static_loss_scale=2**10)
 
     num_params = sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 
@@ -221,7 +231,7 @@ def main():
         break
 
     print('=== Training ===')
-    train(args, model, d_model, train_loader, val_loader, optimizer, plot=not args.noplot)
+    train(args, model, d_model, train_loader, val_loader, optimizer, d_optimizer, plot=not args.noplot)
 
 if __name__ == '__main__':
     main()

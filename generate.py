@@ -13,7 +13,7 @@ from constants import *
 from util import *
 from model import DeepJ
     
-def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, temperature=1, auto_break=False):
+def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, temperature=1):
     """
     Generates samples up to max length
     """
@@ -27,15 +27,15 @@ def generate(model, start_token=torch.tensor([0]), max_len=const.SEQ_LEN - 1, te
             prev_token = outputs[-1][0]
         
         logits, memory, hidden = model(prev_token, memory)
-        probs = torch.softmax(logits / temperature, dim=-1)
+        probs = torch.softmax(logits.float() / temperature, dim=-1)
 
         # Sample action
+        if torch.isnan(probs).any():
+            raise Exception('Probability contains nan', probs)
+        
         sampled_token = probs.multinomial(1).detach().squeeze(-1)
         
         outputs.append((sampled_token, hidden))
-        
-        if auto_break and sampled_token == const.TOKEN_EOS:
-            break
 
     return zip(*outputs)
 
@@ -77,7 +77,7 @@ def main():
         for style in styles:
             fname = args.fname + str(list(style))
             print('File: {}'.format(fname))
-            seq, *_ = generate(model, max_len=args.length, temperature=args.temperature, auto_break=True)
+            seq, *_ = generate(model, max_len=args.length, temperature=args.temperature)
             seq = [x.item() for x in seq]
             midi_file = tokens_to_midi(seq)
             midi_file.save('out/samples/' + fname + '.mid')

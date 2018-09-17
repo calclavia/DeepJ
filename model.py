@@ -80,7 +80,7 @@ class DeepJ(nn.Module):
 
         for rnn, m in zip(self.rnns, memory):
             h, c = rnn(x, m)
-            x = x + h
+            x = h
             new_memory.append(torch.stack((h, c), dim=0))
 
         return x, torch.stack(new_memory, dim=0)
