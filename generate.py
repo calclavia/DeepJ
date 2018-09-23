@@ -100,6 +100,7 @@ def main():
             generation = Generation(model, style=style, default_temp=args.temperature)
             seq = generation.generate(seq_len=args.length)
             print(seq)
+            os.makedirs('out/samples', exist_ok=True)
             midi_file = tokens_to_midi(seq.tolist())
             midi_file.save('out/samples/' + fname + '.mid')
 

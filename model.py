@@ -49,13 +49,13 @@ class mLSTMCell(nn.Module):
         m = F.linear(input, self.w_mih) * F.linear(hx, self.w_mhh)
         igates = F.linear(input, self.w_ih, self.b_ih) + F.linear(m, self.w_hh, self.b_hh)
 
-        ingate = F.sigmoid(igates[:, :self.hidden_size])
-        forgetgate = F.sigmoid(igates[:, self.hidden_size:self.hidden_size * 2])
-        cellgate = F.tanh(igates[:, self.hidden_size * 2:self.hidden_size * 3])
-        outgate = F.sigmoid(igates[:, -self.hidden_size:])
+        ingate = torch.sigmoid(igates[:, :self.hidden_size])
+        forgetgate = torch.sigmoid(igates[:, self.hidden_size:self.hidden_size * 2])
+        cellgate = torch.tanh(igates[:, self.hidden_size * 2:self.hidden_size * 3])
+        outgate = torch.sigmoid(igates[:, -self.hidden_size:])
         
         cy = (forgetgate * cx) + (ingate * cellgate)
-        hy = outgate * F.tanh(cy)
+        hy = outgate * torch.tanh(cy)
         return hy, cy
 
 class DeepJ(nn.Module):
