@@ -4,7 +4,6 @@ matplotlib
 numpy
 mido
 http://download.pytorch.org/whl/cu92/torch-0.4.1-cp36-cp36m-linux_x86_64.whl
-sentencepiece
 git+https://github.com/NVIDIA/apex
 tensorflow
 # Note: Install onnx first from Conda Forge
