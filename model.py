@@ -6,63 +6,84 @@ import constants as const
 from util import *
 import numpy as np
 import math
-from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
 
-class mLSTMCell(nn.Module):
+class SRU(nn.Module):
     def __init__(self, input_size, hidden_size):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.gate_size = 4 * self.hidden_size
 
-        # Weights
-        self.w_ih = nn.Parameter(torch.Tensor(self.gate_size, self.input_size))
-        self.w_hh = nn.Parameter(torch.Tensor(self.gate_size, self.hidden_size))
-        self.w_mih = nn.Parameter(torch.Tensor(self.hidden_size, self.input_size))
-        self.w_mhh = nn.Parameter(torch.Tensor(self.hidden_size, self.hidden_size))
+        self.w = nn.Parameter(torch.Tensor(self.hidden_size * 3, self.input_size))
 
-        # Biases
-        self.b_ih = nn.Parameter(torch.Tensor(self.gate_size))
-        self.b_hh = nn.Parameter(torch.Tensor(self.gate_size))
+        self.b_f = nn.Parameter(torch.Tensor(self.hidden_size))
+        self.b_r = nn.Parameter(torch.Tensor(self.hidden_size))
 
+        self.v_f = nn.Parameter(torch.Tensor(self.hidden_size))
+        self.v_r = nn.Parameter(torch.Tensor(self.hidden_size))
+
+        self.scaling = math.sqrt(3)
         self.reset_parameters()
     
     def reset_parameters(self):
-        stdev = 1.0 / math.sqrt(self.hidden_size)
-        for param in self.parameters():
-            param.data.normal_(-stdev, stdev)
+        std = math.sqrt(3 / self.w.size(0))
+        self.w.data.uniform_(-std, std)
 
-    def forward(self, input, hidden):
-        if hidden is None:
-            hidden = torch.zeros((2, input.size(0), self.hidden_size), dtype=input.dtype, device=input.device)
+        self.b_f.data.zero_()
+        self.b_r.data.zero_()
 
-        hx, cx = hidden
+        self.v_f.data.zero_()
+        self.v_r.data.zero_()
 
-        if input.is_cuda:
-            igates = F.linear(input, self.w_ih)
-            m = F.linear(input, self.w_mih) * F.linear(hx, self.w_mhh)
-            hgates = F.linear(m, self.w_hh)
+    def forward(self, x, c=None):
+        """
+        Args:
+            x: [batch, seq_len, input_size]
+        """
+        seq_input = len(x.size()) == 3
+        batch_size = x.size(0)
+        assert self.input_size == x.size(-1)
 
-            state = fusedBackend.LSTMFused.apply
-            return state(igates, hgates, cx, self.b_ih, self.b_hh)
+        wx = F.linear(x, self.w)
+        wf_x = wx[..., :self.hidden_size] + self.b_f
+        w_x = wx[..., self.hidden_size:self.hidden_size * 2]
+        wr_x = wx[..., -self.hidden_size:] + self.b_r
+
+        if c is None:
+            c = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
         
-        m = F.linear(input, self.w_mih) * F.linear(hx, self.w_mhh)
-        igates = F.linear(input, self.w_ih, self.b_ih) + F.linear(m, self.w_hh, self.b_hh)
+        if seq_input:
+            all_cs = [c]
 
-        ingate = torch.sigmoid(igates[:, :self.hidden_size])
-        forgetgate = torch.sigmoid(igates[:, self.hidden_size:self.hidden_size * 2])
-        cellgate = torch.tanh(igates[:, self.hidden_size * 2:self.hidden_size * 3])
-        outgate = torch.sigmoid(igates[:, -self.hidden_size:])
-        
-        cy = (forgetgate * cx) + (ingate * cellgate)
-        hy = outgate * torch.tanh(cy)
-        return hy, cy
+            for i in range(x.size(1)):
+                c = self.recurrent(wf_x[:, i], w_x[:, i], c)
+                all_cs.append(c)
+
+            all_cs = torch.stack(all_cs, dim=1)
+
+            h = self.highway(wr_x, x, all_cs[:, :-1], all_cs[:, 1:])
+        else:
+            prev_c = c
+            c = self.recurrent(wf_x, w_x, c)
+
+            h = self.highway(wr_x, x, prev_c, c)
+        return h, c
+    
+    def recurrent(self, wf_x, w_x, c):
+        f = torch.sigmoid(wf_x + self.v_f * c)
+        c = f * (c - w_x) + w_x
+        return c
+
+    def highway(self, wr_x, x, prev_c, c):
+        r = torch.sigmoid(wr_x + self.v_r * prev_c)
+        x = x * self.scaling
+        h = r * (c - x) + x
+        return h
 
 class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=const.NUM_UNITS, num_layers=3):
+    def __init__(self, num_units=const.NUM_UNITS, num_layers=5):
         super().__init__()
         self.num_units = num_units
 
@@ -70,8 +91,8 @@ class DeepJ(nn.Module):
         self.decoder = nn.Linear(num_units, VOCAB_SIZE)
 
         # RNN
-        self.rnns = nn.ModuleList([mLSTMCell(num_units, num_units) for _ in range(num_layers)])
-
+        self.rnns = nn.ModuleList([SRU(num_units, num_units) for _ in range(num_layers)])
+   
     def forward_rnns(self, x, memory):
         if memory is None:
             memory = tuple(None for _ in self.rnns)
@@ -79,25 +100,15 @@ class DeepJ(nn.Module):
         new_memory = []
 
         for rnn, m in zip(self.rnns, memory):
-            h, c = rnn(x, m)
-            x = x + h
-            new_memory.append(torch.stack((h, c), dim=0))
+            x, c = rnn(x, m)
+            new_memory.append(c)
 
         return x, torch.stack(new_memory, dim=0)
 
     def forward(self, x, memory=None):
-        seq_input = len(x.size()) == 2
         x = self.encoder(x)
 
-        if seq_input:
-            ys = []
-            for t in range(x.size(1)):
-                y, memory = self.forward_rnns(x[:, t], memory)
-                ys.append(y)
-            
-            x = torch.stack(ys, dim=1)
-        else:
-            x, memory = self.forward_rnns(x, memory)
+        x, memory = self.forward_rnns(x, memory)
 
         x = self.decoder(x)
         return x, memory

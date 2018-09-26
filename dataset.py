@@ -19,8 +19,6 @@ import midi_io
 from util import *
 import constants as const
 
-import sentencepiece as spm
-
 class MusicDataset(Dataset):
     def __init__(self, data_files):
         """    

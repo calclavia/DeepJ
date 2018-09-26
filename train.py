@@ -102,7 +102,6 @@ def train_step(model, data, optimizer, total_step):
     # Zero out the gradient
     optimizer.zero_grad()
     optimizer.backward(loss)
-    optimizer.clip_master_grads(GRADIENT_CLIP)
     optimizer.step()
     return metrics
 
@@ -134,8 +133,8 @@ def compute_metrics(model, data, total_step):
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--load', help='Load existing model?')
-    parser.add_argument('--batch-size', default=64, type=int, help='Size of the batch')
-    parser.add_argument('--lr', default=3e-4, type=float, help='Learning rate')
+    parser.add_argument('--batch-size', default=128, type=int, help='Size of the batch')
+    parser.add_argument('--lr', default=5e-4, type=float, help='Learning rate')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     args = parser.parse_args()
 
@@ -148,7 +147,7 @@ def main():
 
     # Construct optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    optimizer = FP16_Optimizer(optimizer, static_loss_scale=256)
+    optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
 
     num_params = sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 
