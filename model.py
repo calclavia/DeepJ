@@ -14,9 +14,7 @@ class SRU(nn.Module):
         self.hidden_size = hidden_size
 
         self.w = nn.Parameter(torch.Tensor(self.hidden_size * 3, self.input_size))
-
-        self.b_f = nn.Parameter(torch.Tensor(self.hidden_size))
-        self.b_r = nn.Parameter(torch.Tensor(self.hidden_size))
+        self.b = nn.Parameter(torch.Tensor(self.hidden_size * 3))
 
         self.v_f = nn.Parameter(torch.Tensor(self.hidden_size))
         self.v_r = nn.Parameter(torch.Tensor(self.hidden_size))
@@ -27,9 +25,7 @@ class SRU(nn.Module):
     def reset_parameters(self):
         std = math.sqrt(3 / self.w.size(0))
         self.w.data.uniform_(-std, std)
-
-        self.b_f.data.zero_()
-        self.b_r.data.zero_()
+        self.b.data.zero_()
 
         self.v_f.data.zero_()
         self.v_r.data.zero_()
@@ -43,10 +39,10 @@ class SRU(nn.Module):
         batch_size = x.size(0)
         assert self.input_size == x.size(-1)
 
-        wx = F.linear(x, self.w)
-        wf_x = wx[..., :self.hidden_size] + self.b_f
+        wx = F.linear(x, self.w, self.b)
+        wf_x = wx[..., :self.hidden_size]
         w_x = wx[..., self.hidden_size:self.hidden_size * 2]
-        wr_x = wx[..., -self.hidden_size:] + self.b_r
+        wr_x = wx[..., -self.hidden_size:]
 
         if c is None:
             c = torch.zeros(batch_size, self.hidden_size, dtype=x.dtype, device=x.device)
@@ -83,7 +79,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=const.NUM_UNITS, num_layers=5):
+    def __init__(self, num_units=const.NUM_UNITS, num_layers=8):
         super().__init__()
         self.num_units = num_units
 
