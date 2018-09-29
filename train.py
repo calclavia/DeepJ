@@ -115,14 +115,14 @@ def compute_metrics(model, data, total_step):
     Trains the model on a single batch of sequence.
     """
     # Convert all tensors into variables
-    seqs = data
+    seqs, seq_id = data
 
     # Feed it to the model
     seqs = seqs.cuda()
     seq_inputs = seqs[:, :-1]
     seq_targets = seqs[:, 1:]
 
-    logits, _ = model(seq_inputs)
+    logits, _ = model(seq_inputs, seq_id)
 
     # Compute the loss.
     # Note that we need to convert this back into a float because it is a large summation.
@@ -166,7 +166,7 @@ def main():
     # Outputs a training sample to check if training data sounds right.
     from midi_io import tokens_to_midi
     for i, seq in enumerate(train_loader):
-        tokens_to_midi(seq[0].cpu().numpy()).save('out/train_seq_{}'.format(i))
+        tokens_to_midi(seq[0][0].cpu().numpy()).save('out/train_seq_{}.mid'.format(i))
         break
 
     print('=== Training ===')

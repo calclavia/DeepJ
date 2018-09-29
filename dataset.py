@@ -65,7 +65,7 @@ class MusicDataset(Dataset):
 
         # Random transposition
         seq = transpose(seq)
-        return torch.LongTensor(list(seq))
+        return torch.LongTensor(list(seq)), torch.tensor(idx)
             
 def transpose(sequence, amount=RANDOM_TRANSPOSE):
     """ A generator that represents the sequence. """
@@ -78,26 +78,8 @@ def transpose(sequence, amount=RANDOM_TRANSPOSE):
     # Perform transposition (consider only notes)
     return (min(max(evt + transpose, TOKEN_NOTE), TOKEN_VEL) if evt >= TOKEN_NOTE and evt < TOKEN_VEL else evt for evt in sequence)
 
-def collate_fn(data):
-    """
-    Creates mini-batch tensors from the list of data.
-    
-    We should build custom collate_fn rather than using default collate_fn, 
-    because merging caption (including padding) is not supported in default.
-    Args:
-        data: list of sequences (LongTensor of shape (seq_len))
-    Returns:
-        seqs: tensor of shape (batch_size, seq_len).
-    """
-    # Sort a data list by sequence length (descending order).
-    seqs = data
-    seqs.sort(key=lambda x: len(x), reverse=True)
-    lengths = np.array([len(x) for x in seqs])
-    seqs = pad_sequence(seqs, batch_first=True, padding_value=const.EOS)
-    return seqs, lengths
-
 def get_tv_loaders(args):
-    data_files = get_all_files(const.STYLES)
+    data_files = get_all_files([const.DATA_FOLDER])
     train_files, val_files = validation_split(data_files)
     print('Training Files:', len(train_files), 'Validation Files:', len(val_files))
     return get_loader(args, train_files), get_loader(args, val_files)

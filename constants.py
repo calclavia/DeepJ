@@ -24,11 +24,8 @@ NUM_UNITS = 512
 
 RANDOM_TRANSPOSE = 4
 
-# Style
-STYLES = ['data/baroque', 'data/classical', 'data/romantic', 'data/modern']
-NUM_STYLES = len(STYLES)
-
 # Paths
+DATA_FOLDER = 'data'
 OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
 SAMPLES_DIR = 'out/samples'

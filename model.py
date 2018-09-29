@@ -62,12 +62,16 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=const.NUM_UNITS, num_layers=3):
+    def __init__(self, num_units=const.NUM_UNITS, num_seqs=1000, num_layers=3):
         super().__init__()
         self.num_units = num_units
+        self.style_units = round(math.sqrt(num_seqs))
 
         self.encoder = nn.Embedding(VOCAB_SIZE, num_units)
         self.decoder = nn.Linear(num_units, VOCAB_SIZE)
+
+        self.style_encoder = nn.Embedding(num_seqs, self.style_units)
+        self.style_linear = nn.Linear(self.style_units, num_units)
 
         # RNN
         self.rnns = nn.ModuleList([LSTMCell(num_units, num_units) for _ in range(num_layers)])
@@ -84,9 +88,16 @@ class DeepJ(nn.Module):
 
         return x, torch.stack(new_memory, dim=0)
 
-    def forward(self, x, memory=None):
+    def forward(self, x, seq_id, memory=None):
         seq_input = len(x.size()) == 2
         x = self.encoder(x)
+        style_x = self.style_linear(self.style_encoder(seq_id))
+
+        if seq_input:
+            # Broadcast across sequence
+            style_x = style_x.unsqueeze(1)
+
+        x = x + style_x
 
         if seq_input:
             ys = []
