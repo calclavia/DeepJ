@@ -102,7 +102,6 @@ def train_step(model, data, optimizer, total_step):
     # Zero out the gradient
     optimizer.zero_grad()
     optimizer.backward(loss)
-    optimizer.clip_master_grads(GRADIENT_CLIP)
     optimizer.step()
     return metrics
 
@@ -148,7 +147,7 @@ def main():
 
     # Construct optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    optimizer = FP16_Optimizer(optimizer, static_loss_scale=256)
+    optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
 
     num_params = sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
 

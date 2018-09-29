@@ -18,9 +18,9 @@ def main():
     tf_rep = prepare(model)
 
     print('ONNX output names:', tf_rep.outputs)
-    tf_outputs_names = [tf_rep.tensor_dict[output] for output in tf_rep.outputs]
+    tf_outputs = [tf_rep.tensor_dict[output] for output in tf_rep.outputs]
+    tf_outputs_names = [o.name.split(':')[0] for o in tf_outputs]
     print('TF output names:', tf_outputs_names)
-    # print('TF graph:', list(tf_rep.tensor_dict.items()))
 
     state_size = const.NUM_UNITS
     x = np.zeros((1,), dtype=np.int64)
@@ -33,7 +33,7 @@ def main():
     print('Done.')
 
     print('Exporting to TFJS...')
-    call(["tensorflowjs_converter", "/tmp/model.pb", "/tmp/tfjs", "--input_format", "tf_frozen_model", "--output_node_names", "Softmax,concat_3"])
+    call(["tensorflowjs_converter", "/tmp/model.pb", "/tmp/tfjs", "--input_format", "tf_frozen_model", "--output_node_names", ','.join(tf_outputs_names)])
     call(["tar", "-czvf", "out/tfjs.tar.gz", "-C", "/tmp/tfjs/", "."])
     print('Done.')
 
