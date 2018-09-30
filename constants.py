@@ -20,11 +20,12 @@ SEQ_LEN = 1024 + 1
 SCALE_FACTOR = 2 ** 10
 VOCAB_SIZE = NUM_TOKENS
 NUM_UNITS = 512
-NUM_SEQS = 1000 # Maximum amount of sequences the model expects
+NUM_SEQS = 2048 # Maximum amount of sequences the model expects
+STYLE_UNITS = 64
 
-MAX_LR = 5
-MIN_LR = MAX_LR / 10
-MAX_ITER = 4000
+MAX_LR = 6
+MIN_LR = MAX_LR / 20
+MAX_ITER = 3000
 
 RANDOM_TRANSPOSE = 4
 

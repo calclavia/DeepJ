@@ -154,7 +154,7 @@ def main():
             m = e / (MAX_ITER // 2)
         else:
             m = 1 - (e - (MAX_ITER // 2)) / (MAX_ITER // 2)
-        return m * (MAX_LR- MIN_LR) + const.MIN_LR
+        return max(m, 0) * (MAX_LR- MIN_LR) + const.MIN_LR
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule)
     optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)

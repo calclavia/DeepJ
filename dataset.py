@@ -20,11 +20,12 @@ from util import *
 import constants as const
 
 class MusicDataset(Dataset):
-    def __init__(self, data_files):
+    def __init__(self, file_ids, data_files):
         """    
         Loads all MIDI files from provided files.
         """
         self.seqs = []
+        self.seq_ids = []
         ignore_count = 0
         
         for f in tqdm(data_files):
@@ -42,6 +43,7 @@ class MusicDataset(Dataset):
                     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
                     np.save(cache_path, seq)
 
+                self.seq_ids.append(file_ids.index(f))
                 self.seqs.append(seq)
             except Exception as e:
                 print('Unable to load {}'.format(f), e)
@@ -56,6 +58,7 @@ class MusicDataset(Dataset):
     def __getitem__(self, idx):
         idx = idx // RANDOM_TRANSPOSE
         seq = self.seqs[idx]
+        seq_id = self.seq_ids[idx]
 
         # Random subsequence
         start_index = random.randint(0, len(seq) - 1 - const.SEQ_LEN)
@@ -63,7 +66,7 @@ class MusicDataset(Dataset):
 
         # Random transposition
         seq = transpose(seq)
-        return torch.LongTensor(list(seq)), torch.tensor(idx)
+        return torch.LongTensor(list(seq)), torch.tensor(seq_id)
             
 def transpose(sequence, amount=RANDOM_TRANSPOSE):
     """ A generator that represents the sequence. """
@@ -78,13 +81,14 @@ def transpose(sequence, amount=RANDOM_TRANSPOSE):
 
 def get_tv_loaders(args):
     data_files = get_all_files([const.DATA_FOLDER])
+    data_files = sorted(data_files)
     train_files, val_files = validation_split(data_files)
     print('Training Files:', len(train_files), 'Validation Files:', len(val_files))
-    return get_loader(args, train_files), get_loader(args, val_files)
+    return get_loader(args, data_files, train_files), get_loader(args, data_files, val_files)
 
-def get_loader(args, files):
+def get_loader(args, file_ids, files):
     print('Setup dataset...')
-    ds = MusicDataset(files)
+    ds = MusicDataset(file_ids, files)
     print('Done.')
     return torch.utils.data.DataLoader(
         dataset=ds, 
