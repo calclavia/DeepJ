@@ -17,7 +17,6 @@ class Generation():
     """
     Represents a music generation sequence
     """
-
     def __init__(self, model, style=None, default_temp=1):
         self.model = model
         self.style = style
@@ -69,35 +68,44 @@ def main():
     parser.add_argument('--synth', default=False, action='store_true', help='Synthesize output in MP3')
     args = parser.parse_args()
 
+    print('Loading model...')
+    model = DeepJ()
+    model.load_state_dict(torch.load(args.model))
+    
+    print('Computing style vectors...')
+    data_files = get_all_files([const.DATA_FOLDER])
+    style_to_vec = {}
+
+    with torch.no_grad():
+        for style_name in STYLE_NAMES:
+            seq_ids = []
+            for i, fname in enumerate(data_files):
+                if style_name in fname:
+                    seq_ids.append(i)
+            seq_ids = torch.LongTensor(seq_ids)
+            vec = model.compute_style(seq_ids.unsqueeze(0))
+            style_to_vec[style_name] = vec
+
     styles = []
 
     if args.style:
         # Custom style
-        styles = [np.mean([one_hot(i, NUM_STYLES) for i in args.style], axis=0)]
+        styles = {'custom': np.mean([style_to_vec[s] for s in args.style], axis=0)}
     else:
         # Generate all possible style
-        styles = [one_hot(i, NUM_STYLES) for i in range(len(STYLES))]
+        styles = style_to_vec
     
     print('=== Loading Model ===')
     print('Path: {}'.format(args.model))
     print('Temperature: {}'.format(args.temperature))
-    print('Styles: {}'.format(styles))
-    settings['force_cpu'] = True
-    
-    model = DeepJ()
-
-    if args.model:
-        model.load_state_dict(torch.load(args.model))
-    else:
-        print('WARNING: No model loaded! Please specify model path.')
+    print('Styles: {}'.format(styles))    
 
     print('=== Generating ===')
-
     with torch.no_grad():
-        for style in styles:
-            fname = args.fname + str(list(style))
+        for style, style_vec in styles.items():
+            fname = args.fname + '_' + style
             print('File: {}'.format(fname))
-            generation = Generation(model, style=style, default_temp=args.temperature)
+            generation = Generation(model, style=style_vec, default_temp=args.temperature)
             seq = generation.generate(seq_len=args.length)
             print(seq)
             os.makedirs('out/samples', exist_ok=True)

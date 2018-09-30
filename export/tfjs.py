@@ -24,8 +24,9 @@ def main():
 
     state_size = const.NUM_UNITS
     x = np.zeros((1,), dtype=np.int64)
+    style = np.zeros((1, 32))
     memory = np.zeros((3, 2, 1, state_size))
-    results = tf_rep.run((x, memory))
+    results = tf_rep.run((x, style, memory))
 
     print('Dummy output (TF):', results)
 

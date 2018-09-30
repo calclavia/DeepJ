@@ -62,7 +62,7 @@ class DeepJ(nn.Module):
     """
     The DeepJ neural network model architecture.
     """
-    def __init__(self, num_units=const.NUM_UNITS, num_seqs=1000, num_layers=3):
+    def __init__(self, num_units=const.NUM_UNITS, num_seqs=const.NUM_SEQS, num_layers=3):
         super().__init__()
         self.num_units = num_units
         self.style_units = round(math.sqrt(num_seqs))
@@ -91,7 +91,12 @@ class DeepJ(nn.Module):
     def forward(self, x, seq_id, memory=None):
         seq_input = len(x.size()) == 2
         x = self.encoder(x)
-        style_x = self.style_linear(self.style_encoder(seq_id))
+
+        if seq_id.dtype == torch.LongTensor or seq_id.dtype == torch.cuda.LongTensor:
+            # Use embedding matrix. Otherwise, it's already embedded.
+            seq_id = self.style_encoder(seq_id)
+        
+        style_x = self.style_linear(seq_id)
 
         if seq_input:
             # Broadcast across sequence
@@ -111,3 +116,11 @@ class DeepJ(nn.Module):
 
         x = self.decoder(x)
         return x, memory
+    
+    def compute_style(self, seq_ids):
+        """
+        Computes the style embedding vector as a mixture of sequences.
+        Args:
+            seq_ids: [Batch, Num]
+        """
+        return self.style_encoder(seq_ids).mean(dim=1)

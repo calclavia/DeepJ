@@ -20,6 +20,7 @@ SEQ_LEN = 1024 + 1
 SCALE_FACTOR = 2 ** 10
 VOCAB_SIZE = NUM_TOKENS
 NUM_UNITS = 512
+NUM_SEQS = 1000 # Maximum amount of sequences the model expects
 
 MAX_LR = 5
 MIN_LR = MAX_LR / 10
@@ -32,10 +33,4 @@ DATA_FOLDER = 'data'
 OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
 SAMPLES_DIR = 'out/samples'
-# Synthesizer sound file
-SOUND_FONT_PATH = CACHE_DIR + '/soundfont.sf2'
-SOUND_FONT_URL = 'http://zenvoid.org/audio/acoustic_grand_piano_ydp_20080910.sf2'
-
-settings = {
-    'force_cpu': False
-}
+STYLE_NAMES = ['baroque', 'classical', 'romantic', 'modern']
