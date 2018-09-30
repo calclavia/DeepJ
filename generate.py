@@ -38,7 +38,7 @@ class Generation():
         prev_event = torch.tensor(self.outputs[-1])
         
         prev_event = prev_event.unsqueeze(0)
-        logits, self.state = self.model(prev_event, self.state)
+        logits, self.state = self.model(prev_event, self.style, self.state)
         probs = torch.softmax(logits / self.temperature, dim=-1)
 
         # Sample action

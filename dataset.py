@@ -19,8 +19,6 @@ import midi_io
 from util import *
 import constants as const
 
-import sentencepiece as spm
-
 class MusicDataset(Dataset):
     def __init__(self, data_files):
         """    
@@ -94,7 +92,6 @@ def get_loader(args, files):
         shuffle=True,
         num_workers=1,
         drop_last=True
-        # collate_fn=collate_fn
     )
 
 def validation_split(seqs, split=0.2):

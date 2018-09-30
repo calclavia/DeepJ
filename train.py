@@ -31,7 +31,7 @@ def plot_graph(training_loss, validation_loss, name):
     plt.plot(validation_loss)
     plt.savefig(OUT_DIR + '/' + name)
 
-def train(args, model, train_loader, val_loader, optimizer, plot=True):
+def train(args, model, train_loader, val_loader, optimizer, scheduler, plot=True):
     """
     Trains a model on multiple seq batches by iterating through a generator.
     """
@@ -63,6 +63,8 @@ def train(args, model, train_loader, val_loader, optimizer, plot=True):
 
                 step += 1
                 total_step += 1
+                scheduler.step()
+                # print(optimizer.optimizer.param_groups[0]['lr'], metrics)
 
         train_metrics.append(avg_metrics)
 
@@ -133,8 +135,7 @@ def compute_metrics(model, data, total_step):
 def main():
     parser = argparse.ArgumentParser(description='Trains model')
     parser.add_argument('--load', help='Load existing model?')
-    parser.add_argument('--batch-size', default=64, type=int, help='Size of the batch')
-    parser.add_argument('--lr', default=3e-4, type=float, help='Learning rate')
+    parser.add_argument('--batch-size', default=256, type=int, help='Size of the batch')
     parser.add_argument('--noplot', default=False, action='store_true', help='Do not plot training/loss graphs')
     args = parser.parse_args()
 
@@ -146,7 +147,16 @@ def main():
         print('Restored model from checkpoint.')
 
     # Construct optimizer
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.SGD(model.parameters(), lr=1, momentum=0.9)
+
+    def lr_schedule(e):
+        if e < MAX_ITER // 2:
+            m = e / (MAX_ITER // 2)
+        else:
+            m = 1 - (e - (MAX_ITER // 2)) / (MAX_ITER // 2)
+        return m * (MAX_LR- MIN_LR) + const.MIN_LR
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule)
     optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
 
     num_params = sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
@@ -170,7 +180,7 @@ def main():
         break
 
     print('=== Training ===')
-    train(args, model, train_loader, val_loader, optimizer, plot=not args.noplot)
+    train(args, model, train_loader, val_loader, optimizer, scheduler, plot=not args.noplot)
 
 if __name__ == '__main__':
     main()
