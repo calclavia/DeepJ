@@ -34,4 +34,4 @@ DATA_FOLDER = 'data'
 OUT_DIR = 'out'
 CACHE_DIR = 'out/cache'
 SAMPLES_DIR = 'out/samples'
-STYLE_NAMES = ['baroque', 'classical', 'romantic', 'modern']
+STYLE_NAMES = ['baroque', 'classical', 'romantic', 'modern', 'jazz', 'ragtime']

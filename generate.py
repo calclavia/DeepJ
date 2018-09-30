@@ -74,6 +74,7 @@ def main():
     
     print('Computing style vectors...')
     data_files = get_all_files([const.DATA_FOLDER])
+    data_files = sorted(data_files)
     style_to_vec = {}
 
     with torch.no_grad():
