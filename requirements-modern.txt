@@ -1,0 +1,7 @@
+# Modern stack (Python 3.10+). Use scripts/setup.sh to install python-midi first.
+tensorflow>=2.12,<2.17
+numpy>=1.23,<2
+joblib>=1.2
+tqdm>=4.65
+h5py>=3.8
+midi>=0.2.3
